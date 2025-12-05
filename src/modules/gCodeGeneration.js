@@ -1,0 +1,486 @@
+// src/modules/gCodeGeneration.js
+// G代码生成模块
+
+const { validateFeatureParameters, validateGCodeBlocks, validateGCodeSyntax, validateGCodeSafety, detectCollisions } = require('./validation');
+const { matchMaterialAndTool, recommendMachiningParameters } = require('./materialToolMatcher');
+
+// 触发G代码生成
+function triggerGCodeGeneration(project) {
+  if (!project || typeof project !== 'object') {
+    throw new Error('项目参数无效');
+  }
+
+  if (!Array.isArray(project.features)) {
+    throw new Error('项目特征列表无效');
+  }
+
+  // 按加工工艺类型对特征进行分类和排序
+  const sortedFeatures = sortFeaturesByProcess(project.features);
+  
+  // 初始化G代码块数组
+  const gCodeBlocks = [];
+
+  // 添加程序开始代码
+  const programStart = {
+    id: 'program_start',
+    type: 'program_control',
+    code: [
+      'O0001 (CNC程序 - 智能加工程序)',
+      '(根据特征类型和位置优化加工顺序)',
+      'G21 (毫米编程)',
+      'G40 (刀具半径补偿取消)',
+      'G49 (刀具长度补偿取消)',
+      'G80 (取消固定循环)',
+      'G90 (绝对编程)',
+      'G54 (工件坐标系1)',
+      'G0 X0. Y0. S500 M03 (主轴正转，500转/分钟，初始转速)'
+    ],
+    featureId: null,
+    createdAt: new Date()
+  };
+
+  // 为每个特征生成G代码
+  for (const feature of sortedFeatures) {
+    if (feature && feature.featureType) {
+      // 验证特征参数
+      const featureValidation = validateFeatureParameters(feature);
+      if (!featureValidation.valid) {
+        console.warn(`特征 ${feature.id} 验证失败:`, featureValidation.errors);
+        // 可以选择跳过无效特征或使用默认参数
+        continue;
+      }
+
+      // 将项目信息添加到特征中，以便G代码生成时使用
+      if (project.materialType) {
+        feature.project = { materialType: project.materialType };
+      }
+
+      const gCodeBlock = generateFeatureGCode(feature);
+      if (gCodeBlock) {
+        gCodeBlocks.push(gCodeBlock);
+      }
+    }
+  }
+
+  // 添加程序结束代码
+  const programEnd = {
+    id: 'program_end',
+    type: 'program_control',
+    code: [
+      'M05 (主轴停止)',
+      'M30 (程序结束)'
+    ],
+    featureId: null,
+    createdAt: new Date()
+  };
+
+  gCodeBlocks.unshift(programStart);
+  gCodeBlocks.push(programEnd);
+
+  // 验证生成的G代码
+  const gCodeValidation = validateGCodeBlocks(gCodeBlocks);
+  if (gCodeValidation.errors.length > 0) {
+    console.warn('G代码验证警告:', gCodeValidation.errors);
+  }
+
+  // 对每块G代码进行安全验证
+  for (const block of gCodeBlocks) {
+    if (Array.isArray(block.code)) {
+      const safetyValidation = validateGCodeSafety(block.code);
+      if (safetyValidation.errors.length > 0) {
+        console.error(`G代码块 ${block.id} 安全验证失败:`, safetyValidation.errors);
+        // 如果安全验证失败，可以选择抛出错误或标记为不安全
+        // 这里我们记录错误但继续处理
+      }
+      if (safetyValidation.warnings.length > 0) {
+        console.warn(`G代码块 ${block.id} 安全验证警告:`, safetyValidation.warnings);
+      }
+
+      // 进行碰撞检测
+      const collisionDetection = detectCollisions(block.code);
+      if (collisionDetection.hasCollisions) {
+        console.error(`G代码块 ${block.id} 碰撞检测失败:`, collisionDetection.collisions);
+        // 如果有碰撞，可以标记该程序块为不安全
+        if (!block.metadata) block.metadata = {};
+        block.metadata.hasCollisionRisk = true;
+        block.metadata.collisionIssues = collisionDetection.collisions;
+      }
+    }
+  }
+
+  return gCodeBlocks;
+}
+
+// 根据加工工艺类型对特征进行排序
+function sortFeaturesByProcess(features) {
+  if (!Array.isArray(features)) {
+    return [];
+  }
+
+  // 按加工工艺优先级排序：先加工孔类特征，再加工铣削特征
+  const processOrder = {
+    'hole': 1,           // 孔加工
+    'counterbore': 1,    // 沉头孔加工
+    'thread': 1,         // 螺纹加工
+    'pocket': 2,         // 口袋铣削
+    'slot': 2,           // 槽铣削
+    'chamfer': 3,        // 倒角
+    'fillet': 3,         // 圆角
+    'surface_finish': 4, // 表面处理
+    'tolerance': 5,      // 公差检查
+    'default': 99
+  };
+
+  // 根据工艺类型和位置进行排序
+  return [...features].sort((a, b) => {
+    const orderA = processOrder[a.featureType] || processOrder['default'];
+    const orderB = processOrder[b.featureType] || processOrder['default'];
+    
+    // 如果工艺类型相同，按X坐标排序，然后按Y坐标排序
+    if (orderA === orderB) {
+      const posA = a.baseGeometry?.center || a.baseGeometry?.start || { x: 0, y: 0 };
+      const posB = b.baseGeometry?.center || b.baseGeometry?.start || { x: 0, y: 0 };
+      
+      if (posA.x === posB.x) {
+        return posA.y - posB.y;
+      }
+      return posA.x - posB.x;
+    }
+    
+    return orderA - orderB;
+  });
+}
+
+// 生成特征G代码
+function generateFeatureGCode(feature) {
+  if (!feature || typeof feature !== 'object') {
+    return null;
+  }
+
+  if (!feature.featureType) {
+    return null;
+  }
+
+  // 如果项目中定义了材料类型，使用智能匹配
+  let recommendedParams = null;
+  if (feature.project && feature.project.materialType) {
+    try {
+      const matches = matchMaterialAndTool(feature.project.materialType, feature.featureType, feature.parameters || {});
+      if (matches && matches.length > 0) {
+        recommendedParams = matches[0].parameters;
+      }
+    } catch (error) {
+      console.warn(`材料-刀具匹配失败: ${error.message}`);
+    }
+  }
+
+  // 更新特征参数以包含推荐的加工参数
+  if (recommendedParams) {
+    if (!feature.parameters) feature.parameters = {};
+    feature.parameters.spindleSpeed = recommendedParams.spindleSpeed;
+    feature.parameters.feedRate = recommendedParams.feedRate;
+    feature.parameters.recommendedTool = recommendedParams.tool;
+  }
+
+  let gCodeLines = [];
+
+  switch (feature.featureType) {
+    case 'hole':
+      gCodeLines = generateHoleGCode(feature);
+      break;
+    case 'counterbore':
+      gCodeLines = generateCounterboreGCode(feature);
+      break;
+    case 'pocket':
+      gCodeLines = generatePocketGCode(feature);
+      break;
+    case 'slot':
+      gCodeLines = generateSlotGCode(feature);
+      break;
+    case 'chamfer':
+      gCodeLines = generateChamferGCode(feature);
+      break;
+    case 'fillet':
+      gCodeLines = generateFilletGCode(feature);
+      break;
+    case 'thread': // 螺纹特征
+      gCodeLines = generateThreadGCode(feature);
+      break;
+    case 'surface_finish': // 表面光洁度
+      gCodeLines = generateSurfaceFinishGCode(feature);
+      break;
+    case 'tolerance': // 形位公差
+      gCodeLines = generateToleranceGCode(feature);
+      break;
+    default:
+      gCodeLines = generateGenericFeatureGCode(feature);
+  }
+
+  return {
+    id: `gcode_${feature.id}`,
+    type: 'feature_operation',
+    code: gCodeLines,
+    featureId: feature.id,
+    featureType: feature.featureType,
+    parameters: { ...feature.parameters },
+    recommendedParams: recommendedParams, // 添加推荐参数
+    createdAt: new Date()
+  };
+}
+
+// 生成沉头孔的G代码（点孔、钻孔、沉孔工艺）
+function generateCounterboreGCode(feature) {
+  const params = feature.parameters || {};
+  const diameter = 'diameter' in params ? params.diameter : 5.5;  // 孔径5.5mm
+  const depth = 'depth' in params ? params.depth : 14;           // 实际加工深度14mm左右
+  const counterboreDiameter = 'counterboreDiameter' in params ? params.counterboreDiameter : 9; // 沉孔径9mm
+  const counterboreDepth = 'counterboreDepth' in params ? params.counterboreDepth : 5.5;        // 沉孔深度5.5mm
+  const useCounterbore = 'useCounterbore' in params ? params.useCounterbore : true; // 是否使用沉孔
+  
+  // 使用推荐参数或默认参数
+  const centerDrillSpindle = params.spindleSpeed ? Math.round(params.spindleSpeed * 0.8) : 1200; // 中心钻通常使用稍低转速
+  const drillSpindle = params.spindleSpeed || 800;
+  const counterboreSpindle = params.spindleSpeed ? Math.round(params.spindleSpeed * 0.7) : 600; // 沉孔使用较低转速
+  const drillFeed = params.feedRate || 100;
+  const counterboreFeed = params.feedRate ? Math.round(params.feedRate * 0.8) : 80;
+  
+  // 根据公式计算实际钻孔深度：图纸深度 + 1/3孔径 + 2mm
+  const drawingDepth = 'drawingDepth' in params ? params.drawingDepth : 10;  // 图纸深度10mm
+  const calculatedDepth = drawingDepth + diameter / 3 + 2;
+  const actualDepth = Math.round(calculatedDepth * 10) / 10;  // 保留一位小数
+  
+  const x = feature.baseGeometry.center?.x || 0;
+  const y = feature.baseGeometry.center?.y || 0;
+  
+  const gCode = [];
+  
+  // 现在处理所有沉头孔，不再限制特定坐标
+  // 注释说明此孔为加工目标
+  gCode.push(`; 加工沉头孔 - 坐标: X${x}, Y${y}`);
+  if (params.recommendedTool) {
+    gCode.push(`; 推荐刀具: ${params.recommendedTool}`);
+  }
+  
+  // 点孔操作 - 使用中心钻T01
+  gCode.push('');
+  gCode.push('(点孔操作 - 使用中心钻T01)');
+  gCode.push('T01 M06 (换1号刀: 中心钻)');
+  gCode.push(`S${centerDrillSpindle} M03 (主轴正转，${centerDrillSpindle}转/分钟)`);  // 使用推荐转速
+  gCode.push('G43 H01 Z100. (刀具长度补偿)');
+  gCode.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} (定位到孔位置)`);
+  gCode.push(`G81 G98 Z-2.0 R2.0 F50 (点孔，深度2mm)`);
+  gCode.push('G80 (取消固定循环)');
+  gCode.push('G0 Z100. (抬刀到安全高度)');
+  
+  // 钻孔操作 - 使用钻头T02
+  gCode.push('');
+  gCode.push('(钻孔操作 - 使用钻头T02)');
+  gCode.push('T02 M06 (换2号刀: 钻头)');
+  gCode.push(`S${drillSpindle} M03 (主轴正转，${drillSpindle}转/分钟)`);  // 使用推荐转速
+  gCode.push('G43 H02 Z100. (刀具长度补偿)');
+  gCode.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} (定位到孔位置)`);
+  gCode.push(`G83 G98 Z-${actualDepth.toFixed(1)} R2.0 Q2.0 F${drillFeed} (深孔钻，每次进给2mm，深度${actualDepth.toFixed(1)}mm)`);
+  gCode.push('G80 (取消固定循环)');
+  gCode.push('G0 Z100. (抬刀到安全高度)');
+  
+  // 沉孔操作 - 使用沉头刀T03
+  if (useCounterbore) {
+    gCode.push('');
+    gCode.push('(沉孔操作 - 使用沉头刀T03)');
+    gCode.push('T03 M06 (换3号刀: 沉头刀)');
+    gCode.push(`S${counterboreSpindle} M03 (主轴正转，${counterboreSpindle}转/分钟)`);  // 使用推荐转速
+    gCode.push('G43 H03 Z100. (刀具长度补偿)');
+    gCode.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} (定位到孔位置)`);
+    gCode.push(`G82 G98 Z-${counterboreDepth.toFixed(1)} R2.0 P2000 F${counterboreFeed} (沉孔，深度${counterboreDepth.toFixed(1)}mm，暂停2秒)`);
+    gCode.push('G80 (取消固定循环)');
+    gCode.push('G0 Z100. (抬刀到安全高度)');
+  }
+  
+  return gCode;
+}
+
+// 生成孔的G代码
+function generateHoleGCode(feature) {
+  const params = feature.parameters || {};
+  const diameter = 'diameter' in params ? params.diameter : 5.5;  // 默认孔径5.5mm
+  const depth = 'depth' in params ? params.depth : 14;            // 默认实际加工深度14mm
+  const toolNumber = 'toolNumber' in params ? params.toolNumber : 2;  // 默认使用钻头T02
+  
+  // 使用推荐参数或默认参数
+  const spindleSpeed = params.spindleSpeed || (toolNumber === 1 ? 1200 : toolNumber === 2 ? 800 : 600);
+  const feedRate = params.feedRate || 100;
+  
+  // 根据公式计算实际钻孔深度：图纸深度 + 1/3孔径 + 2mm
+  const drawingDepth = 'drawingDepth' in params ? params.drawingDepth : 10;  // 图纸深度10mm
+  const calculatedDepth = drawingDepth + diameter / 3 + 2;
+  const actualDepth = Math.round(calculatedDepth * 10) / 10;  // 保留一位小数
+  
+  const x = feature.baseGeometry.center?.x || 0;
+  const y = feature.baseGeometry.center?.y || 0;
+  
+  const gCode = [];
+  
+  // 现在处理所有孔，不再限制特定坐标
+  // 注释说明此孔为加工目标
+  gCode.push(`; 加工孔 - 坐标: X${x}, Y${y}`);
+  if (params.recommendedTool) {
+    gCode.push(`; 推荐刀具: ${params.recommendedTool}`);
+  }
+  
+  // 换刀并启动主轴
+  gCode.push(`T0${toolNumber} M06 (换${toolNumber}号刀)`);
+  gCode.push(`S${spindleSpeed} M03 (主轴正转，${spindleSpeed}转/分钟)`);  // 使用推荐或计算的转速
+  gCode.push(`G43 H0${toolNumber} Z100. (刀具长度补偿)`);
+  gCode.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} (定位到孔位置)`);
+  gCode.push(`G83 G98 Z-${actualDepth.toFixed(1)} R2.0 Q2.0 F${feedRate} (深孔钻，每次进给2mm，深度${actualDepth.toFixed(1)}mm)`);
+  gCode.push('G80 (取消固定循环)');
+  gCode.push('G0 Z100. (抬刀到安全高度)');
+  
+  return gCode;
+}
+
+// 生成口袋的G代码
+function generatePocketGCode(feature) {
+  const params = feature.parameters || {};
+  const width = 'width' in params ? params.width : 20;
+  const length = 'length' in params ? params.length : 20;
+  const depth = 'depth' in params ? params.depth : 10;
+  const feedRate = 'feedRate' in params ? params.feedRate : 300;
+  
+  const centerX = feature.baseGeometry.center?.x || 0;
+  const centerY = feature.baseGeometry.center?.y || 0;
+  
+  const gCode = [
+    `; 生成口袋 - 宽度: ${width}, 长度: ${length}, 深度: ${depth}`,
+    'G43 H1 ; 刀具长度补偿',
+    `G0 X${centerX - width/2} Y${centerY - length/2} ; 快速移动到口袋起点`,
+    `G0 Z2 ; 快速移动到加工起始点`,
+    `G1 Z-${depth} F${feedRate} ; 开始铣削`,
+    `G1 X${centerX + width/2} F${feedRate} ; 铣削X方向`,
+    `G1 Y${centerY + length/2} ; 铣削Y方向`,
+    `G1 X${centerX - width/2} ; 返回X方向`,
+    `G1 Y${centerY - length/2} ; 返回Y方向`,
+    'G0 Z2 ; 快速退刀'
+  ];
+  
+  return gCode;
+}
+
+// 生成槽的G代码
+function generateSlotGCode(feature) {
+  const params = feature.parameters || {};
+  const width = 'width' in params ? params.width : 5;
+  const length = 'length' in params ? params.length : 30;
+  const depth = 'depth' in params ? params.depth : 5;
+  const feedRate = 'feedRate' in params ? params.feedRate : 250;
+  
+  const startX = feature.baseGeometry.start?.x || 0;
+  const startY = feature.baseGeometry.start?.y || 0;
+  
+  const gCode = [
+    `; 生成槽 - 宽度: ${width}, 长度: ${length}, 深度: ${depth}`,
+    'G43 H1 ; 刀具长度补偿',
+    `G0 X${startX} Y${startY} ; 快速移动到槽起点`,
+    `G0 Z2 ; 快速移动到加工起始点`,
+    `G1 Z-${depth} F${feedRate} ; 开始铣槽`,
+    `G1 X${startX + length} F${feedRate} ; 铣槽`,
+    'G0 Z2 ; 快速退刀'
+  ];
+  
+  return gCode;
+}
+
+// 生成倒角的G代码
+function generateChamferGCode(feature) {
+  const params = feature.parameters || {};
+  const angle = 'angle' in params ? params.angle : 45;
+  const distance = 'distance' in params ? params.distance : 2;
+  
+  const gCode = [
+    `; 生成倒角 - 角度: ${angle}, 距离: ${distance}`,
+    `; 倒角操作通常在路径转角处进行`
+  ];
+  
+  return gCode;
+}
+
+// 生成圆角的G代码
+function generateFilletGCode(feature) {
+  const params = feature.parameters || {};
+  const radius = 'radius' in params ? params.radius : 5;
+  
+  const gCode = [
+    `; 生成圆角 - 半径: ${radius}`,
+    `; 圆角操作通常在路径转角处进行`
+  ];
+  
+  return gCode;
+}
+
+// 生成通用特征的G代码
+function generateGenericFeatureGCode(feature) {
+  return [
+    `; 通用特征操作: ${feature.featureType || 'unknown'}`,
+    '; 此特征类型暂无具体的G代码生成逻辑'
+  ];
+}
+
+// 生成螺纹的G代码
+function generateThreadGCode(feature) {
+  const params = feature.parameters || {};
+  const diameter = 'diameter' in params ? params.diameter : 6;  // 默认螺纹直径
+  const pitch = 'pitch' in params ? params.pitch : 1;          // 默认螺距
+  const depth = 'depth' in params ? params.depth : 10;         // 默认螺纹深度
+  const threadType = 'threadType' in params ? params.threadType : 'internal'; // 默认内螺纹
+  
+  const x = feature.baseGeometry?.center?.x || 0;
+  const y = feature.baseGeometry?.center?.y || 0;
+  
+  const gCode = [
+    `; 生成${threadType === 'internal' ? '内' : '外'}螺纹 - 直径: ${diameter}, 螺距: ${pitch}, 深度: ${depth}`,
+    `; 螺纹加工通常使用G33或G76指令`,
+    `G0 X${x.toFixed(3)} Y${y.toFixed(3)} ; 定位到螺纹孔位置`,
+    `G84.2 Z-${depth} F${diameter/pitch} ; 攻丝循环 (根据螺距计算进给)`,
+    'G80 ; 取消固定循环'
+  ];
+  
+  return gCode;
+}
+
+// 生成表面光洁度相关的G代码
+function generateSurfaceFinishGCode(feature) {
+  const params = feature.parameters || {};
+  const roughness = 'roughness' in params ? params.roughness : 'Ra3.2';  // 默认粗糙度
+  const operation = 'operation' in params ? params.operation : 'finish';  // 默认精加工
+  const feedRate = 'feedRate' in params ? params.feedRate : 200;         // 默认进给率
+  
+  const gCode = [
+    `; 表面光洁度要求: ${roughness}`,
+    `; 执行${operation}加工以达到要求的表面质量`,
+    `; 使用较小的进给率${feedRate}以保证表面质量`,
+    `; 通常需要使用特殊的刀具和工艺参数`
+  ];
+  
+  return gCode;
+}
+
+// 生成形位公差相关的G代码
+function generateToleranceGCode(feature) {
+  const params = feature.parameters || {};
+  const toleranceType = 'type' in params ? params.type : 'position';  // 默认位置公差
+  const toleranceValue = 'value' in params ? params.value : 0.1;      // 默认公差值
+  const datum = 'datum' in params ? params.datum : 'A';              // 默认基准
+  
+  const gCode = [
+    `; 形位公差要求: ${toleranceType}公差 ${toleranceValue}mm`,
+    `; 相对基准${datum}进行加工`,
+    `; 加工时需确保达到指定的形位精度要求`,
+    `; 可能需要使用特殊的加工工艺或检测手段`
+  ];
+  
+  return gCode;
+}
+
+module.exports = {
+  triggerGCodeGeneration
+};
