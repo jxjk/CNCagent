@@ -1,291 +1,113 @@
-// CNCagent 部署脚本 - 使用指定端口
-const { CNCStateManager } = require('./src/index');
+const { spawn, exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
-// 创建状态管理器实例
-const cncStateManager = new CNCStateManager();
-
-// 启动服务器
-const express = require('express');
-const rateLimit = require('express-rate-limit');
-const app = express();
-const BASE_PORT = 8081; // 使用一个明确未被占用的端口
-
-// 安全中间件
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15分钟
-  max: 100, // 限制每个IP 15分钟内最多100个请求
-  message: '请求过于频繁，请稍后再试'
-});
-
-app.use(limiter);
-app.use(express.json({ 
-  limit: '10mb' // 限制请求体大小
-}));
-
-// 输入验证中间件
-function validateInput(req, res, next) {
-  // 验证所有输入参数
-  if (req.body) {
-    // 检查是否包含潜在的恶意代码
-    const bodyStr = JSON.stringify(req.body);
-    const dangerousPatterns = [
-      /<script/i,
-      /javascript:/i,
-      /vbscript:/i,
-      /on\w+\s*=/i,
-      /<iframe/i,
-      /<object/i,
-      /<embed/i
-    ];
-    
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(bodyStr)) {
-        return res.status(400).json({ 
-          success: false, 
-          error: '请求包含潜在的恶意内容' 
-        });
-      }
-    }
-  }
+// 部署CNCagent应用程序
+function deployCNCagent() {
+  console.log('开始部署CNCagent应用程序...');
   
-  next();
-}
-
-app.use(validateInput);
-
-// API路由（从index.js复制）
-app.post('/api/project/new', (req, res) => {
-  try {
-    const result = cncStateManager.startNewProject();
-    res.json({ ...result, state: cncStateManager.state });
-  } catch (error) {
-    console.error('创建新项目时出错:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post('/api/project/import', async (req, res) => {
-  try {
-    const { filePath } = req.body;
-    if (!filePath) {
-      return res.status(400).json({ success: false, error: '缺少文件路径' });
-    }
-    
-    const result = await cncStateManager.handleImport(filePath);
-    res.json({ ...result, state: cncStateManager.state });
-  } catch (error) {
-    console.error('导入项目时出错:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post('/api/feature/select', (req, res) => {
-  try {
-    const { x, y } = req.body;
-    if (typeof x !== 'number' || typeof y !== 'number') {
-      return res.status(400).json({ success: false, error: '坐标必须是数字' });
-    }
-    
-    const selection = cncStateManager.handleFeatureSelection(x, y);
-    if (selection && selection.hasOwnProperty('success') && selection.success === false) {
-      return res.status(400).json(selection);
-    }
-    res.json({ success: true, selection, hasElement: !!(selection && selection.element) });
-  } catch (error) {
-    console.error('选择特征时出错:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post('/api/feature/define', (req, res) => {
-  try {
-    const { batch } = req.body; // 检查是否请求批量处理
-    let result;
-    if (batch) {
-      result = cncStateManager.startFeatureDefinitionBatch();
-      if (result && result.success === false) {
-        return res.status(400).json(result);
-      }
-      res.json({ success: Array.isArray(result), features: result });
+  // 检查是否已安装PM2，如果没有则安装
+  exec('npm list -g pm2', (error, stdout, stderr) => {
+    if (error) {
+      console.log('PM2未安装，正在全局安装PM2...');
+      const installPM2 = spawn('npm', ['install', '-g', 'pm2'], { shell: true });
+      
+      installPM2.stdout.on('data', (data) => {
+        console.log(`PM2安装输出: ${data}`);
+      });
+      
+      installPM2.stderr.on('data', (data) => {
+        console.error(`PM2安装错误: ${data}`);
+      });
+      
+      installPM2.on('close', (code) => {
+        if (code === 0) {
+          console.log('PM2安装成功');
+          startApplication();
+        } else {
+          console.error(`PM2安装失败，退出码: ${code}`);
+          console.log('使用node直接启动应用...');
+          startApplicationDirectly();
+        }
+      });
     } else {
-      result = cncStateManager.startFeatureDefinition();
-      if (result && result.success === false) {
-        return res.status(400).json(result);
-      }
-      res.json({ success: !!result, feature: result });
-    }
-  } catch (error) {
-    console.error('定义特征时出错:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post('/api/feature/type', (req, res) => {
-  try {
-    const { featureId, featureType } = req.body;
-    if (!featureId || !featureType) {
-      return res.status(400).json({ success: false, error: '缺少必要参数' });
-    }
-    
-    const result = cncStateManager.selectFeatureType(featureId, featureType);
-    if (result && result.success === false) {
-      return res.status(400).json(result);
-    }
-    res.json({ success: !!result, feature: result });
-  } catch (error) {
-    console.error('选择特征类型时出错:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post('/api/feature/variable', (req, res) => {
-  try {
-    const { featureId, dimensionId, variableName } = req.body;
-    if (!featureId || !dimensionId || !variableName) {
-      return res.status(400).json({ success: false, error: '缺少必要参数' });
-    }
-    
-    const result = cncStateManager.associateMacroVariable(featureId, dimensionId, variableName);
-    if (result && result.success === false) {
-      return res.status(400).json(result);
-    }
-    res.json({ success: !!result, feature: result });
-  } catch (error) {
-    console.error('关联宏变量时出错:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post('/api/gcode/generate', (req, res) => {
-  try {
-    const result = cncStateManager.generateGCode();
-    if (result && result.success === false) {
-      return res.status(400).json(result);
-    }
-    res.json({ success: !!result, gCodeBlocks: result });
-  } catch (error) {
-    console.error('生成G代码时出错:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post('/api/simulation/start', (req, res) => {
-  try {
-    const results = cncStateManager.runSimulation();
-    if (results && results.success === false) {
-      return res.status(400).json(results);
-    }
-    res.json({ success: !!results, results });
-  } catch (error) {
-    console.error('运行模拟时出错:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post('/api/simulation/variable', (req, res) => {
-  try {
-    const { variableValues } = req.body;
-    if (!variableValues) {
-      return res.status(400).json({ success: false, error: '缺少变量值' });
-    }
-    
-    const results = cncStateManager.runVariableDrivenSimulation(variableValues);
-    if (results && results.success === false) {
-      return res.status(400).json(results);
-    }
-    res.json({ success: !!results, results });
-  } catch (error) {
-    console.error('运行变量驱动模拟时出错:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post('/api/gcode/export', (req, res) => {
-  try {
-    const { outputPath } = req.body;
-    const gCode = cncStateManager.exportCode(outputPath);
-    if (gCode && gCode.success === false) {
-      return res.status(400).json(gCode);
-    }
-    res.json({ success: !!gCode, gCode });
-  } catch (error) {
-    console.error('导出代码时出错:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get('/api/state', (req, res) => {
-  try {
-    const stateInfo = cncStateManager.getStateInfo();
-    res.json(stateInfo);
-  } catch (error) {
-    console.error('获取状态时出错:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// 健康检查端点
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    service: 'CNCagent',
-    timestamp: new Date().toISOString(),
-    state: cncStateManager.state
-  });
-});
-
-// 错误处理中间件
-app.use((error, req, res, next) => {
-  console.error('服务器错误:', error);
-  res.status(500).json({ 
-    success: false, 
-    error: '服务器内部错误' 
-  });
-});
-
-// 404中间件
-app.use('*', (req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    error: 'API端点不存在' 
-  });
-});
-
-// 启动服务器
-let currentPort = BASE_PORT;
-let maxRetries = 10; // 尝试最多10个端口
-let attempt = 0;
-
-function startServer(port) {
-  attempt++;
-  console.log(`尝试启动服务器在端口 ${port} (尝试 ${attempt}/${maxRetries + 1})`);
-  const server = app.listen(port, '127.0.0.1', () => {
-    console.log(`=======================================================`);
-    console.log(`CNCagent 部署成功!`);
-    console.log(`服务器运行在: http://127.0.0.1:${port}`);
-    console.log(`健康检查: http://127.0.0.1:${port}/health`);
-    console.log(`API文档: http://127.0.0.1:${port}/api/state`);
-    console.log(`当前状态: ${cncStateManager.state}`);
-    console.log(`=======================================================`);
-  });
-
-  // 处理端口被占用的情况
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      if (attempt < maxRetries) {
-        const newPort = port + 1;
-        console.log(`端口 ${port} 已被占用，尝试使用端口 ${newPort}`);
-        setTimeout(() => {
-          startServer(newPort);
-        }, 1000);
-      } else {
-        console.error(`已尝试 ${maxRetries} 个端口，都被占用，无法启动服务器:`);
-        console.error(err);
-      }
-    } else {
-      console.error('服务器启动错误:', err);
+      console.log('PM2已安装');
+      startApplication();
     }
   });
 }
 
-startServer(currentPort);
+function startApplication() {
+  console.log('使用PM2启动CNCagent应用...');
+  
+  // 使用PM2启动应用
+  const pm2Start = spawn('npx', ['pm2', 'start', 'src/index.js', '--name', 'cncagent', '--watch'], { shell: true });
+  
+  pm2Start.stdout.on('data', (data) => {
+    console.log(`PM2启动输出: ${data}`);
+  });
+  
+  pm2Start.stderr.on('data', (data) => {
+    console.error(`PM2启动错误: ${data}`);
+  });
+  
+  pm2Start.on('close', (code) => {
+    if (code === 0) {
+      console.log('CNCagent应用已通过PM2成功启动');
+      checkApplicationStatus();
+    } else {
+      console.error(`PM2启动失败，退出码: ${code}`);
+      console.log('尝试使用node直接启动应用...');
+      startApplicationDirectly();
+    }
+  });
+}
+
+function startApplicationDirectly() {
+  console.log('使用Node.js直接启动CNCagent应用...');
+  
+  // 直接使用Node.js启动应用
+  const app = spawn('node', ['src/index.js'], { shell: true });
+  
+  app.stdout.on('data', (data) => {
+    console.log(`应用输出: ${data}`);
+  });
+  
+  app.stderr.on('data', (data) => {
+    console.error(`应用错误: ${data}`);
+  });
+  
+  app.on('close', (code) => {
+    console.log(`应用进程已退出，退出码: ${code}`);
+  });
+}
+
+function checkApplicationStatus() {
+  console.log('检查应用状态...');
+  
+  setTimeout(() => {
+    const pm2Status = spawn('npx', ['pm2', 'status'], { shell: true });
+    
+    pm2Status.stdout.on('data', (data) => {
+      console.log('PM2状态信息:');
+      console.log(data.toString());
+    });
+    
+    pm2Status.stderr.on('data', (data) => {
+      console.error(`PM2状态检查错误: ${data}`);
+    });
+    
+    pm2Status.on('close', (code) => {
+      console.log('应用状态检查完成');
+      console.log('部署完成！CNCagent现在应该在 http://localhost:3000 上运行');
+    });
+  }, 5000); // 等待5秒让应用启动
+}
+
+// 确保在正确的目录下运行
+process.chdir(path.join(__dirname));
+
+// 执行部署
+deployCNCagent();
+
+module.exports = { deployCNCagent };

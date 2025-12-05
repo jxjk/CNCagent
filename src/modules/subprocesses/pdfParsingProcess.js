@@ -1077,9 +1077,20 @@ async function extractFromPdfImage(pdf, page, scale = 2.0) {
     
     await worker.load();
     await worker.loadLanguage('eng+chi_sim'); // 加载英文和中文简体语言包
-    await worker.initialize('eng+chi_sim');
+    await worker.initialize('eng+chi_sim', {
+      // 设置OCR配置选项以提高识别准确性
+      tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,;:!?()[]{}+-=*/<>"\' \n\t',
+      preserve_interword_spaces: true,
+    });
     
-    const result = await worker.recognize(imageData);
+    const result = await worker.recognize(imageData, {
+      rectangle: {
+        left: 0,
+        top: 0,
+        width: canvas.width,
+        height: canvas.height
+      }
+    });
     const text = result.data.text;
     
     await worker.terminate();
@@ -1090,6 +1101,72 @@ async function extractFromPdfImage(pdf, page, scale = 2.0) {
     console.error('OCR处理失败:', error.message);
     return '';
   }
+}
+
+// OCR文本后处理函数，提高CAD图纸元素识别准确性
+function postProcessOcrText(ocrText) {
+  if (!ocrText || typeof ocrText !== 'string') {
+    return ocrText;
+  }
+  
+  let processedText = ocrText;
+  
+  // 修复常见的OCR错误
+  // 例如，将常见的误识别字符进行替换
+  const corrections = [
+    // 修复数字和字母的误识别
+    [/(\d)O(\d)/g, '$10$2'],  // 将 "O" 在数字中间时修正为 "0"
+    [/(\d)l(\d)/g, '$11$2'],  // 将 "l" 在数字中间时修正为 "1"
+    [/(\d)I(\d)/g, '$11$2'],  // 将 "I" 在数字中间时修正为 "1"
+    [/(\d)Z(\d)/g, '$12$2'],  // 将 "Z" 在数字中间时修正为 "2"
+    [/(\d)S(\d)/g, '$15$2'],  // 将 "S" 在数字中间时修正为 "5"
+    
+    // 修复单位识别错误
+    [/(\d+)\s*tnm/gi, '$1 mm'],  // 将 "tnm" 修正为 "mm"
+    [/(\d+)\s*nn/gi, '$1 mm'],  // 将 "nn" 修正为 "mm"
+    [/(\d+)\s*rm/gi, '$1 mm'],  // 将 "rm" 修正为 "mm"
+    [/(\d+)\s*cm/gi, '$1 mm'],  // 将 "cm" 修正为 "mm" (假设是毫米)
+    [/(\d+)\s*inn/gi, '$1 in'],  // 将 "inn" 修正为 "in"
+    
+    // 修复钻孔相关术语
+    [/H0LE/gi, 'HOLE'],  // 将 "H0LE" 修正为 "HOLE"
+    [/h0le/gi, 'hole'],  // 将 "h0le" 修正为 "hole"
+    [/dril/gi, 'drill'],  // 将 "dril" 修正为 "drill"
+    [/thru/gi, 'THRU'],  // 将 "thru" 修正为 "THRU"
+    
+    // 修复几何术语
+    [/C1RCLE/gi, 'CIRCLE'],  // 将 "C1RCLE" 修正为 "CIRCLE"
+    [/rectange/gi, 'rectangle'],  // 将 "rectange" 修正为 "rectangle"
+    [/dimention/gi, 'dimension'],  // 将 "dimention" 修正为 "dimension"
+    [/dimentions/gi, 'dimensions'],  // 将 "dimentions" 修正为 "dimensions"
+    
+    // 修复符号
+    [/81/g, 'G81'],  // 将 "81" 修正为 "G81" (G代码)
+    [/80/g, 'G80'],  // 将 "80" 修正为 "G80" (G代码)
+    [/82/g, 'G82'],  // 将 "82" 修正为 "G82" (G代码)
+    [/83/g, 'G83'],  // 将 "83" 修正为 "G83" (G代码)
+    [/98/g, 'G98'],  // 将 "98" 修正为 "G98" (G代码)
+    
+    // 修复坐标格式
+    [/\s*Z\s*-\s*(\d+\.?\d*)/g, ' Z-$1'],  // 修正 Z- 格式
+    [/\s*R\s*(\d+\.?\d*)/g, ' R$1'],      // 修正 R 格式
+    [/\s*F\s*(\d+\.?\d*)/g, ' F$1'],      // 修正 F 格式
+    
+    // 修复小数点问题
+    [/(\d)\.(\d)\.(\d)/g, '$1.$2 $3'],  // 修复多重小数点
+    
+    // 修复常见的中文误识别
+    [/孔日/g, '孔口'],  // 修正孔的表述
+    [/孔0/g, '孔'],    // 修正孔的表述
+    [/深度日/g, '深度'], // 修正深度的表述
+  ];
+  
+  // 应用所有修正
+  for (const [pattern, replacement] of corrections) {
+    processedText = processedText.replace(pattern, replacement);
+  }
+  
+  return processedText;
 }
 
 // 自动视角识别函数
@@ -1216,8 +1293,11 @@ async function pdfParsingProcess(filePath) {
             if (ocrText && ocrText.trim().length > 0) {
               console.log(`OCR识别成功，文本长度: ${ocrText.length}`);
               
-              // 从OCR文本中提取几何信息
-              const ocrExtracted = extractGeometricInfoFromText(ocrText);
+              // 对OCR文本进行后处理，提高CAD元素识别准确性
+              const processedOcrText = postProcessOcrText(ocrText);
+              
+              // 从处理后的OCR文本中提取几何信息
+              const ocrExtracted = extractGeometricInfoFromText(processedOcrText);
               geometryElements = [...geometryElements, ...ocrExtracted.geometryElements];
               dimensions = [...dimensions, ...ocrExtracted.dimensions];
               // 添加OCR提取的其他信息
@@ -1317,5 +1397,13 @@ async function pdfParsingProcess(filePath) {
 
 
 module.exports = {
-  pdfParsingProcess
+  pdfParsingProcess,
+  // 导出辅助函数以供测试使用
+  extractGeometricInfoFromText,
+  postProcessOcrText,
+  identifyViewOrientation,
+  enhanceGeometricRelationships,
+  identifyHoleGroups,
+  findBoltCircle,
+  findRectangularArray
 };

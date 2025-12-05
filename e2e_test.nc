@@ -1,5 +1,5 @@
 ; CNCagent Generated G-Code
-; Generated on: 2025-12-05T07:45:22.536Z
+; Generated on: 2025-12-05T08:33:36.948Z
 
 ; Block: program_start
 O0001 (CNC程序 - 智能加工程序)
@@ -12,13 +12,13 @@ G90 (绝对编程)
 G54 (工件坐标系1)
 G0 X0. Y0. S500 M03 (主轴正转，500转/分钟，初始转速)
 
-; Block: gcode_feat_misk895agmmxx
+; Block: gcode_feat_mislyahwdyfwf
 ; 加工孔 - 坐标: X0, Y0
 T02 M06 (换2号刀)
 S800 M03 (主轴正转，800转/分钟)
 G43 H02 Z100. (刀具长度补偿)
-G0 X0.000 Y0.000 (定位到孔位置)
-G83 G98 Z-13.8 R2.0 Q2.0 F100 (深孔钻，每次进给2mm，深度13.8mm)
+G0 X0.000 Y0.000 (快速定位到孔位置)
+G81 G98 Z-13.8 R2.0 F100. (G81钻孔循环，钻孔深度13.8mm，参考平面R2mm，进给率F100.)
 G80 (取消固定循环)
 G0 Z100. (抬刀到安全高度)
 
