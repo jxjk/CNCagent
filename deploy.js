@@ -8,7 +8,7 @@ const cncStateManager = new CNCStateManager();
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const app = express();
-const PORT = 8081; // 使用一个明确未被占用的端口
+const BASE_PORT = 8081; // 使用一个明确未被占用的端口
 
 // 安全中间件
 const limiter = rateLimit({
@@ -252,20 +252,40 @@ app.use('*', (req, res) => {
 });
 
 // 启动服务器
-const server = app.listen(PORT, '127.0.0.1', () => {
-  console.log(`=======================================================`);
-  console.log(`CNCagent 部署成功!`);
-  console.log(`服务器运行在: http://127.0.0.1:${PORT}`);
-  console.log(`健康检查: http://127.0.0.1:${PORT}/health`);
-  console.log(`API文档: http://127.0.0.1:${PORT}/api/state`);
-  console.log(`当前状态: ${cncStateManager.state}`);
-  console.log(`=======================================================`);
-});
+let currentPort = BASE_PORT;
+let maxRetries = 10; // 尝试最多10个端口
+let attempt = 0;
 
-// 处理服务器错误
-server.on('error', (err) => {
-  console.error('服务器启动错误:', err);
-  if (err.code === 'EADDRINUSE') {
-    console.error(`端口 ${PORT} 已被占用，请尝试其他端口`);
-  }
-});
+function startServer(port) {
+  attempt++;
+  console.log(`尝试启动服务器在端口 ${port} (尝试 ${attempt}/${maxRetries + 1})`);
+  const server = app.listen(port, '127.0.0.1', () => {
+    console.log(`=======================================================`);
+    console.log(`CNCagent 部署成功!`);
+    console.log(`服务器运行在: http://127.0.0.1:${port}`);
+    console.log(`健康检查: http://127.0.0.1:${port}/health`);
+    console.log(`API文档: http://127.0.0.1:${port}/api/state`);
+    console.log(`当前状态: ${cncStateManager.state}`);
+    console.log(`=======================================================`);
+  });
+
+  // 处理端口被占用的情况
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      if (attempt < maxRetries) {
+        const newPort = port + 1;
+        console.log(`端口 ${port} 已被占用，尝试使用端口 ${newPort}`);
+        setTimeout(() => {
+          startServer(newPort);
+        }, 1000);
+      } else {
+        console.error(`已尝试 ${maxRetries} 个端口，都被占用，无法启动服务器:`);
+        console.error(err);
+      }
+    } else {
+      console.error('服务器启动错误:', err);
+    }
+  });
+}
+
+startServer(currentPort);

@@ -1,5 +1,5 @@
 ; CNCagent Generated G-Code
-; Generated on: 2025-12-05T06:13:43.518Z
+; Generated on: 2025-12-05T07:45:22.536Z
 
 ; Block: program_start
 O0001 (CNC程序 - 智能加工程序)
@@ -12,7 +12,7 @@ G90 (绝对编程)
 G54 (工件坐标系1)
 G0 X0. Y0. S500 M03 (主轴正转，500转/分钟，初始转速)
 
-; Block: gcode_feat_misgye26h2pup
+; Block: gcode_feat_misk895agmmxx
 ; 加工孔 - 坐标: X0, Y0
 T02 M06 (换2号刀)
 S800 M03 (主轴正转，800转/分钟)

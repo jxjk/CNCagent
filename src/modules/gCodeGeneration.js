@@ -14,8 +14,8 @@ function triggerGCodeGeneration(project) {
     throw new Error('项目特征列表无效');
   }
 
-  // 按加工工艺类型对特征进行分类和排序
-  const sortedFeatures = sortFeaturesByProcess(project.features);
+  // 按加工工艺类型对特征进行分类和分组
+  const groupedFeatures = groupFeaturesByTypeAndParameters(project.features);
   
   // 初始化G代码块数组
   const gCodeBlocks = [];
@@ -39,23 +39,27 @@ function triggerGCodeGeneration(project) {
     createdAt: new Date()
   };
 
-  // 为每个特征生成G代码
-  for (const feature of sortedFeatures) {
-    if (feature && feature.featureType) {
+  // 为每个特征分组生成G代码
+  for (const groupKey in groupedFeatures) {
+    const group = groupedFeatures[groupKey];
+    const mainFeature = group[0]; // 使用组中的第一个特征作为代表
+    
+    if (mainFeature && mainFeature.featureType) {
       // 验证特征参数
-      const featureValidation = validateFeatureParameters(feature);
+      const featureValidation = validateFeatureParameters(mainFeature);
       if (!featureValidation.valid) {
-        console.warn(`特征 ${feature.id} 验证失败:`, featureValidation.errors);
-        // 可以选择跳过无效特征或使用默认参数
+        console.warn(`特征组 ${groupKey} 中的特征验证失败:`, featureValidation.errors);
+        // 可以选择跳过无效特征组或使用默认参数
         continue;
       }
 
       // 将项目信息添加到特征中，以便G代码生成时使用
       if (project.materialType) {
-        feature.project = { materialType: project.materialType };
+        mainFeature.project = { materialType: project.materialType };
       }
 
-      const gCodeBlock = generateFeatureGCode(feature);
+      // 生成批量加工G代码
+      const gCodeBlock = generateFeatureGCode(mainFeature, group);
       if (gCodeBlock) {
         gCodeBlocks.push(gCodeBlock);
       }
@@ -111,7 +115,31 @@ function triggerGCodeGeneration(project) {
   return gCodeBlocks;
 }
 
-// 根据加工工艺类型对特征进行排序
+// 根据特征类型和参数对特征进行分组
+function groupFeaturesByTypeAndParameters(features) {
+  if (!Array.isArray(features)) {
+    return {};
+  }
+
+  const groupedFeatures = {};
+  
+  for (const feature of features) {
+    // 生成特征的唯一键用于分组
+    const featureKey = getFeatureKey(feature);
+    
+    // 如果该特征类型和参数组合还没有分组，创建新分组
+    if (!groupedFeatures[featureKey]) {
+      groupedFeatures[featureKey] = [];
+    }
+    
+    // 将特征添加到对应的分组中
+    groupedFeatures[featureKey].push(feature);
+  }
+  
+  return groupedFeatures;
+}
+
+// 根据加工工艺类型对特征进行排序和分组，优化换刀次数
 function sortFeaturesByProcess(features) {
   if (!Array.isArray(features)) {
     return [];
@@ -131,28 +159,77 @@ function sortFeaturesByProcess(features) {
     'default': 99
   };
 
-  // 根据工艺类型和位置进行排序
-  return [...features].sort((a, b) => {
-    const orderA = processOrder[a.featureType] || processOrder['default'];
-    const orderB = processOrder[b.featureType] || processOrder['default'];
-    
-    // 如果工艺类型相同，按X坐标排序，然后按Y坐标排序
-    if (orderA === orderB) {
-      const posA = a.baseGeometry?.center || a.baseGeometry?.start || { x: 0, y: 0 };
-      const posB = b.baseGeometry?.center || b.baseGeometry?.start || { x: 0, y: 0 };
-      
-      if (posA.x === posB.x) {
-        return posA.y - posB.y;
-      }
-      return posA.x - posB.x;
+  // 首先根据工艺类型对特征进行分组
+  const groupedFeatures = {};
+  for (const feature of features) {
+    const order = processOrder[feature.featureType] || processOrder['default'];
+    if (!groupedFeatures[order]) {
+      groupedFeatures[order] = {};
     }
-    
-    return orderA - orderB;
-  });
+
+    // 为相同特征类型创建子分组（考虑参数相同的情况）
+    const featureKey = getFeatureKey(feature);
+    if (!groupedFeatures[order][featureKey]) {
+      groupedFeatures[order][featureKey] = [];
+    }
+    groupedFeatures[order][featureKey].push(feature);
+  }
+
+  // 按工艺优先级处理每个分组
+  const sortedGroups = Object.keys(groupedFeatures)
+    .sort((a, b) => parseInt(a) - parseInt(b));
+
+  const result = [];
+  for (const order of sortedGroups) {
+    const group = groupedFeatures[order];
+    // 处理每个特征类型的子分组
+    for (const featureKey in group) {
+      const featureGroup = group[featureKey];
+      // 对同一特征类型的特征按位置排序，以优化加工路径
+      const sortedByPosition = [...featureGroup].sort((a, b) => {
+        const posA = a.baseGeometry?.center || a.baseGeometry?.start || { x: 0, y: 0 };
+        const posB = b.baseGeometry?.center || b.baseGeometry?.start || { x: 0, y: 0 };
+        
+        if (posA.x === posB.x) {
+          return posA.y - posB.y;
+        }
+        return posA.x - posB.x;
+      });
+      result.push(...sortedByPosition);
+    }
+  }
+
+  return result;
+}
+
+// 生成特征的唯一键，用于识别相同特征（相同类型和参数）
+function getFeatureKey(feature) {
+  if (!feature || !feature.featureType) return 'unknown';
+
+  // 根据特征类型生成唯一键
+  switch (feature.featureType) {
+    case 'hole':
+      const holeParams = feature.parameters || {};
+      return `${feature.featureType}_${holeParams.diameter || 'default'}_${holeParams.depth || 'default'}`;
+    case 'counterbore':
+      const counterboreParams = feature.parameters || {};
+      return `${feature.featureType}_${counterboreParams.diameter || 'default'}_${counterboreParams.depth || 'default'}_${counterboreParams.counterboreDiameter || 'default'}_${counterboreParams.counterboreDepth || 'default'}`;
+    case 'pocket':
+      const pocketParams = feature.parameters || {};
+      return `${feature.featureType}_${pocketParams.width || 'default'}_${pocketParams.length || 'default'}_${pocketParams.depth || 'default'}`;
+    case 'slot':
+      const slotParams = feature.parameters || {};
+      return `${feature.featureType}_${slotParams.width || 'default'}_${slotParams.length || 'default'}_${slotParams.depth || 'default'}`;
+    case 'thread':
+      const threadParams = feature.parameters || {};
+      return `${feature.featureType}_${threadParams.diameter || 'default'}_${threadParams.pitch || 'default'}_${threadParams.depth || 'default'}`;
+    default:
+      return feature.featureType;
+  }
 }
 
 // 生成特征G代码
-function generateFeatureGCode(feature) {
+function generateFeatureGCode(feature, groupedFeatures = null) {
   if (!feature || typeof feature !== 'object') {
     return null;
   }
@@ -182,6 +259,54 @@ function generateFeatureGCode(feature) {
     feature.parameters.recommendedTool = recommendedParams.tool;
   }
 
+  let gCodeLines = [];
+
+  // 如果存在分组特征且当前特征是分组的一部分，则生成批量加工代码
+  if (groupedFeatures && Array.isArray(groupedFeatures) && groupedFeatures.length > 1) {
+    // 根据特征类型生成批量加工代码
+    switch (feature.featureType) {
+      case 'hole':
+        gCodeLines = generateHoleGCodeBatch(feature, groupedFeatures);
+        break;
+      case 'counterbore':
+        gCodeLines = generateCounterboreGCodeBatch(feature, groupedFeatures);
+        break;
+      default:
+        // 对于不支持批量加工的特征类型，使用普通方法
+        gCodeLines = generateStandardFeatureGCode(feature, recommendedParams);
+    }
+  } else {
+    // 使用标准方法生成单个特征的G代码
+    gCodeLines = generateStandardFeatureGCode(feature, recommendedParams);
+  }
+
+  // 创建G代码块对象
+  const gCodeBlock = {
+    id: `gcode_${feature.id}`,
+    type: 'feature_operation',
+    code: gCodeLines,
+    featureId: feature.id,
+    featureType: feature.featureType,
+    parameters: { ...feature.parameters },
+    recommendedParams: recommendedParams, // 添加推荐参数
+    createdAt: new Date()
+  };
+
+  // 如果是批量加工，添加批量加工信息
+  if (groupedFeatures && Array.isArray(groupedFeatures) && groupedFeatures.length > 1) {
+    gCodeBlock.isBatchOperation = true;
+    gCodeBlock.batchSize = groupedFeatures.length;
+    gCodeBlock.featureGroup = groupedFeatures.map(f => ({
+      id: f.id,
+      geometry: f.baseGeometry
+    }));
+  }
+
+  return gCodeBlock;
+}
+
+// 生成标准特征G代码（单个特征）
+function generateStandardFeatureGCode(feature, recommendedParams) {
   let gCodeLines = [];
 
   switch (feature.featureType) {
@@ -216,16 +341,139 @@ function generateFeatureGCode(feature) {
       gCodeLines = generateGenericFeatureGCode(feature);
   }
 
-  return {
-    id: `gcode_${feature.id}`,
-    type: 'feature_operation',
-    code: gCodeLines,
-    featureId: feature.id,
-    featureType: feature.featureType,
-    parameters: { ...feature.parameters },
-    recommendedParams: recommendedParams, // 添加推荐参数
-    createdAt: new Date()
-  };
+  return gCodeLines;
+}
+
+// 生成批量孔加工G代码
+function generateHoleGCodeBatch(mainFeature, features) {
+  const params = mainFeature.parameters || {};
+  const diameter = 'diameter' in params ? params.diameter : 5.5;  // 孔径5.5mm
+  const depth = 'depth' in params ? params.depth : 14;            // 默认实际加工深度14mm
+  const toolNumber = 'toolNumber' in params ? params.toolNumber : 2;  // 默认使用钻头T02
+  
+  // 使用推荐参数或默认参数
+  const spindleSpeed = params.spindleSpeed || (toolNumber === 1 ? 1200 : toolNumber === 2 ? 800 : 600);
+  const feedRate = params.feedRate || 100;
+  
+  // 根据公式计算实际钻孔深度：图纸深度 + 1/3孔径 + 2mm
+  const drawingDepth = 'drawingDepth' in params ? params.drawingDepth : 10;  // 图纸深度10mm
+  const calculatedDepth = drawingDepth + diameter / 3 + 2;
+  const actualDepth = Math.round(calculatedDepth * 10) / 10;  // 保留一位小数
+  
+  const gCode = [];
+  
+  // 注释说明这是批量加工
+  gCode.push(`; 批量加工${features.length}个相同孔特征`);
+  if (params.recommendedTool) {
+    gCode.push(`; 推荐刀具: ${params.recommendedTool}`);
+  }
+  gCode.push(`; 孔径: ${diameter}mm, 深度: ${actualDepth}mm`);
+  
+  // 换刀并启动主轴 - 只换一次刀
+  gCode.push('');
+  gCode.push(`(批量钻孔操作 - 加工${features.length}个孔)`);
+  gCode.push(`T0${toolNumber} M06 (换${toolNumber}号刀 - 批量加工)`);
+  gCode.push(`S${spindleSpeed} M03 (主轴正转，${spindleSpeed}转/分钟)`);  // 使用推荐或计算的转速
+  gCode.push(`G43 H0${toolNumber} Z100. (刀具长度补偿)`);
+  
+  // 依次加工所有孔
+  for (const feature of features) {
+    const x = feature.baseGeometry.center?.x || 0;
+    const y = feature.baseGeometry.center?.y || 0;
+    gCode.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} (定位到孔位置 X${x}, Y${y})`);
+    gCode.push(`G83 G98 Z-${actualDepth.toFixed(1)} R2.0 Q2.0 F${feedRate} (深孔钻，每次进给2mm，深度${actualDepth.toFixed(1)}mm)`);
+  }
+  
+  gCode.push('G80 (取消固定循环)');
+  gCode.push('G0 Z100. (抬刀到安全高度)');
+  
+  return gCode;
+}
+
+// 生成批量沉头孔加工G代码
+function generateCounterboreGCodeBatch(mainFeature, features) {
+  const params = mainFeature.parameters || {};
+  const diameter = 'diameter' in params ? params.diameter : 5.5;  // 孔径5.5mm
+  const depth = 'depth' in params ? params.depth : 14;           // 实际加工深度14mm
+  const counterboreDiameter = 'counterboreDiameter' in params ? params.counterboreDiameter : 9; // 沉孔径9mm
+  const counterboreDepth = 'counterboreDepth' in params ? params.counterboreDepth : 5.5;        // 沉孔深度5.5mm
+  const useCounterbore = 'useCounterbore' in params ? params.useCounterbore : true; // 是否使用沉孔
+  
+  // 使用推荐参数或默认参数
+  const centerDrillSpindle = params.spindleSpeed ? Math.round(params.spindleSpeed * 0.8) : 1200; // 中心钻通常使用稍低转速
+  const drillSpindle = params.spindleSpeed || 800;
+  const counterboreSpindle = params.spindleSpeed ? Math.round(params.spindleSpeed * 0.7) : 600; // 沉孔使用较低转速
+  const drillFeed = params.feedRate || 100;
+  const counterboreFeed = params.feedRate ? Math.round(params.feedRate * 0.8) : 80;
+  
+  // 根据公式计算实际钻孔深度：图纸深度 + 1/3孔径 + 2mm
+  const drawingDepth = 'drawingDepth' in params ? params.drawingDepth : 10;  // 图纸深度10mm
+  const calculatedDepth = drawingDepth + diameter / 3 + 2;
+  const actualDepth = Math.round(calculatedDepth * 10) / 10;  // 保留一位小数
+  
+  const gCode = [];
+  
+  // 注释说明这是批量加工
+  gCode.push(`; 批量加工${features.length}个相同沉头孔特征`);
+  if (params.recommendedTool) {
+    gCode.push(`; 推荐刀具: ${params.recommendedTool}`);
+  }
+  gCode.push(`; 孔径: ${diameter}mm, 深度: ${actualDepth}mm, 沉孔径: ${counterboreDiameter}mm, 沉孔深: ${counterboreDepth}mm`);
+  
+  // 点孔操作 - 使用中心钻T01，批量加工
+  gCode.push('');
+  gCode.push(`(批量点孔操作 - 使用中心钻T01)`);
+  gCode.push('T01 M06 (换1号刀: 中心钻 - 批量加工)');
+  gCode.push(`S${centerDrillSpindle} M03 (主轴正转，${centerDrillSpindle}转/分钟)`);  // 使用推荐转速
+  gCode.push('G43 H01 Z100. (刀具长度补偿)');
+  
+  // 依次加工所有孔的点孔操作
+  for (const feature of features) {
+    const x = feature.baseGeometry.center?.x || 0;
+    const y = feature.baseGeometry.center?.y || 0;
+    gCode.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} (定位到孔位置 X${x}, Y${y})`);
+    gCode.push(`G81 G98 Z-2.0 R2.0 F50 (点孔，深度2mm)`);
+  }
+  gCode.push('G80 (取消固定循环)');
+  gCode.push('G0 Z100. (抬刀到安全高度)');
+  
+  // 钻孔操作 - 使用钻头T02，批量加工
+  gCode.push('');
+  gCode.push(`(批量钻孔操作 - 使用钻头T02)`);
+  gCode.push('T02 M06 (换2号刀: 钻头 - 批量加工)');
+  gCode.push(`S${drillSpindle} M03 (主轴正转，${drillSpindle}转/分钟)`);  // 使用推荐转速
+  gCode.push('G43 H02 Z100. (刀具长度补偿)');
+  
+  // 依次加工所有孔的钻孔操作
+  for (const feature of features) {
+    const x = feature.baseGeometry.center?.x || 0;
+    const y = feature.baseGeometry.center?.y || 0;
+    gCode.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} (定位到孔位置 X${x}, Y${y})`);
+    gCode.push(`G83 G98 Z-${actualDepth.toFixed(1)} R2.0 Q2.0 F${drillFeed} (深孔钻，每次进给2mm，深度${actualDepth.toFixed(1)}mm)`);
+  }
+  gCode.push('G80 (取消固定循环)');
+  gCode.push('G0 Z100. (抬刀到安全高度)');
+  
+  // 沉孔操作 - 使用沉头刀T03，批量加工（如果需要）
+  if (useCounterbore) {
+    gCode.push('');
+    gCode.push(`(批量沉孔操作 - 使用沉头刀T03)`);
+    gCode.push('T03 M06 (换3号刀: 沉头刀 - 批量加工)');
+    gCode.push(`S${counterboreSpindle} M03 (主轴正转，${counterboreSpindle}转/分钟)`);  // 使用推荐转速
+    gCode.push('G43 H03 Z100. (刀具长度补偿)');
+    
+    // 依次加工所有孔的沉孔操作
+    for (const feature of features) {
+      const x = feature.baseGeometry.center?.x || 0;
+      const y = feature.baseGeometry.center?.y || 0;
+      gCode.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} (定位到孔位置 X${x}, Y${y})`);
+      gCode.push(`G82 G98 Z-${counterboreDepth.toFixed(1)} R2.0 P2000 F${counterboreFeed} (沉孔，深度${counterboreDepth.toFixed(1)}mm，暂停2秒)`);
+    }
+    gCode.push('G80 (取消固定循环)');
+    gCode.push('G0 Z100. (抬刀到安全高度)');
+  }
+  
+  return gCode;
 }
 
 // 生成沉头孔的G代码（点孔、钻孔、沉孔工艺）

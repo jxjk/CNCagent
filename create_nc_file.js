@@ -1,4 +1,12 @@
-O0001 (CNC程序 - 双沉头孔加工程序)
+// 生成符合要求的NC程序
+// X轴按工件长边摆放，G55原点在工件右上角
+// 两个带沉孔的特征孔，按点孔、钻孔、沉孔工艺加工
+
+const fs = require('fs');
+const path = require('path');
+
+// 符合要求的G代码内容
+const gcodeContent = `O0001 (CNC程序 - 双沉头孔加工程序)
 (X轴按工件长边摆放，G55原点在工件右上角)
 G21 (毫米编程)
 G40 (刀具半径补偿取消)
@@ -43,3 +51,17 @@ G0 Z100. (抬刀到安全高度)
 
 M05 (主轴停止)
 M30 (程序结束)
+`;
+
+// 写入文件
+const outputPath = path.join(__dirname, '1.NC');
+fs.writeFileSync(outputPath, gcodeContent);
+
+console.log('NC程序已成功生成到 1.NC');
+console.log('程序特性：');
+console.log('- 使用G55坐标系（右上角为原点）');
+console.log('- X轴按工件长边摆放');
+console.log('- 两个孔的坐标为(-20.000, -5.000)和(-80.000, -5.000)');
+console.log('- 按NC编程最佳实践批量加工（一次换刀加工两个孔）');
+console.log('- 采用点孔、钻孔、沉孔的完整工艺');
+console.log('- 使用了针对铝材优化的切削参数');
