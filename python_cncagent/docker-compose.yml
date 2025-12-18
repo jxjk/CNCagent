@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  cncagent:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - FLASK_ENV=production
+      - PORT=3000
+    volumes:
+      - ./workspace:/app/workspace
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - cncagent-network
+
+networks:
+  cncagent-network:
+    driver: bridge
