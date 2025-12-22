@@ -51,7 +51,7 @@ def test_fanuc_comment_format():
     # 检查程序头部注释
     has_program_id = any('O0001 (MAIN PROGRAM)' in line for line in lines)
     has_description = any('(DESCRIPTION:' in line for line in lines)
-    has_date = any('(DATE:' in line in lines)
+    has_date = any('(DATE:' in line for line in lines)
     has_author = any('(AUTHOR:' in line for line in lines)
     
     # 检查单位和坐标系统注释

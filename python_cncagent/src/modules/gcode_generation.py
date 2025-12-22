@@ -4,6 +4,44 @@ FANUC NC程序生成模块
 """
 from typing import List, Dict
 import math
+import datetime
+
+# 导入优化模块
+try:
+    from .fanuc_optimization import optimize_tapping_cycle, optimize_drilling_cycle, get_thread_pitch
+except ImportError:
+    # 如果无法导入优化模块，使用基础实现
+    def get_thread_pitch(thread_type: str) -> float:
+        """根据螺纹类型获取标准螺距"""
+        thread_pitch_map = {
+            "M3": 0.5,
+            "M4": 0.7,
+            "M5": 0.8,
+            "M6": 1.0,
+            "M8": 1.25,
+            "M10": 1.5,
+            "M12": 1.75
+        }
+        
+        # 提取螺纹规格（如"M10"中的"10"）
+        if thread_type.startswith("M"):
+            try:
+                size = thread_type[1:]  # 获取M后面的数字
+                if size in ["3", "4", "5", "6", "8", "10", "12"]:
+                    return thread_pitch_map.get(f"M{size}", 1.5)  # 默认M10螺距
+                else:
+                    # 对于其他M系列螺纹，按比例估算
+                    size_num = int(size)
+                    if size_num < 5:
+                        return 0.5  # 小螺纹螺距较小
+                    elif size_num < 10:
+                        return 1.0  # 中等螺纹螺距中等
+                    else:
+                        return 1.5  # 大螺纹螺距较大
+            except ValueError:
+                return 1.5  # 无法解析时使用默认值
+        else:
+            return 1.5  # 非标准格式使用默认值
 
 
 def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: float = 1.0) -> str:
@@ -23,7 +61,6 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
     # 程序头部注释 - 符合FANUC规范
     gcode.append("O0001 (MAIN PROGRAM)")
     gcode.append("(DESCRIPTION: FANUC CNC PROGRAM FOR FEATURE MACHINING)")
-    import datetime
     gcode.append(f"(DATE: {datetime.datetime.now().strftime('%Y-%m-%d')})")
     gcode.append("(AUTHOR: CNC AGENT)")
     gcode.append("")
@@ -46,7 +83,7 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
     
     # 设置初始安全高度
     gcode.append("(MOVE TO SAFE HEIGHT)")
-    gcode.append("G00 Z50 (RAPID MOVE TO SAFE HEIGHT)")
+    gcode.append("G00 Z100.0 (RAPID MOVE TO SAFE HEIGHT)")
     gcode.append("")
     
     # 根据加工类型生成G代码
@@ -60,9 +97,11 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
         gcode.append("")
         gcode.append("(PROGRAM END)")
         gcode.append("M05 (SPINDLE STOP)")
-        gcode.append("G00 Z100 (RAISE TOOL TO SAFE HEIGHT)")
-        gcode.append("G00 X0 Y0 (RETURN TO ORIGIN)")
-        gcode.append("G00 Z0 (RETURN Z-AXIS TO ORIGIN)")
+        gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
+        gcode.append("G91 (INCREMENTAL COORDINATE SYSTEM)")
+        gcode.append("G28 Z0. (RETURN TO Z ORIGIN THROUGH REFERENCE POINT)")
+        gcode.append("G28 X0. Y0. (RETURN TO X,Y ORIGIN THROUGH REFERENCE POINT)")
+        gcode.append("G90 (ABSOLUTE COORDINATE SYSTEM)")
         gcode.append("M30 (PROGRAM END)")
     elif processing_type == "tapping":  # 新增攻丝工艺
         gcode.extend(_generate_tapping_code_with_full_process(features, description_analysis))
@@ -70,9 +109,11 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
         gcode.append("")
         gcode.append("(PROGRAM END)")
         gcode.append("M05 (SPINDLE STOP)")
-        gcode.append("G00 Z100 (RAISE TOOL TO SAFE HEIGHT)")
-        gcode.append("G00 X0 Y0 (RETURN TO ORIGIN)")
-        gcode.append("G00 Z0 (RETURN Z-AXIS TO ORIGIN)")
+        gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
+        gcode.append("G91 (INCREMENTAL COORDINATE SYSTEM)")
+        gcode.append("G28 Z0. (RETURN TO Z ORIGIN THROUGH REFERENCE POINT)")
+        gcode.append("G28 X0. Y0. (RETURN TO X,Y ORIGIN THROUGH REFERENCE POINT)")
+        gcode.append("G90 (ABSOLUTE COORDINATE SYSTEM)")
         gcode.append("M30 (PROGRAM END)")
     elif processing_type == "milling":
         gcode.extend(_generate_milling_code(features, description_analysis))
@@ -80,9 +121,11 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
         gcode.append("")
         gcode.append("(PROGRAM END)")
         gcode.append("M05 (SPINDLE STOP)")
-        gcode.append("G00 Z100 (RAISE TOOL TO SAFE HEIGHT)")
-        gcode.append("G00 X0 Y0 (RETURN TO ORIGIN)")
-        gcode.append("G00 Z0 (RETURN Z-AXIS TO ORIGIN)")
+        gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
+        gcode.append("G91 (INCREMENTAL COORDINATE SYSTEM)")
+        gcode.append("G28 Z0. (RETURN TO Z ORIGIN THROUGH REFERENCE POINT)")
+        gcode.append("G28 X0. Y0. (RETURN TO X,Y ORIGIN THROUGH REFERENCE POINT)")
+        gcode.append("G90 (ABSOLUTE COORDINATE SYSTEM)")
         gcode.append("M30 (PROGRAM END)")
     elif processing_type == "turning":
         gcode.extend(_generate_turning_code(features, description_analysis))
@@ -90,9 +133,11 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
         gcode.append("")
         gcode.append("(PROGRAM END)")
         gcode.append("M05 (SPINDLE STOP)")
-        gcode.append("G00 Z100 (RAISE TOOL TO SAFE HEIGHT)")
-        gcode.append("G00 X0 Y0 (RETURN TO ORIGIN)")
-        gcode.append("G00 Z0 (RETURN Z-AXIS TO ORIGIN)")
+        gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
+        gcode.append("G91 (INCREMENTAL COORDINATE SYSTEM)")
+        gcode.append("G28 Z0. (RETURN TO Z ORIGIN THROUGH REFERENCE POINT)")
+        gcode.append("G28 X0. Y0. (RETURN TO X,Y ORIGIN THROUGH REFERENCE POINT)")
+        gcode.append("G90 (ABSOLUTE COORDINATE SYSTEM)")
         gcode.append("M30 (PROGRAM END)")
     else:
         # 检查用户描述中是否包含螺纹相关关键词
@@ -103,9 +148,9 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
             gcode.append("")
             gcode.append("(PROGRAM END)")
             gcode.append("M05 (SPINDLE STOP)")
-            gcode.append("G00 Z100 (RAISE TOOL TO SAFE HEIGHT)")
-            gcode.append("G00 X0 Y0 (RETURN TO ORIGIN)")
-            gcode.append("G00 Z0 (RETURN Z-AXIS TO ORIGIN)")
+            gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
+            gcode.append("G00 X0.0 Y0.0 (RETURN TO ORIGIN)")
+            gcode.append("G00 Z0.0 (RETURN Z-AXIS TO ORIGIN)")
             gcode.append("M30 (PROGRAM END)")
         else:
             # 默认使用铣削代码
@@ -115,7 +160,7 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
             gcode.append("(PROGRAM END)")
             gcode.append("M05 (SPINDLE STOP)")
             gcode.append("G00 Z100 (RAISE TOOL TO SAFE HEIGHT)")
-            gcode.append("G00 X0 Y0 (RETURN TO ORIGIN)")
+            gcode.append("G00 X0.0 Y0.0 (RETURN TO ORIGIN)")
             gcode.append("G00 Z0 (RETURN Z-AXIS TO ORIGIN)")
             gcode.append("M30 (PROGRAM END)")
 
@@ -174,19 +219,23 @@ def _generate_drilling_code(features: List[Dict], description_analysis: Dict) ->
         # 首先在第一个孔执行完整循环
         first_feature = hole_features[0]
         center_x, center_y = first_feature["center"]
-        gcode.append(f"G99 G83 X{center_x:.3f} Y{center_y:.3f} Z{-depth} R2 F{feed_rate} (DEEP HOLE DRILLING CYCLE)")
+        gcode.append(f"G99 G83 X{center_x:.3f} Y{center_y:.3f} Z{-depth:.3f} R2.0 F{feed_rate:.1f} (DEEP HOLE DRILLING CYCLE)")
         
         # 对于后续孔，只使用X、Y坐标，简化编程
         for feature in hole_features[1:]:
             center_x, center_y = feature["center"]
             gcode.append(f"X{center_x:.3f} Y{center_y:.3f} (DRILLING OPERATION)")
     else:
-        gcode.append(f"G99 G83 Z{-depth} R2 F{feed_rate} (DEEP HOLE DRILLING CYCLE)")
+        gcode.append(f"G99 G83 Z{-depth:.3f} R2.0 F{feed_rate:.1f} (DEEP HOLE DRILLING CYCLE)")
     
     gcode.append("G80 (CANCEL FIXED CYCLE)")
     
     # 关闭切削液
     gcode.append("M09 (COOLANT OFF)")
+    
+    # 移动到统一的安全高度，然后取消刀具长度补偿
+    gcode.append("G00 Z100.0 (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
+    gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
     
     return gcode
 
@@ -274,21 +323,23 @@ def _generate_tapping_code_with_full_process(features: List[Dict], description_a
     # 点孔循环 - 首先在第一个孔位置执行完整循环
     if hole_positions:
         first_x, first_y = hole_positions[0]
-        gcode.append(f"G82 X{first_x:.3f} Y{first_y:.3f} Z{-centering_depth} R2 P1000 F50 (SPOT DRILLING CYCLE, DWELL 1 SECOND)")
+        gcode.append(f"G82 X{first_x:.3f} Y{first_y:.3f} Z{-centering_depth:.3f} R2.0 P1000 F50.0 (SPOT DRILLING CYCLE, DWELL 1 SECOND)")
         
         # 对于后续孔位置，只使用X、Y坐标，简化编程
         for i, (center_x, center_y) in enumerate(hole_positions[1:], 2):
             gcode.append(f"X{center_x:.3f} Y{center_y:.3f} (PILOT DRILLING {i}: X{center_x:.1f},Y{center_y:.1f})")
     else:
         # 如果没有孔位置，仍保留原始循环指令
-        gcode.append(f"G82 Z{-centering_depth} R2 P1000 F50 (SPOT DRILLING CYCLE, DWELL 1 SECOND)")
+        gcode.append(f"G82 Z{-centering_depth:.3f} R2.0 P1000 F50.0 (SPOT DRILLING CYCLE, DWELL 1 SECOND)")
     
     gcode.append("G80 (CANCEL FIXED CYCLE)")
     
     # 关闭切削液
     gcode.append("M09 (COOLANT OFF)")
     
-    gcode.append("G00 Z50 (RAPID MOVE TO SAFE HEIGHT)")
+    # 移动到统一的安全高度，然后取消刀具长度补偿
+    gcode.append("G00 Z100.0 (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
+    gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
     
     # 2. 钻孔工艺 (使用T2 - 钻头)
     gcode.append("")
@@ -308,21 +359,23 @@ def _generate_tapping_code_with_full_process(features: List[Dict], description_a
     drill_feed = 100  # 钻孔进给
     if hole_positions:
         first_x, first_y = hole_positions[0]
-        gcode.append(f"G83 X{first_x:.3f} Y{first_y:.3f} Z{-drilling_depth} R2 Q1 F{drill_feed} (DEEP HOLE DRILLING CYCLE)")
+        gcode.append(f"G83 X{first_x:.3f} Y{first_y:.3f} Z{-drilling_depth:.3f} R2.0 Q1.0 F{drill_feed:.1f} (DEEP HOLE DRILLING CYCLE)")
         
         # 对于后续孔位置，只使用X、Y坐标，简化编程
         for i, (center_x, center_y) in enumerate(hole_positions[1:], 2):
             gcode.append(f"X{center_x:.3f} Y{center_y:.3f} (DRILLING {i}: X{center_x:.1f},Y{center_y:.1f})")
     else:
         # 如果没有孔位置，仍保留原始循环指令
-        gcode.append(f"G83 Z{-drilling_depth} R2 Q1 F{drill_feed} (DEEP HOLE DRILLING CYCLE)")
+        gcode.append(f"G83 Z{-drilling_depth:.3f} R2.0 Q1.0 F{drill_feed:.1f} (DEEP HOLE DRILLING CYCLE)")
     
     gcode.append("G80 (CANCEL FIXED CYCLE)")
     
     # 关闭切削液
     gcode.append("M09 (COOLANT OFF)")
     
-    gcode.append("G00 Z50 (RAPID MOVE TO SAFE HEIGHT)")
+    # 移动到统一的安全高度，然后取消刀具长度补偿
+    gcode.append("G00 Z100.0 (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
+    gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
     
     # 3. 攻丝工艺 (使用T3 - 丝锥)
     gcode.append("")
@@ -354,6 +407,8 @@ def _generate_tapping_code_with_full_process(features: List[Dict], description_a
         thread_pitch = 1.75  # M12螺纹螺距 (粗牙)
     
     tapping_feed = tapping_spindle_speed * thread_pitch  # F = S * 螺距 (mm/rev)，不需要除以60
+    # 确保攻丝进给率不低于1，避免系统报错
+    tapping_feed = max(tapping_feed, 1.0)
     
     gcode.append(f"T3 M06 (TOOL CHANGE - TAP)")
     gcode.append(f"M03 S{int(tapping_spindle_speed)} (SPINDLE FORWARD, TAPPING SPEED)")
@@ -386,11 +441,14 @@ def _generate_tapping_code_with_full_process(features: List[Dict], description_a
     
     if hole_positions:
         first_x, first_y = hole_positions[0]
-        gcode.append(f"G84 X{first_x:.3f} Y{first_y:.3f} Z{-tapping_depth} R2 F{tapping_feed:.1f} (TAPPING 1: X{first_x:.1f},Y{first_y:.1f} - {thread_type} THREAD)")
+        gcode.append(f"G84 X{first_x:.3f} Y{first_y:.3f} Z{-tapping_depth:.3f} R2.0 F{tapping_feed:.1f} (TAPPING 1: X{first_x:.1f},Y{first_y:.1f} - {thread_type} THREAD)")
         
         # 对于后续孔位置，只使用X、Y坐标，简化编程
         for i, (center_x, center_y) in enumerate(hole_positions[1:], 2):
             gcode.append(f"X{center_x:.3f} Y{center_y:.3f} (TAPPING {i}: X{center_x:.1f},Y{center_y:.1f} - {thread_type} THREAD)")
+    else:
+        # 如果没有孔位置，仍保留原始循环指令
+        gcode.append(f"G84 Z{-tapping_depth:.3f} R2.0 F{tapping_feed:.1f} (TAPPING CYCLE - NO SPECIFIC POSITION)")
     
     gcode.append("G80 (CANCEL FIXED CYCLE)")
     
@@ -399,7 +457,9 @@ def _generate_tapping_code_with_full_process(features: List[Dict], description_a
     
     # 攻丝后主轴反转退刀
     gcode.append(f"M04 S{int(tapping_spindle_speed)} (SPINDLE REVERSE, PREPARE FOR RETRACTION)")
-    gcode.append(f"G00 Z50 (RAPID RETRACTION TO SAFE HEIGHT)")
+    # 移动到统一的安全高度，然后取消刀具长度补偿
+    gcode.append(f"G00 Z100.0 (RAPID RETRACTION TO UNIFIED SAFE HEIGHT)")
+    gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
     gcode.append("M05 (SPINDLE STOP)")
     
     return gcode
@@ -454,11 +514,11 @@ def _generate_milling_code(features: List[Dict], description_analysis: Dict) -> 
             # 快速移动到圆的起始点
             start_x = center_x - radius
             gcode.append(f"G00 X{start_x:.3f} Y{center_y:.3f} (MOVE TO CIRCULAR ARC START POINT)")
-            gcode.append(f"G01 Z{-depth/2:.3f} F{feed_rate/2} (INITIAL CUTTING)")
+            gcode.append(f"G01 Z{-depth/2:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
             gcode.append(f"G02 X{start_x:.3f} Y{center_y:.3f} I{radius:.3f} J0 F{feed_rate} (CLOCKWISE CIRCULAR MILLING)")
             
             # 如果需要更深的加工，进行第二次切削
-            gcode.append(f"G01 Z{-depth:.3f} F{feed_rate/2} (CONTINUE CUTTING)")
+            gcode.append(f"G01 Z{-depth:.3f} F{feed_rate/2:.1f} (CONTINUE CUTTING)")
             gcode.append(f"G02 X{start_x:.3f} Y{center_y:.3f} I{radius:.3f} J0 F{feed_rate} (CLOCKWISE CIRCULAR MILLING)")
             
         elif feature["shape"] in ["rectangle", "square"]:
@@ -473,7 +533,7 @@ def _generate_milling_code(features: List[Dict], description_analysis: Dict) -> 
             start_x = center_x - half_length
             start_y = center_y - half_width
             gcode.append(f"G00 X{start_x:.3f} Y{start_y:.3f} (MOVE TO RECTANGLE START POINT)")
-            gcode.append(f"G01 Z{-depth:.3f} F{feed_rate/2} (INITIAL CUTTING)")
+            gcode.append(f"G01 Z{-depth:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
             
             # 铣削矩形轮廓
             gcode.append(f"G01 X{start_x + length:.3f} F{feed_rate} (MILL X DIRECTION EDGE)")
@@ -487,7 +547,7 @@ def _generate_milling_code(features: List[Dict], description_analysis: Dict) -> 
             if len(vertices) >= 3:
                 start_x, start_y = vertices[0]
                 gcode.append(f"G00 X{start_x:.3f} Y{start_y:.3f} (MOVE TO TRIANGLE START POINT)")
-                gcode.append(f"G01 Z{-depth:.3f} F{feed_rate/2} (INITIAL CUTTING)")
+                gcode.append(f"G01 Z{-depth:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
                 
                 for i in range(1, len(vertices)):
                     x, y = vertices[i]
@@ -499,6 +559,10 @@ def _generate_milling_code(features: List[Dict], description_analysis: Dict) -> 
     
     # 关闭切削液
     gcode.append("M09 (COOLANT OFF)")
+    
+    # 移动到统一的安全高度，然后取消刀具长度补偿
+    gcode.append("G00 Z100.0 (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
+    gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
     
     return gcode
 
@@ -550,14 +614,19 @@ def _generate_turning_code(features: List[Dict], description_analysis: Dict) -> 
             # 粗车循环 (G71)
             gcode.append(f"G71 U2 R1 (ROUGH TURNING CYCLE, 2MM DEPTH PER PASS)")
             gcode.append(f"G71 P10 Q20 U{diameter/10:.3f} W0.5 F{feed_rate/2} (ROUGH EXTERNAL DIAMETER)")
-            gcode.append("N10 G00 X0 Z0")
-            gcode.append(f"N20 G01 X{diameter} Z0 F{feed_rate/2}")
+            gcode.append("N10 G00 X0.0 Z0.0")
+            gcode.append(f"N20 G01 X{diameter:.3f} Z0.0 F{feed_rate/2}")
             
             # 精车循环 (G70)
             gcode.append("G70 P10 Q20 (FINISHING CYCLE)")
     
     # 关闭切削液
     gcode.append("M09 (COOLANT OFF)")
+    
+    # 移动到足够高的安全位置（高于刀具补偿值），然后取消刀具长度补偿
+    gcode.append("G00 Z105 (RAPID MOVE TO SAFE HEIGHT - ABOVE TOOL COMPENSATION VALUE)")
+    gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
+    gcode.append("G00 Z50 (RAPID MOVE TO INTERMEDIATE SAFE HEIGHT)")
     
     return gcode
 
@@ -589,4 +658,3 @@ def validate_nc_code(nc_code: str) -> List[str]:
         errors.append("缺少坐标模式设定指令 (G90 或 G91)")
     
     return errors
-
