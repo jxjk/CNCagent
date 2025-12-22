@@ -92,16 +92,19 @@ def _extract_depth(description: str) -> Optional[float]:
     for pattern in patterns:
         match = re.search(pattern, description)
         if match:
-            value = float(match.group(1))
-            unit = match.group(2).lower()
-            
-            # 如果单位是mm，则直接返回；如果是cm或m，则转换为mm
-            if 'cm' in unit:
-                return value * 10
-            elif 'm' in unit and 'mm' not in unit:
-                return value * 1000
-            else:
-                return value  # 默认为mm
+            try:
+                value = float(match.group(1))
+                unit = match.group(2).lower()
+                
+                # 如果单位是mm，则直接返回；如果是cm或m，则转换为mm
+                if 'cm' in unit:
+                    return value * 10
+                elif 'm' in unit and 'mm' not in unit:
+                    return value * 1000
+                else:
+                    return value  # 默认为mm
+            except (ValueError, TypeError):
+                continue  # 如果转换失败，继续尝试下一个模式
     
     return None
 
@@ -117,7 +120,10 @@ def _extract_feed_rate(description: str) -> Optional[float]:
     for pattern in patterns:
         match = re.search(pattern, description)
         if match:
-            return float(match.group(1))
+            try:
+                return float(match.group(1))
+            except (ValueError, TypeError):
+                continue  # 如果转换失败，继续尝试下一个模式
     
     return None
 
@@ -133,7 +139,10 @@ def _extract_spindle_speed(description: str) -> Optional[float]:
     for pattern in patterns:
         match = re.search(pattern, description)
         if match:
-            return float(match.group(1))
+            try:
+                return float(match.group(1))
+            except (ValueError, TypeError):
+                continue  # 如果转换失败，继续尝试下一个模式
     
     return None
 
@@ -164,6 +173,9 @@ def _extract_precision(description: str) -> Optional[str]:
     for pattern in patterns:
         match = re.search(pattern, description)
         if match:
-            return f"Ra{match.group(1)}"
+            try:
+                return f"Ra{match.group(1)}"
+            except (IndexError, TypeError):
+                continue  # 如果提取失败，继续尝试下一个模式
     
     return None

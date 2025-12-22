@@ -7,6 +7,8 @@ from PIL import Image
 import pytesseract
 import numpy as np
 import os
+import logging
+pytesseract.pytesseract.tesseract_cmd = r'D:\Program Files\Tesseract-OCR\tesseract.exe'
 
 
 def pdf_to_images(pdf_path, dpi=150):  # 降低DPI以兼容性更好
@@ -66,21 +68,27 @@ def ocr_image(image, lang='chi_sim+eng'):
     Returns:
         str: 识别出的文本
     """
-    # 预处理图像
-    processed_img = preprocess_image(image)
-    
-    # 临时保存图像用于OCR
-    temp_path = "temp_ocr.png"
-    processed_img.save(temp_path)
-    
     try:
+        # 预处理图像
+        processed_img = preprocess_image(image)
+        
+        # 临时保存图像用于OCR
+        temp_path = "temp_ocr.png"
+        processed_img.save(temp_path)
+        
         # OCR识别
         text = pytesseract.image_to_string(Image.open(temp_path), lang=lang)
         return text
+    except Exception as e:
+        logging.warning(f"OCR处理失败: {str(e)}。请确保已安装Tesseract OCR引擎并添加到系统PATH中。")
+        return ""
     finally:
         # 清理临时文件
         if os.path.exists(temp_path):
-            os.remove(temp_path)
+            try:
+                os.remove(temp_path)
+            except:
+                pass  # 忽略删除临时文件时的错误
 
 
 def extract_text_from_pdf(pdf_path):

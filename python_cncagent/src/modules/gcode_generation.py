@@ -40,8 +40,13 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
     tool_number = _get_tool_number(tool_required)
     gcode.append(f"T{tool_number} M06 ; 选择刀具T{tool_number}")
     
-    # 设置主轴转速
-    spindle_speed = description_analysis.get("spindle_speed", 1000)
+    # 设置主轴转速 - 安全处理None值
+    spindle_speed = description_analysis.get("spindle_speed")
+    if spindle_speed is None or not isinstance(spindle_speed, (int, float)):
+        spindle_speed = 1000  # 默认值
+    else:
+        spindle_speed = float(spindle_speed)
+    
     gcode.append(f"M03 S{int(spindle_speed)} ; 主轴正转，速度{int(spindle_speed)} RPM")
     gcode.append("G04 P1000 ; 延时1秒，等待主轴达到设定转速")
     gcode.append("")
@@ -84,9 +89,18 @@ def _generate_drilling_code(features: List[Dict], description_analysis: Dict) ->
     """生成钻孔加工代码"""
     gcode = []
     
-    # 设置钻孔循环参数
-    depth = description_analysis.get("depth", 10)
-    feed_rate = description_analysis.get("feed_rate", 100)
+    # 设置钻孔循环参数 - 安全处理None值
+    depth = description_analysis.get("depth")
+    if depth is None or not isinstance(depth, (int, float)):
+        depth = 10  # 默认值
+    else:
+        depth = float(depth)
+    
+    feed_rate = description_analysis.get("feed_rate")
+    if feed_rate is None or not isinstance(feed_rate, (int, float)):
+        feed_rate = 100  # 默认值
+    else:
+        feed_rate = float(feed_rate)
     
     gcode.append(f"G99 G83 Z{-depth} R2 F{feed_rate} ; 深孔钻循环")
     
@@ -104,10 +118,24 @@ def _generate_milling_code(features: List[Dict], description_analysis: Dict) -> 
     """生成铣削加工代码"""
     gcode = []
     
-    # 设置铣削参数
-    depth = description_analysis.get("depth", 5)
-    feed_rate = description_analysis.get("feed_rate", 200)
-    spindle_speed = description_analysis.get("spindle_speed", 1000)
+    # 设置铣削参数 - 安全处理None值
+    depth = description_analysis.get("depth")
+    if depth is None or not isinstance(depth, (int, float)):
+        depth = 5  # 默认值
+    else:
+        depth = float(depth)
+    
+    feed_rate = description_analysis.get("feed_rate")
+    if feed_rate is None or not isinstance(feed_rate, (int, float)):
+        feed_rate = 200  # 默认值
+    else:
+        feed_rate = float(feed_rate)
+    
+    spindle_speed = description_analysis.get("spindle_speed")
+    if spindle_speed is None or not isinstance(spindle_speed, (int, float)):
+        spindle_speed = 1000  # 默认值
+    else:
+        spindle_speed = float(spindle_speed)
     
     # 为每个特征生成铣削代码
     for feature in features:
@@ -172,10 +200,24 @@ def _generate_turning_code(features: List[Dict], description_analysis: Dict) -> 
     """生成车削加工代码"""
     gcode = []
     
-    # 设置车削参数
-    depth = description_analysis.get("depth", 2)
-    feed_rate = description_analysis.get("feed_rate", 100)
-    spindle_speed = description_analysis.get("spindle_speed", 800)
+    # 设置车削参数 - 安全处理None值
+    depth = description_analysis.get("depth")
+    if depth is None or not isinstance(depth, (int, float)):
+        depth = 2  # 默认值
+    else:
+        depth = float(depth)
+    
+    feed_rate = description_analysis.get("feed_rate")
+    if feed_rate is None or not isinstance(feed_rate, (int, float)):
+        feed_rate = 100  # 默认值
+    else:
+        feed_rate = float(feed_rate)
+    
+    spindle_speed = description_analysis.get("spindle_speed")
+    if spindle_speed is None or not isinstance(spindle_speed, (int, float)):
+        spindle_speed = 800  # 默认值
+    else:
+        spindle_speed = float(spindle_speed)
     
     gcode.append(f"M03 S{int(spindle_speed)} ; 设置主轴转速")
     

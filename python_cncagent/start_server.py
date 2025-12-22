@@ -3,7 +3,7 @@ Flask API服务，提供PDF到NC程序的Web接口
 """
 import os
 import json
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template_string
 from flask_cors import CORS
 import tempfile
 from src.main import generate_nc_from_pdf
@@ -11,6 +11,233 @@ from src.main import generate_nc_from_pdf
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
+
+
+# HTML模板 - CNC Agent用户界面
+HTML_TEMPLATE = '''
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNC Agent - PDF到NC程序转换器</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        input[type="file"], input[type="text"], input[type="number"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        .result h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .nc-code {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            color: #e74c3c;
+            background: #fadbd8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .success {
+            color: #27ae60;
+            background: #d5f4e6;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .loading:after {
+            content: "";
+            animation: spin 1s linear infinite;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #3498db;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .instructions {
+            background: #e8f4fc;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #2980b9;
+        }
+        .instructions ul {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CNC Agent - PDF到NC程序转换器</h1>
+        
+        <div class="instructions">
+            <h3>使用说明</h3>
+            <ul>
+                <li>上传包含几何图纸的PDF文件</li>
+                <li>在描述框中输入加工要求（如：请加工一个直径10mm的孔，深度5mm）</li>
+                <li>设置图纸比例尺（默认为1.0）</li>
+                <li>点击"生成NC程序"按钮</li>
+            </ul>
+        </div>
+        
+        <form id="cncForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="pdfFile">PDF图纸文件:</label>
+                <input type="file" id="pdfFile" name="pdf" accept=".pdf" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="description">加工描述:</label>
+                <textarea id="description" name="description" placeholder="例如：请加工一个直径10mm的孔，深度5mm，使用铣削加工" required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="scale">图纸比例尺 (可选):</label>
+                <input type="number" id="scale" name="scale" value="1.0" min="0.001" max="100" step="0.1">
+            </div>
+            
+            <button type="submit" id="submitBtn">生成NC程序</button>
+        </form>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('cncForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = document.getElementById('submitBtn');
+            const resultDiv = document.getElementById('result');
+            
+            // 显示加载状态
+            submitBtn.disabled = true;
+            submitBtn.textContent = '生成中...';
+            resultDiv.innerHTML = '<div class="loading">处理中</div>';
+            
+            try {
+                const response = await fetch('/generate_nc', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    resultDiv.innerHTML = `
+                        <div class="result">
+                            <h3>生成的NC程序</h3>
+                            <div class="nc-code">${data.nc_program}</div>
+                            <br>
+                            <a href="/download_nc/${data.nc_file_path}" download="output.nc">
+                                <button>下载NC文件</button>
+                            </a>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">错误: ${data.error || '未知错误'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">请求失败: ${error.message}</div>`;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '生成NC程序';
+            }
+        });
+    </script>
+</body>
+</html>
+'''
+
+
+@app.route('/')
+def index():
+    """返回用户界面"""
+    return render_template_string(HTML_TEMPLATE)
 
 
 @app.route('/health', methods=['GET'])
