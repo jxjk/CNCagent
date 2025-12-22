@@ -1,363 +1,250 @@
 """
-材料-刀具智能匹配模块
+用户描述理解模块
+使用NLP技术分析用户对加工需求的描述，提取关键信息如加工类型、材料、精度要求等
 """
-import math
-from typing import Dict, List, Any, Optional
+import spacy
+import re
+from typing import Dict, List, Optional
+from dataclasses import dataclass
 
 
-# 材料数据库
-MATERIAL_DATABASE = {
-    # 钢材
-    'steel': {
-        'name': '钢',
-        'hardness': {'min': 150, 'max': 600, 'unit': 'HB'},
-        'tensile_strength': {'min': 400, 'max': 2000, 'unit': 'MPa'},
-        'default_tool_material': 'carbide',
-        'recommended_cutting_speed': { 
-            'rough': {'min': 80, 'max': 150, 'unit': 'm/min'},
-            'finish': {'min': 120, 'max': 200, 'unit': 'm/min'}
-        }
-    },
-    'stainless_steel': {
-        'name': '不锈钢',
-        'hardness': {'min': 150, 'max': 300, 'unit': 'HB'},
-        'tensile_strength': {'min': 500, 'max': 800, 'unit': 'MPa'},
-        'default_tool_material': 'carbide',
-        'recommended_cutting_speed': {
-            'rough': {'min': 60, 'max': 120, 'unit': 'm/min'},
-            'finish': {'min': 100, 'max': 160, 'unit': 'm/min'}
-        }
-    },
-    'aluminum': {
-        'name': '铝',
-        'hardness': {'min': 15, 'max': 150, 'unit': 'HB'},
-        'tensile_strength': {'min': 70, 'max': 300, 'unit': 'MPa'},
-        'default_tool_material': 'carbide',
-        'recommended_cutting_speed': {
-            'rough': {'min': 200, 'max': 1000, 'unit': 'm/min'},
-            'finish': {'min': 300, 'max': 1200, 'unit': 'm/min'}
-        }
-    },
-    'copper': {
-        'name': '铜',
-        'hardness': {'min': 35, 'max': 100, 'unit': 'HB'},
-        'tensile_strength': {'min': 200, 'max': 300, 'unit': 'MPa'},
-        'default_tool_material': 'hss',
-        'recommended_cutting_speed': {
-            'rough': {'min': 100, 'max': 300, 'unit': 'm/min'},
-            'finish': {'min': 150, 'max': 400, 'unit': 'm/min'}
-        }
-    },
-    'plastic': {
-        'name': '塑料',
-        'hardness': {'min': 10, 'max': 50, 'unit': 'HB'},
-        'tensile_strength': {'min': 20, 'max': 100, 'unit': 'MPa'},
-        'default_tool_material': 'carbide',
-        'recommended_cutting_speed': {
-            'rough': {'min': 150, 'max': 500, 'unit': 'm/min'},
-            'finish': {'min': 200, 'max': 600, 'unit': 'm/min'}
-        }
-    },
-    'titanium': {
-        'name': '钛合金',
-        'hardness': {'min': 300, 'max': 450, 'unit': 'HB'},
-        'tensile_strength': {'min': 900, 'max': 1200, 'unit': 'MPa'},
-        'default_tool_material': 'carbide',
-        'recommended_cutting_speed': {
-            'rough': {'min': 30, 'max': 60, 'unit': 'm/min'},
-            'finish': {'min': 50, 'max': 80, 'unit': 'm/min'}
-        }
-    }
-}
-
-# 刀具数据库
-TOOL_DATABASE = {
-    'hss': {
-        'name': '高速钢刀具',
-        'materials': ['steel', 'aluminum', 'copper', 'plastic'],
-        'coating': 'none',
-        'max_rpm': 8000,
-        'max_cutting_speed': 150,
-        'feed_per_tooth': {'steel': 0.05, 'aluminum': 0.15, 'copper': 0.12, 'plastic': 0.2}
-    },
-    'carbide_uncoated': {
-        'name': '未涂层硬质合金刀具',
-        'materials': ['steel', 'stainless_steel', 'aluminum', 'copper', 'plastic', 'titanium'],
-        'coating': 'none',
-        'max_rpm': 15000,
-        'max_cutting_speed': 300,
-        'feed_per_tooth': {'steel': 0.08, 'stainless_steel': 0.06, 'aluminum': 0.18, 'copper': 0.15, 'plastic': 0.25, 'titanium': 0.03}
-    },
-    'carbide_ticn': {
-        'name': 'TiCN涂层硬质合金刀具',
-        'materials': ['steel', 'stainless_steel', 'aluminum', 'copper', 'titanium'],
-        'coating': 'TiCN',
-        'max_rpm': 20000,
-        'max_cutting_speed': 400,
-        'feed_per_tooth': {'steel': 0.10, 'stainless_steel': 0.08, 'aluminum': 0.20, 'copper': 0.18, 'titanium': 0.04}
-    },
-    'carbide_alcrn': {
-        'name': 'AlCrN涂层硬质合金刀具',
-        'materials': ['steel', 'stainless_steel', 'titanium'],
-        'coating': 'AlCrN',
-        'max_rpm': 25000,
-        'max_cutting_speed': 500,
-        'feed_per_tooth': {'steel': 0.12, 'stainless_steel': 0.10, 'titanium': 0.05}
-    }
-}
-
-# 特征类型到刀具映射
-FEATURE_TO_TOOL_MAPPING = {
-    'hole': {
-        'center_drill': ['steel', 'stainless_steel', 'aluminum', 'copper'],
-        'twist_drill': ['steel', 'stainless_steel', 'aluminum', 'copper', 'plastic'],
-        'step_drill': ['aluminum', 'copper', 'plastic'],
-        'reamer': ['steel', 'stainless_steel', 'aluminum', 'copper']
-    },
-    'counterbore': {
-        'counterbore_tool': ['steel', 'stainless_steel', 'aluminum', 'copper'],
-        'spotface_tool': ['steel', 'stainless_steel', 'aluminum', 'copper']
-    },
-    'pocket': {
-        'endmill': ['steel', 'stainless_steel', 'aluminum', 'copper', 'plastic', 'titanium'],
-        'face_mill': ['steel', 'aluminum', 'copper', 'plastic']
-    },
-    'slot': {
-        'slot_drill': ['steel', 'aluminum', 'copper'],
-        'side_mill': ['steel', 'aluminum', 'copper', 'plastic']
-    },
-    'face_mill': {
-        'face_mill': ['steel', 'stainless_steel', 'aluminum', 'copper', 'plastic']
-    },
-    'thread': {
-        'tap': ['steel', 'aluminum', 'copper', 'plastic'],
-        'thread_mill': ['steel', 'stainless_steel', 'aluminum', 'copper']
-    }
-}
+@dataclass
+class ProcessingInstruction:
+    """加工指令数据类"""
+    processing_type: str  # 加工类型：drilling, milling, turning等
+    tool_required: str    # 需要的刀具
+    depth: Optional[float] = None  # 加工深度
+    feed_rate: Optional[float] = None  # 进给速度
+    spindle_speed: Optional[float] = None  # 主轴转速
+    material: Optional[str] = None  # 材料类型
+    precision: Optional[str] = None  # 精度要求
 
 
-def recommend_machining_parameters(material_type: str, tool_type: str, feature_type: str, feature_size: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
-    """
-    推荐加工参数
+class UserDescriptionAnalyzer:
+    """用户描述分析器"""
     
-    Args:
-        material_type: 材料类型
-        tool_type: 刀具类型
-        feature_type: 特征类型
-        feature_size: 特征尺寸
+    def __init__(self):
+        """初始化分析器，加载NLP模型"""
+        try:
+            # 尝试加载中文模型，如果失败则加载英文模型
+            try:
+                self.nlp = spacy.load("zh_core_web_sm")
+            except OSError:
+                try:
+                    self.nlp = spacy.load("en_core_web_sm")
+                except OSError:
+                    # 如果都没有安装，则使用简化版本
+                    self.nlp = None
+        except:
+            self.nlp = None
+    
+    def analyze(self, description: str) -> ProcessingInstruction:
+        """
+        分析用户描述，提取加工指令
         
-    Returns:
-        推荐的加工参数
-    """
-    if feature_size is None:
-        feature_size = {}
+        Args:
+            description (str): 用户描述文本
+        
+        Returns:
+            ProcessingInstruction: 解析出的加工指令
+        """
+        if self.nlp:
+            return self._analyze_with_nlp(description)
+        else:
+            return self._analyze_without_nlp(description)
     
-    material = MATERIAL_DATABASE.get(material_type)
-    tool = TOOL_DATABASE.get(tool_type)
+    def _analyze_with_nlp(self, description: str) -> ProcessingInstruction:
+        """使用NLP模型分析描述"""
+        doc = self.nlp(description)
+        
+        # 提取实体和关键词
+        entities = {}
+        for ent in doc.ents:
+            entities[ent.label_] = ent.text
+        
+        # 分析加工类型
+        processing_type = self._identify_processing_type(description)
+        
+        # 提取数值信息（深度、转速等）
+        depth = self._extract_depth(description)
+        feed_rate = self._extract_feed_rate(description)
+        spindle_speed = self._extract_spindle_speed(description)
+        
+        # 提取材料信息
+        material = self._extract_material(description)
+        
+        # 提取精度要求
+        precision = self._extract_precision(description)
+        
+        # 确定所需刀具
+        tool_required = self._identify_tool_required(processing_type)
+        
+        return ProcessingInstruction(
+            processing_type=processing_type,
+            tool_required=tool_required,
+            depth=depth,
+            feed_rate=feed_rate,
+            spindle_speed=spindle_speed,
+            material=material,
+            precision=precision
+        )
     
-    if not material or not tool:
+    def _analyze_without_nlp(self, description: str) -> ProcessingInstruction:
+        """不使用NLP模型的简化分析"""
+        processing_type = self._identify_processing_type(description)
+        depth = self._extract_depth(description)
+        feed_rate = self._extract_feed_rate(description)
+        spindle_speed = self._extract_spindle_speed(description)
+        material = self._extract_material(description)
+        precision = self._extract_precision(description)
+        tool_required = self._identify_tool_required(processing_type)
+        
+        return ProcessingInstruction(
+            processing_type=processing_type,
+            tool_required=tool_required,
+            depth=depth,
+            feed_rate=feed_rate,
+            spindle_speed=spindle_speed,
+            material=material,
+            precision=precision
+        )
+    
+    def _identify_processing_type(self, description: str) -> str:
+        """识别加工类型"""
+        description_lower = description.lower()
+        
+        # 关键词映射
+        drilling_keywords = ['drill', 'hole', '钻孔', '打孔', '孔']
+        milling_keywords = ['mill', 'milling', 'cut', 'cutting', '铣', '铣削', '切削']
+        turning_keywords = ['turn', 'turning', 'lathe', '车', '车削']
+        grinding_keywords = ['grind', 'grinding', '磨', '磨削']
+        
+        if any(keyword in description_lower for keyword in drilling_keywords):
+            return 'drilling'
+        elif any(keyword in description_lower for keyword in milling_keywords):
+            return 'milling'
+        elif any(keyword in description_lower for keyword in turning_keywords):
+            return 'turning'
+        elif any(keyword in description_lower for keyword in grinding_keywords):
+            return 'grinding'
+        else:
+            return 'general'
+    
+    def _identify_tool_required(self, processing_type: str) -> str:
+        """根据加工类型确定需要的刀具"""
+        tool_mapping = {
+            'drilling': 'drill_bit',
+            'milling': 'end_mill',
+            'turning': 'cutting_tool',
+            'grinding': 'grinding_wheel'
+        }
+        
+        return tool_mapping.get(processing_type, 'general_tool')
+    
+    def _extract_depth(self, description: str) -> Optional[float]:
+        """提取加工深度"""
+        # 匹配 "深度5mm" 或 "5mm深" 等模式
+        patterns = [
+            r'深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM])',
+            r'(\d+\.?\d*)\s*([mM]?[mM])\s*深',
+            r'depth[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM])'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, description)
+            if match:
+                value = float(match.group(1))
+                unit = match.group(2).lower()
+                
+                # 如果单位是mm，则直接返回；如果是cm或m，则转换为mm
+                if 'cm' in unit:
+                    return value * 10
+                elif 'm' in unit and 'mm' not in unit:
+                    return value * 1000
+                else:
+                    return value  # 默认为mm
+        
+        return None
+    
+    def _extract_feed_rate(self, description: str) -> Optional[float]:
+        """提取进给速度"""
+        patterns = [
+            r'进给[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev)',
+            r'feed[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev)',
+            r'速度[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, description)
+            if match:
+                return float(match.group(1))
+        
+        return None
+    
+    def _extract_spindle_speed(self, description: str) -> Optional[float]:
+        """提取主轴转速"""
+        patterns = [
+            r'转速[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|转/分钟)',
+            r'speed[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|rev/min)',
+            r'主轴[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, description)
+            if match:
+                return float(match.group(1))
+        
+        return None
+    
+    def _extract_material(self, description: str) -> Optional[str]:
+        """提取材料信息"""
+        materials = ['steel', 'aluminum', 'aluminium', 'titanium', 'copper', 'brass', 
+                     'plastic', 'wood', 'steel', '不锈钢', '铝合金', '钛合金', '铜', 
+                     '塑料', '木材', 'steel', '铁', 'metal', '金属']
+        
+        for material in materials:
+            if material in description.lower():
+                return material
+        
+        return None
+    
+    def _extract_precision(self, description: str) -> Optional[str]:
+        """提取精度要求"""
+        # 匹配 "精度0.01mm" 或 "Ra1.6" 等
+        patterns = [
+            r'精度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM])',
+            r'Ra\s*(\d+\.?\d*)',
+            r'粗糙度[：:]?\s*Ra\s*(\d+\.?\d*)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, description)
+            if match:
+                return f"Ra{match.group(1)}"
+        
         return None
 
-    # 基础参数计算
-    base_cutting_speed = material['recommended_cutting_speed']['finish']['min']
-    feed_per_tooth = tool['feed_per_tooth'].get(material_type, 0.1)
 
-    # 根据特征类型调整参数
-    cutting_speed = base_cutting_speed
-    spindle_speed = 0
-    feed_rate = 0
-
-    # 计算主轴转速 (RPM = (Cutting Speed * 1000) / (π * Tool Diameter))
-    tool_diameter = feature_size.get('diameter', 6)  # 默认6mm
-    spindle_speed = round((cutting_speed * 1000) / (math.pi * tool_diameter))
-
-    # 限制主轴转速不超过刀具最大RPM
-    spindle_speed = min(spindle_speed, tool['max_rpm'])
-
-    # 计算进给率 (Feed Rate = Spindle Speed * Feed Per Tooth * Number of Flutes)
-    number_of_flutes = feature_size.get('flutes', 2)  # 默认2刃
-    feed_rate = round(spindle_speed * feed_per_tooth * number_of_flutes)
-
-    # 根据特征类型进一步调整
-    if feature_type == 'hole':
-        # 钻孔时降低主轴转速和进给率
-        spindle_speed = round(spindle_speed * 0.7)
-        feed_rate = round(feed_rate * 0.6)
-    elif feature_type == 'pocket':
-        # 铣削口袋时使用中等参数
-        spindle_speed = round(spindle_speed * 0.9)
-        feed_rate = round(feed_rate * 0.85)
-    elif feature_type == 'face_mill':
-        # 面铣时可以使用较高参数
-        spindle_speed = round(spindle_speed * 0.95)
-        feed_rate = round(feed_rate * 0.9)
-    elif feature_type == 'thread':
-        # 攻丝时使用较低参数
-        spindle_speed = round(spindle_speed * 0.5)
-        feed_rate = round(feed_rate * 0.4)
-    # 其他特征类型使用计算值
-
+def analyze_user_description(description: str) -> Dict:
+    """
+    分析用户描述，提取关键信息
+    
+    Args:
+        description (str): 用户对加工需求的描述
+    
+    Returns:
+        dict: 包含提取信息的字典
+    """
+    analyzer = UserDescriptionAnalyzer()
+    instruction = analyzer.analyze(description)
+    
     return {
-        'spindle_speed': spindle_speed,
-        'feed_rate': feed_rate,
-        'cutting_speed': cutting_speed,
-        'tool_diameter': tool_diameter,
-        'number_of_flutes': number_of_flutes,
-        'material': material['name'],
-        'tool': tool['name'],
-        'adjustments': {
-            'feature_specific': True,
-            'speed_factor': spindle_speed / (base_cutting_speed * 1000 / (math.pi * tool_diameter)),
-            'feed_factor': feed_rate / (spindle_speed * feed_per_tooth * number_of_flutes)
-        }
+        "processing_type": instruction.processing_type,
+        "tool_required": instruction.tool_required,
+        "depth": instruction.depth,
+        "feed_rate": instruction.feed_rate,
+        "spindle_speed": instruction.spindle_speed,
+        "material": instruction.material,
+        "precision": instruction.precision,
+        "description": description
     }
-
-
-def match_material_and_tool(material_type: str, feature_type: str, feature_size: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-    """
-    智能匹配材料和刀具
-    
-    Args:
-        material_type: 材料类型
-        feature_type: 特征类型
-        feature_size: 特征尺寸
-        
-    Returns:
-        适合的刀具列表
-    """
-    if feature_size is None:
-        feature_size = {}
-    
-    material = MATERIAL_DATABASE.get(material_type)
-    if not material:
-        raise ValueError(f'不支持的材料类型: {material_type}')
-
-    # 获取适合该材料和特征的刀具列表
-    suitable_tools = []
-
-    for tool_key, tool in TOOL_DATABASE.items():
-        # 检查刀具是否适用于该材料
-        if material_type in tool['materials']:
-            # 获取适合该特征的刀具类型
-            feature_tools = FEATURE_TO_TOOL_MAPPING.get(feature_type, {})
-
-            # 检查是否有该特征对应的刀具
-            has_feature_tool = False
-            for feature_tool_materials in feature_tools.values():
-                if material_type in feature_tool_materials:
-                    has_feature_tool = True
-                    break
-
-            if has_feature_tool:
-                # 推荐加工参数
-                parameters = recommend_machining_parameters(material_type, tool_key, feature_type, feature_size)
-
-                suitable_tools.append({
-                    'tool_type': tool_key,
-                    'tool_name': tool['name'],
-                    'parameters': parameters,
-                    'ranking': calculate_tool_ranking(material, tool, feature_type, feature_size)
-                })
-
-    # 按排名排序
-    suitable_tools.sort(key=lambda x: x['ranking'], reverse=True)
-
-    return suitable_tools
-
-
-def calculate_tool_ranking(material: Dict[str, Any], tool: Dict[str, Any], feature_type: str, feature_size: Dict[str, Any]) -> int:
-    """
-    计算刀具排名
-    
-    Args:
-        material: 材料信息
-        tool: 刀具信息
-        feature_type: 特征类型
-        feature_size: 特征尺寸
-        
-    Returns:
-        排名分数
-    """
-    ranking = 0
-
-    # 基础分
-    ranking += 50
-
-    # 根据涂层加分
-    if tool['coating'] == 'AlCrN':
-        ranking += 20
-    elif tool['coating'] == 'TiCN':
-        ranking += 15
-
-    # 根据最大切削速度加分
-    ranking += (tool['max_cutting_speed'] / 100)
-
-    # 根据材料硬度调整
-    material_hardness = (material['hardness']['min'] + material['hardness']['max']) / 2
-    if material_hardness > 400 and tool['max_cutting_speed'] > 300:
-        ranking += 10
-
-    # 根据特征类型特殊加分
-    if feature_type == 'thread' and tool['coating']:
-        ranking += 5
-    if feature_type == 'pocket' and tool['max_cutting_speed'] > 200:
-        ranking += 5
-
-    return ranking
-
-
-def get_materials_list() -> List[Dict[str, Any]]:
-    """
-    获取材料列表
-    
-    Returns:
-        材料列表
-    """
-    return [
-        {
-            'key': key,
-            'name': value['name'],
-            'properties': {
-                'hardness': value['hardness'],
-                'tensile_strength': value['tensile_strength']
-            }
-        }
-        for key, value in MATERIAL_DATABASE.items()
-    ]
-
-
-def get_tools_list() -> List[Dict[str, Any]]:
-    """
-    获取刀具列表
-    
-    Returns:
-        刀具列表
-    """
-    return [
-        {
-            'key': key,
-            'name': value['name'],
-            'properties': {
-                'coating': value['coating'],
-                'max_rpm': value['max_rpm'],
-                'max_cutting_speed': value['max_cutting_speed']
-            }
-        }
-        for key, value in TOOL_DATABASE.items()
-    ]
-
-
-if __name__ == "__main__":
-    # 测试代码
-    print("材料列表:")
-    for material in get_materials_list():
-        print(f"  {material['key']}: {material['name']}")
-    
-    print("\n刀具列表:")
-    for tool in get_tools_list():
-        print(f"  {tool['key']}: {tool['name']}")
-    
-    print("\n为铝材孔加工推荐刀具:")
-    tools = match_material_and_tool('aluminum', 'hole', {'diameter': 6})
-    for tool in tools:
-        print(f"  {tool['tool_name']}: 排名 {tool['ranking']}, 参数 {tool['parameters']}")

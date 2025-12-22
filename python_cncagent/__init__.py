@@ -1,3 +1,3 @@
 """
-CNCagent - Python版CNC代码编写助手
+CNC Agent Python包初始化文件
 """

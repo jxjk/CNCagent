@@ -1,127 +1,56 @@
 """
-项目初始化模块，负责创建和管理项目实例
+项目初始化模块
+负责初始化CNC Agent的所有组件
 """
 import os
-import json
-from datetime import datetime
-from typing import Dict, Any, Optional
-import uuid
+import sys
+from pathlib import Path
 
 
-class Project:
-    """项目类定义"""
-    def __init__(self, name: str = "New Project"):
-        self.id = self._generate_id()
-        self.name = name
-        self.file_path = None
-        self.drawing_info = None
-        self.geometry_elements = []
-        self.dimensions = []
-        self.features = []
-        self.gcode_blocks = []
-        self.created_at = datetime.now()
-        self.updated_at = datetime.now()
-        self.workspace_path = None
-        self.material_type = None  # 添加材料类型属性
-        self.collision_warnings = []  # 添加碰撞警告属性
-
-    def _generate_id(self) -> str:
-        """生成唯一ID"""
-        return f"proj_{int(datetime.now().timestamp())}_{str(uuid.uuid4())[:8]}"
-
-    def update_metadata(self):
-        """更新元数据"""
-        self.updated_at = datetime.now()
-
-    def serialize(self) -> Dict[str, Any]:
-        """将项目对象序列化为字典"""
-        return {
-            'id': self.id,
-            'name': self.name,
-            'file_path': self.file_path,
-            'drawing_info': self.drawing_info,
-            'geometry_elements': self.geometry_elements,
-            'dimensions': self.dimensions,
-            'features': self.features,
-            'gcode_blocks': self.gcode_blocks,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'workspace_path': self.workspace_path,
-            'material_type': self.material_type,
-            'collision_warnings': self.collision_warnings
-        }
-
-
-def initialize_project(project_name: str = "New Project") -> Project:
+def initialize_project():
     """
-    初始化项目
+    初始化项目环境
+    """
+    # 创建必要的目录
+    directories = [
+        "logs",
+        "temp",
+        "output",
+        "workspace"
+    ]
     
-    Args:
-        project_name: 项目名称
-        
-    Returns:
-        Project: 初始化的项目对象
-    """
-    if not isinstance(project_name, str):
-        raise ValueError('项目名必须是字符串')
-
-    project = Project(project_name)
-    project.workspace_path = os.path.join(os.path.dirname(__file__), '..', '..', 'workspace', project.id)
+    for directory in directories:
+        path = Path(directory)
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
+            print(f"创建目录: {directory}")
     
-    # 创建工作目录
-    os.makedirs(project.workspace_path, exist_ok=True)
+    print("项目初始化完成")
+
+
+def setup_logging():
+    """
+    设置日志记录
+    """
+    import logging
     
-    return project
-
-
-def clear_workspace():
-    """
-    清理工作区
-    """
-    workspace_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'workspace')
-    if os.path.exists(workspace_dir):
-        for project_dir in os.listdir(workspace_dir):
-            full_path = os.path.join(workspace_dir, project_dir)
-            if os.path.isdir(full_path):
-                import shutil
-                shutil.rmtree(full_path, ignore_errors=True)
-
-
-def handle_drawing_import(file_path: str) -> Project:
-    """
-    处理图纸导入
+    # 创建日志目录
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
     
-    Args:
-        file_path: 文件路径
-        
-    Returns:
-        Project: 包含导入文件信息的项目对象
-    """
-    if not file_path or not isinstance(file_path, str):
-        raise ValueError('文件路径无效')
-
-    # 检查文件是否存在
-    if not os.path.exists(file_path):
-        raise ValueError(f'文件不存在: {file_path}')
-
-    # 模拟文件导入处理
-    file_extension = os.path.splitext(file_path)[1].lower()
-    valid_extensions = ['.pdf', '.dxf', '.svg', '.dwg', '.step', '.iges']
+    # 配置日志
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_dir / "cnc_agent.log"),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
     
-    if file_extension not in valid_extensions:
-        raise ValueError(f'不支持的文件格式: {file_extension}')
-
-    # 创建项目实例
-    file_name = os.path.splitext(os.path.basename(file_path))[0]
-    project = initialize_project(file_name)
-    project.file_path = file_path
-    project.update_metadata()
-
-    return project
+    print("日志系统已设置")
 
 
 if __name__ == "__main__":
-    # 测试代码
-    test_project = initialize_project("Test Project")
-    print(f"创建项目: {test_project.name} (ID: {test_project.id})")
-    print(f"工作空间路径: {test_project.workspace_path}")
+    initialize_project()
+    setup_logging()

@@ -1,43 +1,34 @@
 @echo off
-echo 开始部署CNCagent到Docker...
+REM CNC Agent 部署脚本 (Windows)
 
-REM 检查Docker是否安装
-docker --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo 错误: Docker未安装，请先安装Docker
+echo 正在部署 CNC Agent...
+
+REM 检查Python是否已安装
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo 错误: 未找到Python，请确保已安装Python并添加到PATH环境变量中
     pause
     exit /b 1
 )
 
-echo 构建CNCagent镜像...
-docker build -t cncagent:latest .
-
-if %errorlevel% equ 0 (
-    echo 启动CNCagent容器...
-    docker run -d ^
-        --name cncagent ^
-        -p 3000:3000 ^
-        -v %cd%\workspace:/app/workspace ^
-        -v %cd%\logs:/app/logs ^
-        cncagent:latest
-    
-    if %errorlevel% equ 0 (
-        echo.
-        echo CNCagent已成功启动！
-        echo 请访问 http://localhost:3000
-        echo.
-        docker ps --filter "name=cncagent"
-    ) else (
-        echo 启动容器失败
-        pause
-        exit /b 1
-    )
-) else (
-    echo 构建镜像失败
+REM 安装依赖
+echo 正在安装依赖...
+pip install -r requirements.txt
+if errorlevel 1 (
+    echo 依赖安装失败
     pause
     exit /b 1
 )
 
-echo.
-echo 部署完成！
+REM 创建必要目录
+echo 正在创建必要目录...
+if not exist logs mkdir logs
+if not exist temp mkdir temp
+if not exist output mkdir output
+if not exist uploads mkdir uploads
+
+REM 启动服务器
+echo 正在启动CNC Agent服务器...
+python start_server.py
+
 pause
