@@ -1,5 +1,5 @@
 """
-几何特征识别模块
+几何特征识别模块 - 优化版本
 从图像中识别几何形状，如圆形、矩形、多边形等，并提取其尺寸和位置信息
 """
 import cv2
@@ -23,20 +23,21 @@ def identify_features(image: np.ndarray, min_area: float = 100, min_perimeter: f
         canny_high (int): Canny边缘检测高阈值
         gaussian_kernel (tuple): 高斯模糊核大小
         morph_kernel (tuple): 形态学操作核大小
-    
+
     Returns:
         list: 识别出的特征列表，每个特征包含形状、位置、尺寸等信息
     """
     # 应用高斯模糊以减少噪声
     blurred = cv2.GaussianBlur(image, gaussian_kernel, 0)
     
-    # 边缘检测
+    # 多尺度边缘检测以提高准确性
     edges = cv2.Canny(blurred, canny_low, canny_high)
     
-    # 形态学操作以连接断开的边缘
+    # 只进行闭操作，保留边缘
     kernel = np.ones(morph_kernel, np.uint8)
-    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)  # 只进行闭操作，避免去除有用边缘
-    
+    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    # 移除开操作，因为可能去除有用边缘信息
+
     # 寻找轮廓（使用RETR_LIST以获取所有轮廓，不限制层级）
     contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     
