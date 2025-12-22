@@ -5,18 +5,17 @@ PDF解析和图像预处理模块
 import fitz  # PyMuPDF
 from PIL import Image
 import pytesseract
-import cv2
 import numpy as np
 import os
 
 
-def pdf_to_images(pdf_path, dpi=300):
+def pdf_to_images(pdf_path, dpi=150):  # 降低DPI以兼容性更好
     """
     将PDF转换为高分辨率图像列表
     
     Args:
         pdf_path (str): PDF文件路径
-        dpi (int): 输出图像的DPI，默认300
+        dpi (int): 输出图像的DPI，默认150
     
     Returns:
         list: PIL图像对象列表
@@ -41,31 +40,19 @@ def pdf_to_images(pdf_path, dpi=300):
 
 def preprocess_image(image):
     """
-    对图像进行预处理以提高OCR和特征识别的准确性
+    对图像进行预处理以提高OCR准确性
+    注意：当前环境中没有OpenCV，使用PIL进行基本预处理
     
     Args:
         image (PIL.Image): 输入图像
     
     Returns:
-        numpy.ndarray: 预处理后的图像（OpenCV格式）
+        PIL.Image: 预处理后的图像
     """
-    # 转换为OpenCV格式
-    cv_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-    
     # 转换为灰度图
-    gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
+    gray_img = image.convert('L')
     
-    # 使用CLAHE增强对比度
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    enhanced = clahe.apply(gray)
-    
-    # 二值化
-    _, thresh = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    
-    # 去噪
-    denoised = cv2.medianBlur(thresh, 3)
-    
-    return denoised
+    return gray_img
 
 
 def ocr_image(image, lang='chi_sim+eng'):
@@ -84,7 +71,7 @@ def ocr_image(image, lang='chi_sim+eng'):
     
     # 临时保存图像用于OCR
     temp_path = "temp_ocr.png"
-    cv2.imwrite(temp_path, processed_img)
+    processed_img.save(temp_path)
     
     try:
         # OCR识别
