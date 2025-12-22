@@ -5,6 +5,7 @@
 import cv2
 import numpy as np
 from typing import List, Dict, Tuple
+import math
 
 
 def identify_features(image: np.ndarray) -> List[Dict]:
@@ -17,95 +18,177 @@ def identify_features(image: np.ndarray) -> List[Dict]:
     Returns:
         list: 识别出的特征列表，每个特征包含形状、位置、尺寸等信息
     """
+    # 应用高斯模糊以减少噪声
+    blurred = cv2.GaussianBlur(image, (5, 5), 0)
+    
     # 边缘检测
-    edges = cv2.Canny(image, 50, 150)
+    edges = cv2.Canny(blurred, 50, 150)
+    
+    # 形态学操作以连接断开的边缘
+    kernel = np.ones((2,2), np.uint8)
+    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
     
     # 寻找轮廓
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     features = []
+    min_area = 100  # 最小面积阈值
+    
     for contour in contours:
-        # 过滤小面积轮廓
         area = cv2.contourArea(contour)
-        if area < 100:  # 面积小于100的轮廓忽略
+        
+        # 过滤小面积轮廓
+        if area < min_area:
             continue
-            
-        # 近似轮廓
-        epsilon = 0.02 * cv2.arcLength(contour, True)
+        
+        # 计算轮廓的周长
+        perimeter = cv2.arcLength(contour, True)
+        
+        # 跳过周长过小的轮廓
+        if perimeter < 10:
+            continue
+        
+        # 轮廓近似
+        epsilon = 0.02 * perimeter
         approx = cv2.approxPolyDP(contour, epsilon, True)
         
-        # 识别形状
-        shape = identify_shape(approx, contour)
+        # 计算边界框
+        x, y, w, h = cv2.boundingRect(contour)
         
-        if shape:
-            # 计算边界框
-            x, y, w, h = cv2.boundingRect(contour)
-            
+        # 计算轮廓的圆度，用于识别圆形
+        _, radius = cv2.minEnclosingCircle(contour)
+        radius = int(radius)
+        circle_area = math.pi * radius * radius
+        
+        # 计算长宽比
+        aspect_ratio = float(w) / h if h != 0 else 0
+        
+        # 识别形状
+        shape, confidence = identify_shape_with_confidence(approx, contour, area, circle_area)
+        
+        if shape and confidence > 0.6:  # 设置置信度阈值
             feature = {
                 "shape": shape,
-                "contour": approx,
+                "contour": contour,
                 "bounding_box": (x, y, w, h),
                 "area": area,
                 "center": (int(x + w/2), int(y + h/2)),
-                "dimensions": (w, h)
+                "dimensions": (w, h),
+                "confidence": confidence  # 添加置信度
             }
             
             # 添加特定形状的额外信息
             if shape == "circle":
-                # 计算圆形的半径
-                radius = int(w / 2)
                 feature["radius"] = radius
-            elif shape == "rectangle":
-                # 确定长宽
+            elif shape == "rectangle" or shape == "square":
                 feature["length"] = max(w, h)
                 feature["width"] = min(w, h)
+                feature["aspect_ratio"] = aspect_ratio
             elif shape == "triangle":
-                # 计算三角形顶点
                 feature["vertices"] = [tuple(point[0]) for point in approx]
             
             features.append(feature)
     
+    # 过滤重复特征
+    features = filter_duplicate_features(features)
+    
     return features
 
 
-def identify_shape(approx: np.ndarray, contour: np.ndarray) -> str:
+def identify_shape_with_confidence(approx: np.ndarray, contour: np.ndarray, area: float, circle_area: float) -> Tuple[str, float]:
     """
-    根据轮廓近似结果识别形状
+    识别形状并返回置信度
     
     Args:
-        approx (numpy.ndarray): 轮廓近似结果
-        contour (numpy.ndarray): 原始轮廓
+        approx: 轮廓近似结果
+        contour: 原始轮廓
+        area: 轮廓面积
+        circle_area: 最小外接圆面积
     
     Returns:
-        str: 识别出的形状类型
+        tuple: (形状名称, 置信度)
     """
     num_vertices = len(approx)
-    
-    # 计算轮廓的面积和周长
-    area = cv2.contourArea(contour)
     perimeter = cv2.arcLength(contour, True)
     
+    # 计算轮廓的实心度（solidity）
+    hull = cv2.convexHull(contour)
+    hull_area = cv2.contourArea(hull)
+    solidity = float(area) / hull_area if hull_area > 0 else 0
+    
+    # 计算轮廓的延伸度（extent）
+    x, y, w, h = cv2.boundingRect(contour)
+    rect_area = w * h
+    extent = float(area) / rect_area if rect_area > 0 else 0
+    
     if num_vertices == 3:
-        return "triangle"
+        # 三角形
+        return "triangle", min(1.0, solidity * 1.2)
     elif num_vertices == 4:
         # 检查是否为正方形或矩形
-        x, y, w, h = cv2.boundingRect(approx)
-        aspect_ratio = float(w) / h
-        if 0.9 <= aspect_ratio <= 1.1:
-            return "square"
+        aspect_ratio = float(w) / h if h != 0 else 0
+        if 0.8 <= aspect_ratio <= 1.2:
+            return "square", min(1.0, solidity * extent * 1.5)
         else:
-            return "rectangle"
-    elif num_vertices > 4:
+            return "rectangle", min(1.0, solidity * extent * 1.3)
+    elif num_vertices > 6:
         # 检查是否为圆形
         # 使用轮廓面积与最小外接圆面积的比值
-        (x, y), radius = cv2.minEnclosingCircle(contour)
-        circle_area = 3.14159 * radius * radius
-        if area > 0 and abs(circle_area - area) / area < 0.2:
-            return "circle"
-        else:
-            return "polygon"
-    else:
-        return "unknown"
+        if area > 0 and circle_area > 0:
+            circularity = area / circle_area
+            if 0.7 <= circularity <= 1.3 and solidity > 0.8:
+                return "circle", min(1.0, circularity * solidity)
+    
+    # 对于其他形状，根据顶点数和实心度判断
+    if num_vertices > 6 and solidity > 0.85:
+        return "polygon", min(1.0, solidity * 0.9)
+    
+    # 无法确定形状
+    return "unknown", 0.0
+
+
+def filter_duplicate_features(features: List[Dict]) -> List[Dict]:
+    """
+    过滤重复的特征
+    
+    Args:
+        features: 特征列表
+    
+    Returns:
+        过滤后的特征列表
+    """
+    if not features:
+        return []
+    
+    filtered_features = []
+    
+    for current_feature in features:
+        is_duplicate = False
+        
+        for existing_feature in filtered_features:
+            # 计算中心点距离
+            curr_center = current_feature["center"]
+            exist_center = existing_feature["center"]
+            distance = math.sqrt((curr_center[0] - exist_center[0])**2 + (curr_center[1] - exist_center[1])**2)
+            
+            # 如果中心点距离小于两个特征最大尺寸的一半，则认为是重复
+            curr_max_dim = max(current_feature["dimensions"])
+            exist_max_dim = max(existing_feature["dimensions"])
+            threshold = max(curr_max_dim, exist_max_dim) / 2
+            
+            if distance < threshold:
+                # 保留置信度更高的特征
+                if current_feature.get("confidence", 0) > existing_feature.get("confidence", 0):
+                    filtered_features.remove(existing_feature)
+                    break
+                else:
+                    is_duplicate = True
+                    break
+        
+        if not is_duplicate:
+            filtered_features.append(current_feature)
+    
+    return filtered_features
 
 
 def extract_dimensions(features: List[Dict], scale: float = 1.0) -> List[Dict]:
@@ -154,19 +237,25 @@ def find_reference_scale(image: np.ndarray, text_regions: List[str]) -> float:
     # 在文本中查找比例尺信息
     for text in text_regions:
         text_lower = text.lower()
-        if 'scale' in text_lower or '比例' in text_lower:
-            # 简化的比例尺提取逻辑
-            # 实际应用中可能需要更复杂的正则表达式
-            if '1:1' in text_lower:
-                return 1.0
-            elif '1:2' in text_lower:
-                return 0.5
-            elif '2:1' in text_lower:
-                return 2.0
-            elif '1:5' in text_lower:
-                return 0.2
-            elif '1:10' in text_lower:
-                return 0.1
+        # 查找比例尺格式，如 1:1, 1:2, 1:5, 1:10, 等
+        import re
+        scale_match = re.search(r'(\d+):(\d+)', text_lower)
+        if scale_match:
+            numerator = int(scale_match.group(1))
+            denominator = int(scale_match.group(2))
+            if denominator != 0:
+                return numerator / denominator
+    
+    # 检查中文比例尺描述
+    for text in text_regions:
+        text_lower = text.lower()
+        if '比例' in text_lower or 'scale' in text_lower:
+            scale_match = re.search(r'(\d+):(\d+)', text_lower)
+            if scale_match:
+                numerator = int(scale_match.group(1))
+                denominator = int(scale_match.group(2))
+                if denominator != 0:
+                    return numerator / denominator
     
     # 如果没有找到明确的比例尺信息，返回默认值
     return 1.0

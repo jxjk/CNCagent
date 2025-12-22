@@ -17,6 +17,7 @@ from .modules.gcode_generation import generate_fanuc_nc, validate_nc_code
 from .modules.validation import validate_features, validate_user_description, validate_parameters
 from .modules.simulation_output import generate_simulation_report, visualize_features
 import logging
+import numpy as np
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -66,29 +67,44 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
     print("正在识别几何特征...")
     features = []
     for img in images:
-        import numpy as np
         # 将PIL图像转换为numpy数组（适用于OpenCV）
         img_array = np.array(img.convert('L'))  # 转换为灰度图
         img_features = identify_features(img_array)
-        features.extend(img_features)
+        
+        # 只保留置信度较高的特征
+        high_confidence_features = [f for f in img_features if f.get('confidence', 0) > 0.7]
+        print(f"  从页面识别到 {len(img_features)} 个特征，其中高置信度特征 {len(high_confidence_features)} 个")
+        features.extend(high_confidence_features)
+    
+    print(f"总共识别到 {len(features)} 个高置信度特征")
     
     # 验证识别出的特征
     if features:
         feature_errors = validate_features(features)
         if feature_errors:
             print(f"警告: 特征验证发现问题: {', '.join(feature_errors)}")
+        
+        # 显示识别到的特征信息
+        print("识别到的特征:")
+        for i, feature in enumerate(features):
+            shape = feature['shape']
+            center = feature['center']
+            dims = feature['dimensions']
+            conf = feature.get('confidence', 1.0)
+            print(f"  特征 {i+1}: {shape}, 中心{center}, 尺寸{dims}, 置信度{conf:.2f}")
     else:
-        print("警告: 未识别到任何几何特征，将基于用户描述生成通用程序")
-        # 创建一个默认特征以确保程序生成
+        print("警告: 未识别到任何高置信度几何特征")
+        # 如果没有识别到特征，基于用户描述生成通用程序
         features = [{
             "shape": "rectangle",
-            "contour": [],
+            "contour": np.array([], dtype=np.int32),
             "bounding_box": (50, 50, 20, 20),
             "area": 400,
             "center": (60, 60),
             "dimensions": (20, 20),
             "length": 20,
-            "width": 20
+            "width": 20,
+            "confidence": 0.5
         }]
     
     # 根据比例尺提取实际尺寸
