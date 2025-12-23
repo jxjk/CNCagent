@@ -3,7 +3,8 @@
 使用规则匹配技术分析用户对加工需求的描述，提取关键信息如加工类型、材料、精度要求等
 """
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+from .mechanical_drawing_expert import MechanicalDrawingExpert
 
 
 def analyze_user_description(description: str) -> Dict:
@@ -33,6 +34,9 @@ def analyze_user_description(description: str) -> Dict:
     # 提取孔位置信息
     hole_positions = _extract_hole_positions(description)
     
+    # 提取参考点信息
+    reference_points = _extract_reference_points(description)
+    
     # 确定所需刀具
     tool_required = _identify_tool_required(processing_type)
     
@@ -45,6 +49,7 @@ def analyze_user_description(description: str) -> Dict:
         "material": material,
         "precision": precision,
         "hole_positions": hole_positions,  # 添加孔位置信息
+        "reference_points": reference_points,  # 添加参考点信息
         "description": description
     }
 
@@ -300,3 +305,67 @@ def _extract_hole_positions(description: str) -> List[tuple]:
             continue
 
     return positions
+
+
+def _extract_reference_points(description: str) -> Dict[str, Tuple[float, float]]:
+    """
+    从描述中提取参考点信息
+    支持格式如: "以左下角为原点", "基准A", "datum A", "原点(0,0)", "origin(0,0)"等
+    
+    Args:
+        description: 用户描述字符串
+        
+    Returns:
+        Dict: 包含参考点名称和坐标的字典
+    """
+    reference_points = {}
+    
+    # 匹配以某点为原点的描述
+    origin_patterns = [
+        r'以\s*([东南西北上下前后左右中])\s*([东南西北上下前后左右中])\s*角为原点',
+        r'原点[：:]?\s*[:：]?\s*([-\d.]+)\s*,\s*([-\d.]+)',
+        r'origin[：:]?\s*[:：]?\s*([-\d.]+)\s*,\s*([-\d.]+)',
+        r'原点[：:]?\s*[:：]?\s*\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)',
+        r'origin[：:]?\s*[:：]?\s*\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)',
+    ]
+    
+    for pattern in origin_patterns:
+        matches = re.findall(pattern, description, re.IGNORECASE)
+        for match in matches:
+            if len(match) == 2 and match[0].isdigit() and match[1].isdigit():
+                # 坐标原点格式
+                x, y = float(match[0]), float(match[1])
+                reference_points['origin'] = (x, y)
+            elif len(match) == 2 and all(c in '东南西北上下前后左右中' for c in match):
+                # 角点描述格式
+                direction = ''.join(match)
+                reference_points[f'origin_{direction}'] = (0, 0)
+    
+    # 匹配基准点描述
+    datum_patterns = [
+        r'基准\s*([A-Z])',
+        r'datum\s*([A-Z])',
+        r'reference\s*([A-Z])',
+        r'基准点\s*([A-Z])',
+    ]
+    
+    for pattern in datum_patterns:
+        matches = re.findall(pattern, description, re.IGNORECASE)
+        for match in matches:
+            reference_points[f'datum_{match.upper()}'] = (0, 0)
+    
+    # 匹配自定义参考点
+    custom_patterns = [
+        r'参考点\s*([A-Z])\s*[：:]?\s*([-\d.]+)\s*,\s*([-\d.]+)',
+        r'reference\s+point\s*([A-Z])\s*[：:]?\s*([-\d.]+)\s*,\s*([-\d.]+)',
+    ]
+    
+    for pattern in custom_patterns:
+        matches = re.findall(pattern, description, re.IGNORECASE)
+        for match in matches:
+            if len(match) == 3:
+                point_name = match[0].upper()
+                x, y = float(match[1]), float(match[2])
+                reference_points[f'custom_{point_name}'] = (x, y)
+    
+    return reference_points

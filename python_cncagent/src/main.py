@@ -11,11 +11,12 @@ CNC Agent: 从PDF图纸自动生成FANUC NC程序的Python实现
 import os
 import sys
 from .modules.pdf_parsing_process import pdf_to_images, ocr_image, extract_text_from_pdf
-from .modules.feature_definition import identify_features, extract_dimensions
+from .modules.feature_definition import identify_features, extract_dimensions, extract_highest_y_center_point, adjust_coordinate_system, select_coordinate_reference
 from .modules.material_tool_matcher import analyze_user_description
 from .modules.gcode_generation import generate_fanuc_nc, validate_nc_code
 from .modules.validation import validate_features, validate_user_description, validate_parameters
 from .modules.simulation_output import generate_simulation_report, visualize_features
+from .modules.mechanical_drawing_expert import MechanicalDrawingExpert
 import logging
 import numpy as np
 
@@ -23,7 +24,8 @@ import numpy as np
 logging.basicConfig(level=logging.INFO)
 
 
-def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.0) -> str:
+def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.0, 
+                        coordinate_strategy: str = "highest_y", custom_origin: Tuple[float, float] = None) -> str:
     """
     完整流程：从PDF图纸和用户描述生成NC程序
     
@@ -31,6 +33,8 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
         pdf_path (str): PDF图纸路径
         user_description (str): 用户加工描述
         scale (float): 比例尺因子
+        coordinate_strategy (str): 坐标基准策略
+        custom_origin (Tuple[float, float]): 自定义原点坐标
     
     Returns:
         str: 生成的NC程序代码
@@ -63,6 +67,11 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
     pdf_text = extract_text_from_pdf(pdf_path)
     all_text += "\n" + pdf_text
     
+    # 使用机械制图专家分析图纸
+    print("正在使用机械制图专家分析图纸...")
+    drawing_expert = MechanicalDrawingExpert()
+    drawing_info = drawing_expert.parse_drawing(all_text)
+    
     # 4. 识别几何特征
     print("正在识别几何特征...")
     features = []
@@ -91,7 +100,10 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
             center = feature['center']
             dims = feature['dimensions']
             conf = feature.get('confidence', 1.0)
-            print(f"  特征 {i+1}: {shape}, 中心{center}, 尺寸{dims}, 置信度{conf:.2f}")
+            if shape == 'counterbore':
+                print(f"  特征 {i+1}: {shape}, 中心{center}, 沉孔直径{feature.get('outer_diameter', 0):.1f}mm, 底孔直径{feature.get('inner_diameter', 0):.1f}mm, 深度{feature.get('depth', 0):.1f}mm, 置信度{conf:.2f}")
+            else:
+                print(f"  特征 {i+1}: {shape}, 中心{center}, 尺寸{dims}, 置信度{conf:.2f}")
     else:
         print("警告: 未识别到任何高置信度几何特征")
         # 如果没有识别到特征，基于用户描述生成通用程序
@@ -107,12 +119,39 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
             "confidence": 0.5
         }]
     
+    # 分析用户描述以提取参考点信息
+    description_analysis = analyze_user_description(user_description)
+    
+    # 选择坐标参考点
+    print(f"使用坐标基准策略: {coordinate_strategy}")
+    
+    # 优先使用用户在描述中指定的参考点
+    reference_points = description_analysis.get("reference_points", {})
+    if reference_points:
+        print(f"检测到用户指定的参考点: {reference_points}")
+        # 使用第一个参考点作为坐标原点
+        first_ref_point = next(iter(reference_points.values()))
+        origin_point = first_ref_point
+    else:
+        # 使用指定的坐标策略选择参考点
+        origin_point = select_coordinate_reference(features, coordinate_strategy, custom_origin)
+    
+    print(f"设置坐标原点为: {origin_point}")
+    
+    # 调整所有特征的坐标
+    features = adjust_coordinate_system(features, origin_point, coordinate_strategy, custom_origin)
+    print("坐标系统调整完成")
+    
     # 根据比例尺提取实际尺寸
     scaled_features = extract_dimensions(features, scale)
     
     # 5. 分析用户描述
     print("正在分析用户描述...")
-    description_analysis = analyze_user_description(user_description)
+    
+    # 如果检测到沉孔加工，更新处理类型
+    description = user_description.lower()
+    if "沉孔" in description or "counterbore" in description or "锪孔" in description:
+        description_analysis["processing_type"] = "counterbore"
     
     # 验证解析参数
     param_errors = validate_parameters(description_analysis)
@@ -158,13 +197,25 @@ def preprocess_image(image):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("用法: python main.py <pdf_path> <user_description> [scale]")
-        print("示例: python main.py part_design.pdf \"请加工一个100mm x 50mm的矩形，使用铣削加工\" 1.0")
+        print("用法: python main.py <pdf_path> <user_description> [scale] [coordinate_strategy] [custom_origin_x] [custom_origin_y]")
+        print("示例: python main.py part_design.pdf \"请加工一个100mm x 50mm的矩形，使用铣削加工\" 1.0 highest_y")
+        print("坐标策略选项: highest_y, lowest_y, leftmost_x, rightmost_x, center, custom, geometric_center")
         sys.exit(1)
     
     pdf_path = sys.argv[1]
     user_description = sys.argv[2]
     scale = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0
+    coordinate_strategy = sys.argv[4] if len(sys.argv) > 4 else "highest_y"
+    
+    custom_origin = None
+    if len(sys.argv) > 6:
+        try:
+            custom_origin_x = float(sys.argv[5])
+            custom_origin_y = float(sys.argv[6])
+            custom_origin = (custom_origin_x, custom_origin_y)
+        except ValueError:
+            print("自定义原点坐标必须是数字")
+            sys.exit(1)
     
     # 检查PDF文件是否存在
     if not os.path.exists(pdf_path):
@@ -174,9 +225,12 @@ if __name__ == "__main__":
     print(f"正在处理PDF文件: {pdf_path}")
     print(f"用户描述: {user_description}")
     print(f"比例: {scale}")
+    print(f"坐标策略: {coordinate_strategy}")
+    if custom_origin:
+        print(f"自定义原点: {custom_origin}")
     
     try:
-        nc_program = generate_nc_from_pdf(pdf_path, user_description, scale)
+        nc_program = generate_nc_from_pdf(pdf_path, user_description, scale, coordinate_strategy, custom_origin)
         print("\n生成的NC程序:")
         print(nc_program)
         

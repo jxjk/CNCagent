@@ -9,6 +9,7 @@ from datetime import datetime
 import uuid
 
 from ..validation import validate_geometry_elements
+from ..mechanical_drawing_expert import MechanicalDrawingExpert
 
 def extract_geometric_info_from_text(text: str) -> Dict[str, Any]:
     """
@@ -1066,6 +1067,9 @@ def pdf_parsing_process(file_path: str) -> Dict[str, Any]:
     surface_finishes = []  # 表面光洁度
     text_content = ''  # 存储所有文本内容用于视角识别
 
+    # 使用机械制图专家来分析图纸
+    drawing_expert = MechanicalDrawingExpert()
+
     # 对于PDF文件，我们暂时返回基本结构，因为完整的PDF解析需要额外的库
     if file_extension == '.pdf':
         try:
@@ -1115,6 +1119,45 @@ def pdf_parsing_process(file_path: str) -> Dict[str, Any]:
 
         drawing_info['dimensions'] = {'width': 100, 'height': 50}
 
+    # 使用机械制图专家分析图纸
+    try:
+        drawing_analysis = drawing_expert.parse_drawing(text_content)
+        
+        # 整合机械制图专家的分析结果
+        for view in drawing_analysis.views:
+            # 从视图中提取参考点
+            for ref_name, ref_point in view.reference_points.items():
+                geometry_elements.append({
+                    'id': f'reference_point_{ref_name}',
+                    'type': 'reference_point',
+                    'name': ref_name,
+                    'x': ref_point[0],
+                    'y': ref_point[1],
+                    'description': f'参考点 {ref_name} at ({ref_point[0]}, {ref_point[1]})'
+                })
+        
+        # 整合整体尺寸信息
+        for dim in drawing_analysis.overall_dimensions:
+            dimensions.append({
+                'id': f'overall_dim_{len(dimensions) + 1}',
+                'type': dim.dimension_type,
+                'value': dim.value,
+                'unit': dim.unit,
+                'tolerance': dim.tolerance,
+                'description': f'整体尺寸'
+            })
+        
+        # 更新图纸信息
+        if drawing_analysis.material:
+            drawing_info['material'] = drawing_analysis.material
+        if drawing_analysis.drawing_number:
+            drawing_info['drawing_number'] = drawing_analysis.drawing_number
+        if drawing_analysis.revision:
+            drawing_info['revision'] = drawing_analysis.revision
+            
+    except Exception as e:
+        print(f'机械制图专家分析失败: {e}')
+
     # 如果最终没有提取到任何几何元素，提供一些默认值以确保API的稳定性
     if not geometry_elements:
         geometry_elements = [
@@ -1132,6 +1175,8 @@ def pdf_parsing_process(file_path: str) -> Dict[str, Any]:
         'dimensions': dimensions,
         'tolerances': tolerances,
         'surface_finishes': surface_finishes,
+        'reference_points': drawing_analysis.views[0].reference_points if drawing_analysis.views else {},  # 添加参考点信息
+        'view_relationships': drawing_expert.analyze_view_relationships(drawing_analysis) if 'drawing_analysis' in locals() else {},  # 添加视图关系
         'parsing_time': 0  # 暂时设置为0，实际使用时可以计算
     }
 

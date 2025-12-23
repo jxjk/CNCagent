@@ -123,6 +123,9 @@ def identify_features(image: np.ndarray, min_area: float = 100, min_perimeter: f
     # 过滤重复特征
     features = filter_duplicate_features_advanced(features)
     
+    # 识别复合孔特征（如沉孔）
+    features = identify_counterbore_features(features)
+    
     return features
 
 
@@ -247,11 +250,11 @@ def filter_duplicate_features_advanced(features: List[Dict]) -> List[Dict]:
             
             # 计算重叠区域
             x_overlap = max(0, min(curr_x + curr_w, exist_x + exist_w) - max(curr_x, exist_x))
-            y_overlap = max(0, min(curr_y + curr_h, exist_y + exist_h) - max(curr_y, exist_y))
+            y_overlap = max(0, min(curr_y + curr_h, exist_y + curr_h) - max(curr_y, exist_y))
             overlap_area = x_overlap * y_overlap
             
             # 计算并集面积
-            union_area = curr_w * curr_h + exist_w * exist_h - overlap_area
+            union_area = curr_w * curr_h + exist_w * curr_h - overlap_area
             iou = overlap_area / union_area if union_area > 0 else 0
             
             # 综合判断：位置接近、形状相同、且有较大重叠度
@@ -277,6 +280,314 @@ def filter_duplicate_features_advanced(features: List[Dict]) -> List[Dict]:
             filtered_features.append(current_feature)
     
     return filtered_features
+
+
+def identify_counterbore_features(features: List[Dict]) -> List[Dict]:
+    """
+    识别沉孔（Counterbore）特征，即φ22沉孔深20mm + φ14.5贯通底孔的组合特征
+    
+    Args:
+        features: 识别出的几何特征列表
+    
+    Returns:
+        识别后特征列表，包含复合沉孔特征
+    """
+    # 首先筛选出圆形特征，并按中心点分组
+    circle_features = [f for f in features if f.get("shape") == "circle"]
+    
+    # 按中心点位置分组可能的沉孔组合
+    grouped_features = {}
+    tolerance = 5.0  # 减小中心点距离容差，单位像素，更精确地匹配同心圆
+    
+    for feature in circle_features:
+        center = feature["center"]
+        found_group = False
+        
+        for group_center, group in grouped_features.items():
+            dist = math.sqrt((center[0] - group_center[0])**2 + (center[1] - group_center[1])**2)
+            if dist < tolerance:
+                grouped_features[group_center].append(feature)
+                found_group = True
+                break
+        
+        if not found_group:
+            grouped_features[center] = [feature]
+    
+    # 过滤后的特征列表
+    filtered_features = [f for f in features if f.get("shape") != "circle"]
+    
+    # 检查每个分组是否为沉孔特征
+    for group_center, group_features in grouped_features.items():
+        if len(group_features) >= 2:
+            # 按半径排序，找到最大和最小的圆（沉孔和底孔）
+            sorted_by_radius = sorted(group_features, key=lambda x: x.get("radius", 0), reverse=True)
+            
+            # 尝试识别沉孔和底孔
+            largest_circle = sorted_by_radius[0]
+            smallest_circle = sorted_by_radius[-1]
+            
+            # 判断是否可能是沉孔特征 (φ22沉孔 + φ14.5底孔)
+            largest_radius = largest_circle.get("radius", 0)
+            smallest_radius = smallest_circle.get("radius", 0)
+            
+            # 检查半径比例是否符合沉孔特征
+            # φ22沉孔 vs φ14.5底孔，半径比约为 11:7.25 ≈ 1.52
+            radius_ratio = largest_radius / smallest_radius if smallest_radius > 0 else 0
+            
+            if 1.2 <= radius_ratio <= 3.0:  # 宽松一些的半径比范围，适应不同的沉孔规格
+                # 创建沉孔特征
+                counterbore_feature = {
+                    "shape": "counterbore",  # 沉孔特征
+                    "center": group_center,
+                    "outer_radius": largest_radius,  # 沉孔半径
+                    "inner_radius": smallest_radius,  # 底孔半径
+                    "outer_diameter": largest_radius * 2,  # 沉孔直径
+                    "inner_diameter": smallest_radius * 2,  # 底孔直径
+                    "depth": 20.0,  # 沉孔深度
+                    "contour": largest_circle["contour"],  # 使用外圆轮廓
+                    "bounding_box": largest_circle["bounding_box"],
+                    "area": largest_circle["area"],
+                    "confidence": (largest_circle.get("confidence", 0) + smallest_circle.get("confidence", 0)) / 2,
+                    "aspect_ratio": largest_circle.get("aspect_ratio", 0)
+                }
+                
+                filtered_features.append(counterbore_feature)
+            else:
+                # 如果不是沉孔特征，将原始圆形特征添加回列表
+                filtered_features.extend(group_features)
+        else:
+            # 只有一个圆，添加回列表
+            filtered_features.extend(group_features)
+    
+    return filtered_features
+
+
+def extract_highest_y_center_point(features: List[Dict]) -> Tuple[float, float]:
+    """
+    提取所有圆形特征中Y坐标最高的圆心点作为坐标原点
+    
+    Args:
+        features: 包含圆形特征的特征列表
+    
+    Returns:
+        Tuple[float, float]: 最高Y坐标圆心点的坐标 (x, y)
+    """
+    circle_features = [f for f in features if f.get("shape") in ["circle", "counterbore"]]
+    if not circle_features:
+        return (0.0, 0.0)  # 如果没有圆形特征，返回原点
+    
+    # 找到Y坐标最小的圆心点（在图像坐标系中，Y越小越靠上）
+    highest_point = min(circle_features, key=lambda f: f["center"][1])
+    return highest_point["center"]
+
+
+def adjust_coordinate_system(features: List[Dict], origin: Tuple[float, float], 
+                           reference_strategy: str = "absolute", 
+                           custom_origin: Tuple[float, float] = None) -> List[Dict]:
+    """
+    根据指定的坐标原点调整所有特征的坐标
+    
+    Args:
+        features: 特征列表
+        origin: 新的坐标原点 (x, y)
+        reference_strategy: 坐标基准策略 ("absolute", "relative", "custom", "highest_y")
+        custom_origin: 自定义原点坐标，当reference_strategy为"custom"时使用
+    
+    Returns:
+        坐标调整后的特征列表
+    """
+    adjusted_features = []
+    
+    # 根据策略确定实际的原点
+    actual_origin = origin
+    if reference_strategy == "custom" and custom_origin:
+        actual_origin = custom_origin
+    elif reference_strategy == "highest_y":
+        actual_origin = extract_highest_y_center_point(features)
+    elif reference_strategy == "relative":
+        # 相对坐标策略：以第一个特征的中心点为原点
+        if features:
+            actual_origin = features[0]["center"]
+    
+    for feature in features:
+        adjusted_feature = feature.copy()
+        
+        # 调整中心点坐标
+        old_center_x, old_center_y = feature["center"]
+        new_center_x = old_center_x - actual_origin[0]
+        new_center_y = old_center_y - actual_origin[1]
+        adjusted_feature["center"] = (new_center_x, new_center_y)
+        
+        # 调整边界框坐标
+        x, y, w, h = feature["bounding_box"]
+        adjusted_feature["bounding_box"] = (x - actual_origin[0], y - actual_origin[1], w, h)
+        
+        adjusted_features.append(adjusted_feature)
+    
+    return adjusted_features
+
+
+def select_coordinate_reference(features: List[Dict], strategy: str = "highest_y", 
+                              custom_reference: Tuple[float, float] = None) -> Tuple[float, float]:
+    """
+    根据指定策略选择坐标参考点
+    
+    Args:
+        features: 特征列表
+        strategy: 参考点选择策略
+                 - "highest_y": Y坐标最高的点
+                 - "lowest_y": Y坐标最低的点
+                 - "leftmost_x": X坐标最左的点
+                 - "rightmost_x": X坐标最右的点
+                 - "center": 图纸中心点
+                 - "custom": 使用自定义参考点
+                 - "geometric_center": 所有特征的几何中心
+        
+        custom_reference: 自定义参考点坐标
+    
+    Returns:
+        Tuple[float, float]: 选定的参考点坐标
+    """
+    if strategy == "custom" and custom_reference:
+        return custom_reference
+    
+    if not features:
+        return (0.0, 0.0)
+    
+    if strategy == "highest_y":
+        return extract_highest_y_center_point(features)
+    elif strategy == "lowest_y":
+        return extract_lowest_y_center_point(features)
+    elif strategy == "leftmost_x":
+        return extract_leftmost_x_point(features)
+    elif strategy == "rightmost_x":
+        return extract_rightmost_x_point(features)
+    elif strategy == "center":
+        return calculate_geometric_center(features)
+    elif strategy == "geometric_center":
+        return calculate_all_features_center(features)
+    else:
+        # 默认使用最高Y坐标点
+        return extract_highest_y_center_point(features)
+
+
+def extract_highest_y_center_point(features: List[Dict]) -> Tuple[float, float]:
+    """
+    提取所有圆形特征中Y坐标最高的圆心点作为坐标原点
+    
+    Args:
+        features: 包含圆形特征的特征列表
+    
+    Returns:
+        Tuple[float, float]: 最高Y坐标圆心点的坐标 (x, y)
+    """
+    circle_features = [f for f in features if f.get("shape") in ["circle", "counterbore"]]
+    if not circle_features:
+        # 如果没有圆形特征，则在所有特征中查找
+        if not features:
+            return (0.0, 0.0)
+        highest_point = min(features, key=lambda f: f["center"][1])
+        return highest_point["center"]
+    
+    # 找到Y坐标最小的圆心点（在图像坐标系中，Y越小越靠上）
+    highest_point = min(circle_features, key=lambda f: f["center"][1])
+    return highest_point["center"]
+
+
+def extract_lowest_y_center_point(features: List[Dict]) -> Tuple[float, float]:
+    """
+    提取所有特征中Y坐标最低的点作为坐标原点
+    
+    Args:
+        features: 特征列表
+    
+    Returns:
+        Tuple[float, float]: 最低Y坐标点的坐标 (x, y)
+    """
+    if not features:
+        return (0.0, 0.0)
+    
+    lowest_point = max(features, key=lambda f: f["center"][1])
+    return lowest_point["center"]
+
+
+def extract_leftmost_x_point(features: List[Dict]) -> Tuple[float, float]:
+    """
+    提取所有特征中X坐标最左的点作为坐标原点
+    
+    Args:
+        features: 特征列表
+    
+    Returns:
+        Tuple[float, float]: 最左X坐标点的坐标 (x, y)
+    """
+    if not features:
+        return (0.0, 0.0)
+    
+    leftmost_point = min(features, key=lambda f: f["center"][0])
+    return leftmost_point["center"]
+
+
+def extract_rightmost_x_point(features: List[Dict]) -> Tuple[float, float]:
+    """
+    提取所有特征中X坐标最右的点作为坐标原点
+    
+    Args:
+        features: 特征列表
+    
+    Returns:
+        Tuple[float, float]: 最右X坐标点的坐标 (x, y)
+    """
+    if not features:
+        return (0.0, 0.0)
+    
+    rightmost_point = max(features, key=lambda f: f["center"][0])
+    return rightmost_point["center"]
+
+
+def calculate_geometric_center(features: List[Dict]) -> Tuple[float, float]:
+    """
+    计算所有特征的几何中心点作为坐标原点
+    
+    Args:
+        features: 特征列表
+    
+    Returns:
+        Tuple[float, float]: 几何中心点的坐标 (x, y)
+    """
+    if not features:
+        return (0.0, 0.0)
+    
+    total_x = sum(f["center"][0] for f in features)
+    total_y = sum(f["center"][1] for f in features)
+    count = len(features)
+    
+    return (total_x / count, total_y / count)
+
+
+def calculate_all_features_center(features: List[Dict]) -> Tuple[float, float]:
+    """
+    计算所有特征边界框的中心点作为坐标原点
+    
+    Args:
+        features: 特征列表
+    
+    Returns:
+        Tuple[float, float]: 所有特征边界框的中心点 (x, y)
+    """
+    if not features:
+        return (0.0, 0.0)
+    
+    # 计算所有边界框的最小包围矩形
+    min_x = min(f["bounding_box"][0] for f in features)
+    min_y = min(f["bounding_box"][1] for f in features)
+    max_x = max(f["bounding_box"][0] + f["bounding_box"][2] for f in features)
+    max_y = max(f["bounding_box"][1] + f["bounding_box"][3] for f in features)
+    
+    center_x = (min_x + max_x) / 2
+    center_y = (min_y + max_y) / 2
+    
+    return (center_x, center_y)
 
 
 def extract_dimensions(features: List[Dict], scale: float = 1.0) -> List[Dict]:
