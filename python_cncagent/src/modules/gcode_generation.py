@@ -2,9 +2,12 @@
 FANUC NC程序生成模块
 根据识别的特征和用户描述生成符合FANUC标准的G代码
 """
-from typing import List, Dict
+from typing import List, Dict, Optional, Union
 import math
 import datetime
+
+# 导入配置参数
+from ..config import GCODE_GENERATION_CONFIG, THREAD_PITCH_MAP
 
 # 导入优化模块
 try:
@@ -13,35 +16,28 @@ except ImportError:
     # 如果无法导入优化模块，使用基础实现
     def get_thread_pitch(thread_type: str) -> float:
         """根据螺纹类型获取标准螺距"""
-        thread_pitch_map = {
-            "M3": 0.5,
-            "M4": 0.7,
-            "M5": 0.8,
-            "M6": 1.0,
-            "M8": 1.25,
-            "M10": 1.5,
-            "M12": 1.75
-        }
+        # 使用配置中的螺纹螺距映射
+        thread_pitch_map = THREAD_PITCH_MAP
         
         # 提取螺纹规格（如"M10"中的"10"）
         if thread_type.startswith("M"):
             try:
                 size = thread_type[1:]  # 获取M后面的数字
                 if size in ["3", "4", "5", "6", "8", "10", "12"]:
-                    return thread_pitch_map.get(f"M{size}", 1.5)  # 默认M10螺距
+                    return thread_pitch_map.get(f"M{size}", GCODE_GENERATION_CONFIG['tapping']['default_thread_pitch'])  # 使用配置中的默认螺距
                 else:
                     # 对于其他M系列螺纹，按比例估算
                     size_num = int(size)
                     if size_num < 5:
-                        return 0.5  # 小螺纹螺距较小
+                        return GCODE_GENERATION_CONFIG['tapping']['default_thread_pitch'] * 0.33  # 小螺纹螺距较小
                     elif size_num < 10:
-                        return 1.0  # 中等螺纹螺距中等
+                        return GCODE_GENERATION_CONFIG['tapping']['default_thread_pitch'] * 0.67  # 中等螺纹螺距中等
                     else:
-                        return 1.5  # 大螺纹螺距较大
+                        return GCODE_GENERATION_CONFIG['tapping']['default_thread_pitch']  # 大螺纹螺距较大
             except ValueError:
-                return 1.5  # 无法解析时使用默认值
+                return GCODE_GENERATION_CONFIG['tapping']['default_thread_pitch']  # 无法解析时使用默认值
         else:
-            return 1.5  # 非标准格式使用默认值
+            return GCODE_GENERATION_CONFIG['tapping']['default_thread_pitch']  # 非标准格式使用配置中的默认值
 
 
 def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: float = 1.0) -> str:
@@ -83,7 +79,7 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
     
     # 设置初始安全高度
     gcode.append("(MOVE TO SAFE HEIGHT)")
-    gcode.append("G00 Z100.0 (RAPID MOVE TO SAFE HEIGHT)")
+    gcode.append(f"G00 Z{GCODE_GENERATION_CONFIG['safety']['safe_height']:.1f} (RAPID MOVE TO SAFE HEIGHT)")
     gcode.append("")
     
     # 根据加工类型生成G代码
@@ -192,19 +188,9 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
 
 def _get_tool_number(tool_type: str) -> int:
     """根据刀具类型返回刀具编号"""
-    tool_mapping = {
-        "center_drill": 1,  # 中心钻/点孔钻
-        "drill_bit": 2,     # 钻头
-        "tap": 3,           # 丝锥
-        "counterbore_tool": 4,  # 锪孔刀
-        "end_mill": 5,
-        "cutting_tool": 6,
-        "grinding_wheel": 7,
-        "general_tool": 8,
-        "thread_mill": 9  # 新增螺纹铣刀
-    }
-    
-    return tool_mapping.get(tool_type, 5)
+    # 使用配置中的刀具映射
+    from ..config import TOOL_MAPPING
+    return TOOL_MAPPING.get(tool_type, 5)
 
 
 def _generate_drilling_code(features: List[Dict], description_analysis: Dict) -> List[str]:
@@ -214,13 +200,13 @@ def _generate_drilling_code(features: List[Dict], description_analysis: Dict) ->
     # 设置钻孔循环参数 - 安全处理None值
     depth = description_analysis.get("depth")
     if depth is None or not isinstance(depth, (int, float)):
-        depth = 10  # 默认值
+        depth = GCODE_GENERATION_CONFIG['drilling']['default_depth']  # 使用配置中的默认值
     else:
         depth = float(depth)
     
     feed_rate = description_analysis.get("feed_rate")
     if feed_rate is None or not isinstance(feed_rate, (int, float)):
-        feed_rate = 100  # 默认值
+        feed_rate = GCODE_GENERATION_CONFIG['drilling']['default_feed_rate']  # 使用配置中的默认值
     else:
         feed_rate = float(feed_rate)
     
@@ -228,8 +214,8 @@ def _generate_drilling_code(features: List[Dict], description_analysis: Dict) ->
     tool_number = _get_tool_number("drill_bit")
     
     gcode.append(f"(DRILLING OPERATION)")
-    gcode.append(f"M03 S800 (SPINDLE FORWARD, DRILLING SPEED)")
-    gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
+    gcode.append(f"M03 S{GCODE_GENERATION_CONFIG['drilling']['default_spindle_speed']} (SPINDLE FORWARD, DRILLING SPEED)")
+    gcode.append(f"G04 P{GCODE_GENERATION_CONFIG['safety']['delay_time']} (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
     
     # 激活刀具长度补偿
     gcode.append(f"G43 H{tool_number} Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T{tool_number:02})")
@@ -268,24 +254,74 @@ def _generate_counterbore_code(features: List[Dict], description_analysis: Dict)
     """生成沉孔（Counterbore）加工代码 - 使用点孔、钻孔、锪孔工艺"""
     gcode = []
     
-    # 获取沉孔和底孔参数
-    # 根据用户要求：φ22沉孔深20mm + φ14.5贯通底孔
-    outer_diameter = 22.0  # 沉孔直径
-    inner_diameter = 14.5  # 底孔直径
-    counterbore_depth = 20.0  # 沉孔深度
+    # 从特征和描述中提取沉孔参数
+    # 默认参数
+    outer_diameter = GCODE_GENERATION_CONFIG['counterbore']['default_outer_diameter']  # 沉孔直径
+    inner_diameter = GCODE_GENERATION_CONFIG['counterbore']['default_inner_diameter']  # 底孔直径
+    counterbore_depth = GCODE_GENERATION_CONFIG['counterbore']['default_depth']  # 沉孔深度
+    
+    # 从沉孔特征中提取实际参数
+    counterbore_features = [f for f in features if f.get("shape") == "counterbore"]
+    if counterbore_features:
+        # 使用第一个沉孔特征的参数作为默认值，但确保值有效
+        first_counterbore = counterbore_features[0]
+        outer_diameter = first_counterbore.get("outer_diameter", outer_diameter)
+        inner_diameter = first_counterbore.get("inner_diameter", inner_diameter)
+        counterbore_depth = first_counterbore.get("depth", counterbore_depth)
+        # 确保直径值有效
+        if outer_diameter is None or outer_diameter <= 0:
+            outer_diameter = 22.0
+        if inner_diameter is None or inner_diameter <= 0:
+            inner_diameter = 14.5
+    
+    # 也可以从用户描述中提取参数
+    description = description_analysis.get("description", "").lower()
+    import re
+    # 尝试从描述中提取沉孔信息
+    outer_matches = re.findall(r'沉孔.*?φ?(\d+\.?\d*)', description)
+    if outer_matches:
+        try:
+            outer_diameter = float(outer_matches[0])
+        except ValueError:
+            pass
+    
+    inner_matches = re.findall(r'(?:底孔|贯通孔|钻孔).*?φ?(\d+\.?\d*)', description)
+    if not inner_matches:
+        inner_matches = re.findall(r'φ?(\d+\.?\d*).*?底孔', description)
+    if inner_matches:
+        try:
+            inner_diameter = float(inner_matches[0])
+        except ValueError:
+            pass
+    
+    depth_matches = re.findall(r'深.*?(\d+\.?\d*)\s*mm', description)
+    if depth_matches:
+        try:
+            counterbore_depth = float(depth_matches[0])
+        except ValueError:
+            pass
+    
+    # 检查用户描述中的孔数量信息
+    from ..config import OCR_CONFIG
+    hole_count = OCR_CONFIG['default_hole_count']  # 默认3个孔
+    count_matches = re.findall(r'(\d+)\s*个', description)
+    if count_matches:
+        try:
+            hole_count = int(count_matches[0])
+        except ValueError:
+            hole_count = 3
     
     # 计算钻孔参数
-    centering_depth = 1    # 点孔深度
-    drilling_depth = counterbore_depth + (inner_diameter / 3) + 1.5  # 钻孔深度，确保贯通
+    centering_depth = GCODE_GENERATION_CONFIG['drilling']['center_drill_depth']    # 点孔深度
+    drilling_depth = counterbore_depth + (inner_diameter / 3) + GCODE_GENERATION_CONFIG['drilling']['drilling_depth_factor']  # 钻孔深度，确保贯通
+    drill_feed = GCODE_GENERATION_CONFIG['drilling']['default_feed_rate']  # 钻孔进给 - 在函数开始就定义，以便在极坐标和非极坐标情况下都可用
+    counterbore_spindle_speed = GCODE_GENERATION_CONFIG['counterbore']['counterbore_spindle_speed']  # 锪孔时较低的转速
+    counterbore_feed = GCODE_GENERATION_CONFIG['counterbore']['counterbore_feed_rate']  # 锪孔进给
     
     # 获取沉孔位置信息
     counterbore_positions = []
     for feature in features:
         if feature["shape"] == "counterbore":
-            center_x, center_y = feature["center"]
-            counterbore_positions.append((center_x, center_y))
-        elif feature["shape"] == "circle":
-            # 如果识别到单独圆形但描述中提到沉孔，也作为加工位置
             center_x, center_y = feature["center"]
             counterbore_positions.append((center_x, center_y))
     
@@ -295,27 +331,156 @@ def _generate_counterbore_code(features: List[Dict], description_analysis: Dict)
         if user_hole_positions:
             counterbore_positions = user_hole_positions
     
+    # 根据用户描述的孔数量限制实际加工的孔数量
+    if len(counterbore_positions) > hole_count:
+        # 如果识别到的孔数量超过用户要求的数量，只取前几个
+        counterbore_positions = counterbore_positions[:hole_count]
+    
     # 如果仍然没有孔位置，但用户要求加工沉孔，提供一个默认位置
     if not counterbore_positions:
-        description = description_analysis.get("description", "").lower()
         if "沉孔" in description or "counterbore" in description or "锪孔" in description:
             counterbore_positions = [(50.0, 50.0)]  # 默认位置
             gcode.append("(COUNTERBORE OPERATION - NO SPECIFIC POSITIONS DETECTED)")
             gcode.append("(USING EXAMPLE POSITION 50.0, 50.0 - MODIFY ACCORDING TO ACTUAL DRAWING)")
-            gcode.append(f"(COUNTERBORE PROCESS - TOTAL {len(counterbore_positions)} HOLES - EXAMPLE)")
+            gcode.append(f"(COUNTERBORE PROCESS - REQUESTED {hole_count} HOLES, USING {len(counterbore_positions)} EXAMPLE POSITIONS - MODIFY AS NEEDED)")
         else:
             gcode.append(f"(COUNTERBORE PROCESS - TOTAL {len(counterbore_positions)} HOLES)")
     else:
-        gcode.append(f"(COUNTERBORE PROCESS - TOTAL {len(counterbore_positions)} HOLES)")
-        
+        gcode.append(f"(COUNTERBORE PROCESS - REQUESTED {hole_count} HOLES, DETECTED {len(counterbore_positions)} POSITIONS)")
+    
+    # 检查用户描述中是否提到极坐标
+    use_polar_coordinates = "极坐标" in description or "polar" in description.lower()
+    if use_polar_coordinates:
+        gcode.append("(USING POLAR COORDINATES FOR HOLE POSITIONS)")
+        gcode.append("G15 (CANCEL POLAR COORDINATES)")
+    
     # 为每个位置添加标注
     for i, (x, y) in enumerate(counterbore_positions):
-        gcode.append(f"(HOLE {i+1}: POSITION X{x:.3f} Y{y:.3f} - φ{outer_diameter} COUNTERBORE DEPTH {counterbore_depth}mm + φ{inner_diameter} THRU HOLE)")
+        gcode.append(f"(HOLE {i+1}: POSITION X{x:.3f} Y{y:.3f} - φ{outer_diameter if outer_diameter > 0 else 22.0} COUNTERBORE DEPTH {counterbore_depth}mm + φ{inner_diameter if inner_diameter > 0 else 14.5} THRU HOLE)")
     
     gcode.append("")
     
-    # 1. 点孔工艺 (使用T1 - 中心钻)
-    gcode.append("(STEP 1: PILOT DRILLING OPERATION)")
+    # 如果需要使用极坐标
+    if use_polar_coordinates and len(counterbore_positions) > 0:
+        # 计算极坐标并输出
+        gcode.append("(POLAR COORDINATE OUTPUT)")
+        base_x, base_y = counterbore_positions[0]  # 选择第一个孔作为参考点
+        gcode.append(f"(REFERENCE HOLE: X{base_x:.3f}, Y{base_y:.3f})")
+        
+        # 在加工循环中使用极坐标
+        # 注意：在FANUC中，G16启用极坐标模式后，X表示半径，Y表示角度
+        gcode.append("")
+        gcode.append("(STEP 1: PILOT DRILLING OPERATION WITH POLAR COORDINATES)")
+        gcode.append("(TOOL CHANGE - T01: CENTER DRILL)")
+        gcode.append("T1 M06 (TOOL CHANGE - CENTER DRILL)")
+        gcode.append("M03 S1000 (SPINDLE FORWARD, PILOT DRILLING SPEED)")
+        gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
+        gcode.append("G43 H1 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T1)")
+        gcode.append("M08 (COOLANT ON)")
+        
+        # 设置参考点
+        gcode.append(f"G00 X{base_x:.3f} Y{base_y:.3f} (MOVE TO POLAR COORDINATE REFERENCE POINT)")
+        # 启用极坐标模式
+        gcode.append("G16 (ENTER POLAR COORDINATE MODE)")
+        
+        # 使用极坐标进行点孔加工 - X表示半径，Y表示角度
+        for i, (x, y) in enumerate(counterbore_positions):
+            # 计算相对于参考点的极坐标
+            dx = x - base_x  # 计算相对于参考点的X偏移
+            dy = y - base_y  # 计算相对于参考点的Y偏移
+            radius = math.sqrt(dx*dx + dy*dy)  # 半径
+            angle = math.degrees(math.atan2(dy, dx))  # 角度
+            
+            if i == 0:
+                gcode.append(f"G82 X{radius:.3f} Y{angle:.3f} Z{-centering_depth:.3f} R{GCODE_GENERATION_CONFIG['safety']['approach_height']:.1f} P{GCODE_GENERATION_CONFIG['safety']['dwell_time']:.0f} F50.0 (SPOT DRILLING CYCLE, R{radius:.1f}, ANGLE{angle:.1f})")
+            else:
+                gcode.append(f"X{radius:.3f} Y{angle:.3f} (PILOT DRILLING {i+1}: R{radius:.1f}, ANGLE{angle:.1f})")
+        
+        gcode.append("G80 (CANCEL FIXED CYCLE)")
+        gcode.append("M09 (COOLANT OFF)")
+        gcode.append(f"G00 Z{GCODE_GENERATION_CONFIG['safety']['safe_height']:.1f} (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
+        gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
+        
+        # 2. 钻孔工艺使用极坐标
+        gcode.append("")
+        gcode.append("(STEP 2: DRILLING OPERATION WITH POLAR COORDINATES)")
+        gcode.append(f"(TOOL CHANGE - T02: DRILL BIT, HOLE DIAMETER {inner_diameter}mm)")
+        gcode.append("T2 M06 (TOOL CHANGE - DRILL BIT)")
+        gcode.append("M03 S800 (SPINDLE FORWARD, DRILLING SPEED)")
+        gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
+        gcode.append("G43 H2 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T2)")
+        gcode.append("M08 (COOLANT ON)")
+        
+        # 重新启用极坐标模式（因为固定循环已被取消）
+        gcode.append("G16 (RE-ENTER POLAR COORDINATE MODE)")
+        
+        # 使用极坐标进行钻孔加工
+        for i, (x, y) in enumerate(counterbore_positions):
+            # 计算相对于参考点的极坐标
+            dx = x - base_x  # 计算相对于参考点的X偏移
+            dy = y - base_y  # 计算相对于参考点的Y偏移
+            radius = math.sqrt(dx*dx + dy*dy)  # 半径
+            angle = math.degrees(math.atan2(dy, dx))  # 角度
+            
+            if i == 0:
+                gcode.append(f"G83 X{radius:.3f} Y{angle:.3f} Z{-drilling_depth:.3f} R2.0 Q1.0 F{drill_feed:.1f} (DEEP HOLE DRILLING CYCLE - R{radius:.1f}, ANGLE{angle:.1f}, φ{inner_diameter} THRU HOLE)")
+            else:
+                gcode.append(f"X{radius:.3f} Y{angle:.3f} (DRILLING {i+1}: R{radius:.1f}, ANGLE{angle:.1f} - φ{inner_diameter} THRU HOLE)")
+        
+        gcode.append("G80 (CANCEL FIXED CYCLE)")
+        gcode.append("M09 (COOLANT OFF)")
+        gcode.append("G00 Z100.0 (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
+        gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
+        
+        # 3. 锪孔工艺使用极坐标
+        gcode.append("")
+        gcode.append("(STEP 3: COUNTERBORE OPERATION WITH POLAR COORDINATES)")
+        gcode.append(f"(TOOL CHANGE - T04: COUNTERBORE TOOL, φ{outer_diameter}mm)")
+        gcode.append("T4 M06 (TOOL CHANGE - COUNTERBORE TOOL)")
+        gcode.append(f"M03 S{int(counterbore_spindle_speed)} (SPINDLE FORWARD, COUNTERBORE SPEED)")
+        gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
+        gcode.append("G43 H4 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T4)")
+        gcode.append("M08 (COOLANT ON)")
+        
+        # 重新启用极坐标模式（因为固定循环已被取消）
+        gcode.append("G16 (RE-ENTER POLAR COORDINATE MODE)")
+        
+        # 使用极坐标进行锪孔加工
+        for i, (x, y) in enumerate(counterbore_positions):
+            # 计算相对于参考点的极坐标
+            dx = x - base_x  # 计算相对于参考点的X偏移
+            dy = y - base_y  # 计算相对于参考点的Y偏移
+            radius = math.sqrt(dx*dx + dy*dy)  # 半径
+            angle = math.degrees(math.atan2(dy, dx))  # 角度
+            
+            if i == 0:
+                gcode.append(f"G81 X{radius:.3f} Y{angle:.3f} Z{-counterbore_depth:.3f} R2.0 F{counterbore_feed:.1f} (COUNTERBORE {i+1}: R{radius:.1f}, ANGLE{angle:.1f} - φ{outer_diameter} COUNTERBORE DEPTH {counterbore_depth}mm)")
+            else:
+                gcode.append(f"X{radius:.3f} Y{angle:.3f} (COUNTERBORE {i+1}: R{radius:.1f}, ANGLE{angle:.1f} - φ{outer_diameter} COUNTERBORE DEPTH {counterbore_depth}mm)")
+        
+        gcode.append("G80 (CANCEL FIXED CYCLE)")
+        gcode.append("M09 (COOLANT OFF)")
+        gcode.append(f"G00 Z100.0 (RAPID RETRACTION TO UNIFIED SAFE HEIGHT)")
+        gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
+        gcode.append("M05 (SPINDLE STOP)")
+        gcode.append("G15 (CANCEL POLAR COORDINATES)")
+        
+        gcode.append("")
+        # 特别输出符合用户期望的极坐标格式（仅作为参考）
+        gcode.append("(EXPECTED POLAR COORDINATE OUTPUT - FOR REFERENCE)")
+        for i, (x, y) in enumerate(counterbore_positions):
+            if i == 0:
+                gcode.append(f"(CENTER REFERENCE: X{base_x:.1f}, Y{base_y:.1f})")
+            else:
+                dx = x - base_x
+                dy = y - base_y
+                radius = math.sqrt(dx*dx + dy*dy)
+                angle = math.degrees(math.atan2(dy, dx))
+                gcode.append(f"(POLAR POSITION: R{radius:.1f} ANGLE{angle:.1f})")
+        gcode.append("")
+    else:  # 没有使用极坐标的情况
+        # 1. 点孔工艺 (使用T1 - 中心钻)
+        gcode.append("(STEP 1: PILOT DRILLING OPERATION)")
     gcode.append("(TOOL CHANGE - T01: CENTER DRILL)")
     gcode.append("T1 M06 (TOOL CHANGE - CENTER DRILL)")
     gcode.append("M03 S1000 (SPINDLE FORWARD, PILOT DRILLING SPEED)")
@@ -362,7 +527,6 @@ def _generate_counterbore_code(features: List[Dict], description_analysis: Dict)
     gcode.append("M08 (COOLANT ON)")
     
     # 钻孔循环
-    drill_feed = 100  # 钻孔进给
     if counterbore_positions:
         first_x, first_y = counterbore_positions[0]
         gcode.append(f"G83 X{first_x:.3f} Y{first_y:.3f} Z{-drilling_depth:.3f} R2.0 Q1.0 F{drill_feed:.1f} (DEEP HOLE DRILLING CYCLE - φ{inner_diameter} THRU HOLE)")
@@ -386,10 +550,6 @@ def _generate_counterbore_code(features: List[Dict], description_analysis: Dict)
     gcode.append("")
     gcode.append("(STEP 3: COUNTERBORE OPERATION)")
     gcode.append(f"(TOOL CHANGE - T04: COUNTERBORE TOOL, φ{outer_diameter}mm)")
-    
-    # 设置锪孔参数
-    counterbore_spindle_speed = 400  # 锪孔时较低的转速
-    counterbore_feed = 80  # 锪孔进给
     
     gcode.append("T4 M06 (TOOL CHANGE - COUNTERBORE TOOL)")
     gcode.append(f"M03 S{int(counterbore_spindle_speed)} (SPINDLE FORWARD, COUNTERBORE SPEED)")

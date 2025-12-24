@@ -20,6 +20,17 @@ class ViewType(Enum):
     SECTION = "section"
 
 
+class FeatureType(Enum):
+    """特征类型枚举"""
+    CIRCLE = "circle"
+    COUNTERBORE = "counterbore"
+    COUNTERSINK = "countersink"
+    DRILLED_HOLE = "drilled_hole"
+    TAPPED_HOLE = "tapped_hole"
+    POCKET = "pocket"
+    SLOT = "slot"
+
+
 @dataclass
 class Dimension:
     """尺寸对象"""
@@ -32,11 +43,22 @@ class Dimension:
 
 
 @dataclass
+class Feature:
+    """特征对象"""
+    type: FeatureType
+    center: Tuple[float, float]
+    dimensions: Dict[str, float]  # 如 {'diameter': 10.0, 'depth': 5.0}
+    annotation: str = ""  # 图纸中的标注
+    confidence: float = 1.0
+
+
+@dataclass
 class View:
     """视图对象"""
     name: str
     type: ViewType
     dimensions: List[Dimension]
+    features: List[Feature]
     reference_points: Dict[str, Tuple[float, float]]
     scale: float = 1.0
 
@@ -46,9 +68,11 @@ class DrawingInfo:
     """图纸信息"""
     views: List[View]
     overall_dimensions: List[Dimension]
+    features: List[Feature]
     material: Optional[str] = None
     drawing_number: Optional[str] = None
     revision: Optional[str] = None
+    drawing_scale: Optional[float] = None  # 图纸比例
 
 
 class MechanicalDrawingExpert:
@@ -79,18 +103,170 @@ class MechanicalDrawingExpert:
         """
         views = self._identify_views(drawing_content)
         overall_dimensions = self._extract_overall_dimensions(drawing_content)
+        features = self._extract_features_from_text(drawing_content)
         
         drawing_info = DrawingInfo(
             views=views,
-            overall_dimensions=overall_dimensions
+            overall_dimensions=overall_dimensions,
+            features=features
         )
         
         # 提取材料、图号、版本等信息
         drawing_info.material = self._extract_material(drawing_content)
         drawing_info.drawing_number = self._extract_drawing_number(drawing_content)
         drawing_info.revision = self._extract_revision(drawing_content)
+        drawing_info.drawing_scale = self._extract_drawing_scale(drawing_content)
         
         return drawing_info
+    
+    def _extract_features_from_text(self, content: str) -> List[Feature]:
+        """
+        从图纸文本中提取加工特征
+        
+        Args:
+            content: 图纸文本内容
+            
+        Returns:
+            List[Feature]: 提取到的特征列表
+        """
+        features = []
+        
+        # 匹配沉孔特征 - 更宽泛的模式匹配
+        counterbore_patterns = [
+            r'φ?(\d+\.?\d*)\s*沉孔.*?深\s*(\d+\.?\d*)\s*mm.*?φ?(\d+\.?\d*)\s*底孔',
+            r'沉孔.*?φ?(\d+\.?\d*).*?深\s*(\d+\.?\d*)\s*mm.*?φ?(\d+\.?\d*)\s*底孔',
+            r'φ?(\d+\.?\d*)\s*counterbore.*?deep\s*(\d+\.?\d*)\s*mm.*?φ?(\d+\.?\d*)\s*thru',
+            r'counterbore.*?φ?(\d+\.?\d*).*?deep\s*(\d+\.?\d*)\s*mm.*?φ?(\d+\.?\d*)\s*thru',
+            # 增加更多模式以匹配"3个φ22沉孔深20mm，φ14.5贯通底孔"这样的描述
+            r'(\d+)\s*个.*?φ?(\d+\.?\d*)\s*沉孔.*?深\s*(\d+\.?\d*)\s*mm.*?φ?(\d+\.?\d*)\s*(?:贯通底孔|底孔|thru)',
+            r'(\d+)\s*φ?(\d+\.?\d*)\s*沉孔.*?深\s*(\d+\.?\d*)\s*mm.*?φ?(\d+\.?\d*)\s*(?:贯通底孔|底孔|thru)',
+            # 简单模式匹配
+            r'沉孔.*?φ?(\d+\.?\d*).*?深\s*(\d+\.?\d*)\s*mm',
+            r'φ?(\d+\.?\d*)\s*沉孔.*?深\s*(\d+\.?\d*)\s*mm'
+        ]
+        
+        for pattern in counterbore_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for match in matches:
+                try:
+                    if len(match) >= 3:
+                        # 处理多孔模式 (数量, 外径, 深度, 内径)
+                        if len(match) == 4 and match[0].isdigit():
+                            # 这是多孔模式，第一个元素是数量
+                            count = int(match[0])
+                            outer_diameter = float(match[1])
+                            depth = float(match[2])
+                            inner_diameter = float(match[3])
+                        else:
+                            # 标准模式 (外径, 深度, 内径)
+                            outer_diameter = float(match[0])
+                            depth = float(match[1])
+                            inner_diameter = float(match[2])
+                    
+                        feature = Feature(
+                            type=FeatureType.COUNTERBORE,
+                            center=(0, 0),  # 实际中心坐标需要与图像识别结果匹配
+                            dimensions={
+                                'outer_diameter': outer_diameter,
+                                'depth': depth,
+                                'inner_diameter': inner_diameter
+                            },
+                            annotation=f"φ{outer_diameter}沉孔深{depth}mm + φ{inner_diameter}贯通底孔",
+                            confidence=0.9
+                        )
+                        features.append(feature)
+                    elif len(match) == 2:
+                        # 简单模式 (外径, 深度)，假设内径为外径的65%
+                        outer_diameter = float(match[0])
+                        depth = float(match[1])
+                        inner_diameter = outer_diameter * 0.65  # 假设内径是外径的65%
+                        
+                        feature = Feature(
+                            type=FeatureType.COUNTERBORE,
+                            center=(0, 0),
+                            dimensions={
+                                'outer_diameter': outer_diameter,
+                                'depth': depth,
+                                'inner_diameter': inner_diameter
+                            },
+                            annotation=f"φ{outer_diameter}沉孔深{depth}mm",
+                            confidence=0.7  # 稍低的置信度因为是估算的内径
+                        )
+                        features.append(feature)
+                except (ValueError, IndexError):
+                    continue
+        
+        # 匹配锪孔特征
+        countersink_patterns = [
+            r'φ?(\d+\.?\d*)\s*锪孔',
+            r'锪孔.*?φ?(\d+\.?\d*)'
+        ]
+        
+        for pattern in countersink_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for match in matches:
+                try:
+                    diameter = float(match)
+                    feature = Feature(
+                        type=FeatureType.COUNTERSINK,
+                        center=(0, 0),
+                        dimensions={'diameter': diameter},
+                        annotation=f"φ{diameter}锪孔",
+                        confidence=0.8
+                    )
+                    features.append(feature)
+                except ValueError:
+                    continue
+        
+        # 匹配螺纹孔特征
+        tapped_hole_patterns = [
+            r'(M\d+\.?\d*).*?深\s*(\d+\.?\d*)\s*mm',
+            r'螺纹.*?(M\d+\.?\d*).*?深\s*(\d+\.?\d*)\s*mm'
+        ]
+        
+        for pattern in tapped_hole_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for match in matches:
+                try:
+                    thread_type = match[0]
+                    depth = float(match[1])
+                    
+                    feature = Feature(
+                        type=FeatureType.TAPPED_HOLE,
+                        center=(0, 0),
+                        dimensions={
+                            'thread_type': thread_type,
+                            'depth': depth
+                        },
+                        annotation=f"{thread_type}螺纹孔深{depth}mm",
+                        confidence=0.85
+                    )
+                    features.append(feature)
+                except (ValueError, IndexError):
+                    continue
+        
+        return features
+
+    def _extract_drawing_scale(self, content: str) -> Optional[float]:
+        """
+        从图纸中提取比例信息
+        """
+        scale_patterns = [
+            r'比例[:：]\s*1\s*[:：]\s*(\d+\.?\d*)',
+            r'scale[:：]\s*1\s*[:：]\s*(\d+\.?\d*)',
+            r'1[:：/](\d+\.?\d*)\s*比例',
+            r'1[:：/](\d+\.?\d*)'
+        ]
+        
+        for pattern in scale_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            if matches:
+                try:
+                    return 1.0 / float(matches[0])
+                except ValueError:
+                    continue
+        
+        return None
     
     def _identify_views(self, content: str) -> List[View]:
         """识别图纸中的视图"""
