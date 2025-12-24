@@ -260,13 +260,21 @@ def _generate_counterbore_code(features: List[Dict], description_analysis: Dict)
     inner_diameter = GCODE_GENERATION_CONFIG['counterbore']['default_inner_diameter']  # 底孔直径
     counterbore_depth = GCODE_GENERATION_CONFIG['counterbore']['default_depth']  # 沉孔深度
     
-    # 从沉孔特征中提取实际参数
+    # 优先从描述分析中提取直径信息（最高优先级）
+    if "outer_diameter" in description_analysis and description_analysis["outer_diameter"] is not None:
+        outer_diameter = description_analysis["outer_diameter"]
+    if "inner_diameter" in description_analysis and description_analysis["inner_diameter"] is not None:
+        inner_diameter = description_analysis["inner_diameter"]
+    
+    # 从沉孔特征中提取实际参数（次优先级）
     counterbore_features = [f for f in features if f.get("shape") == "counterbore"]
     if counterbore_features:
-        # 使用第一个沉孔特征的参数作为默认值，但确保值有效
+        # 使用第一个沉孔特征的参数，但只有在描述分析中没有提供时才使用
         first_counterbore = counterbore_features[0]
-        outer_diameter = first_counterbore.get("outer_diameter", outer_diameter)
-        inner_diameter = first_counterbore.get("inner_diameter", inner_diameter)
+        if outer_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_outer_diameter']:  # 如果还是默认值
+            outer_diameter = first_counterbore.get("outer_diameter", outer_diameter)
+        if inner_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_inner_diameter']:  # 如果还是默认值
+            inner_diameter = first_counterbore.get("inner_diameter", inner_diameter)
         counterbore_depth = first_counterbore.get("depth", counterbore_depth)
         # 确保直径值有效
         if outer_diameter is None or outer_diameter <= 0:
@@ -478,76 +486,79 @@ def _generate_counterbore_code(features: List[Dict], description_analysis: Dict)
                 angle = math.degrees(math.atan2(dy, dx))
                 gcode.append(f"(POLAR POSITION: R{radius:.1f} ANGLE{angle:.1f})")
         gcode.append("")
+        
+        # 既然已经使用极坐标完成加工，返回以避免执行非极坐标加工流程
+        return gcode
     else:  # 没有使用极坐标的情况
         # 1. 点孔工艺 (使用T1 - 中心钻)
         gcode.append("(STEP 1: PILOT DRILLING OPERATION)")
-    gcode.append("(TOOL CHANGE - T01: CENTER DRILL)")
-    gcode.append("T1 M06 (TOOL CHANGE - CENTER DRILL)")
-    gcode.append("M03 S1000 (SPINDLE FORWARD, PILOT DRILLING SPEED)")
-    gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
-    
-    # 激活刀具长度补偿
-    gcode.append("G43 H1 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T1)")
-    
-    # 开启切削液
-    gcode.append("M08 (COOLANT ON)")
-    
-    # 点孔循环
-    if counterbore_positions:
-        first_x, first_y = counterbore_positions[0]
-        gcode.append(f"G82 X{first_x:.3f} Y{first_y:.3f} Z{-centering_depth:.3f} R2.0 P1000 F50.0 (SPOT DRILLING CYCLE, DWELL 1 SECOND)")
+        gcode.append("(TOOL CHANGE - T01: CENTER DRILL)")
+        gcode.append("T1 M06 (TOOL CHANGE - CENTER DRILL)")
+        gcode.append("M03 S1000 (SPINDLE FORWARD, PILOT DRILLING SPEED)")
+        gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
         
-        # 对于后续孔位置，只使用X、Y坐标
-        for i, (center_x, center_y) in enumerate(counterbore_positions[1:], 2):
-            gcode.append(f"X{center_x:.3f} Y{center_y:.3f} (PILOT DRILLING {i}: X{center_x:.1f},Y{center_y:.1f})")
-    else:
-        gcode.append(f"G82 Z{-centering_depth:.3f} R2.0 P1000 F50.0 (SPOT DRILLING CYCLE, DWELL 1 SECOND)")
-    
-    gcode.append("G80 (CANCEL FIXED CYCLE)")
-    
-    # 关闭切削液
-    gcode.append("M09 (COOLANT OFF)")
-    
-    # 移动到统一的安全高度，然后取消刀具长度补偿
-    gcode.append("G00 Z100.0 (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
-    gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
-    
-    # 2. 钻孔工艺 (使用T2 - φ14.5钻头)
-    gcode.append("")
-    gcode.append("(STEP 2: DRILLING OPERATION)")
-    gcode.append(f"(TOOL CHANGE - T02: DRILL BIT, HOLE DIAMETER {inner_diameter}mm)")
-    gcode.append("T2 M06 (TOOL CHANGE - DRILL BIT)")
-    gcode.append("M03 S800 (SPINDLE FORWARD, DRILLING SPEED)")
-    gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
-    
-    # 激活刀具长度补偿
-    gcode.append("G43 H2 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T2)")
-    
-    # 开启切削液
-    gcode.append("M08 (COOLANT ON)")
-    
-    # 钻孔循环
-    if counterbore_positions:
-        first_x, first_y = counterbore_positions[0]
-        gcode.append(f"G83 X{first_x:.3f} Y{first_y:.3f} Z{-drilling_depth:.3f} R2.0 Q1.0 F{drill_feed:.1f} (DEEP HOLE DRILLING CYCLE - φ{inner_diameter} THRU HOLE)")
+        # 激活刀具长度补偿
+        gcode.append("G43 H1 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T1)")
         
-        # 对于后续孔位置，只使用X、Y坐标
-        for i, (center_x, center_y) in enumerate(counterbore_positions[1:], 2):
-            gcode.append(f"X{center_x:.3f} Y{center_y:.3f} (DRILLING {i}: X{center_x:.1f},Y{center_y:.1f} - φ{inner_diameter} THRU HOLE)")
-    else:
-        gcode.append(f"G83 Z{-drilling_depth:.3f} R2.0 Q1.0 F{drill_feed:.1f} (DEEP HOLE DRILLING CYCLE - φ{inner_diameter} THRU HOLE)")
-    
-    gcode.append("G80 (CANCEL FIXED CYCLE)")
-    
-    # 关闭切削液
-    gcode.append("M09 (COOLANT OFF)")
-    
-    # 移动到统一的安全高度，然后取消刀具长度补偿
-    gcode.append("G00 Z100.0 (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
-    gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
-    
-    # 3. 锪孔工艺 (使用T4 - 锪孔刀)
-    gcode.append("")
+        # 开启切削液
+        gcode.append("M08 (COOLANT ON)")
+        
+        # 点孔循环
+        if counterbore_positions:
+            first_x, first_y = counterbore_positions[0]
+            gcode.append(f"G82 X{first_x:.3f} Y{first_y:.3f} Z{-centering_depth:.3f} R2.0 P1000 F50.0 (SPOT DRILLING CYCLE, DWELL 1 SECOND)")
+            
+            # 对于后续孔位置，只使用X、Y坐标
+            for i, (center_x, center_y) in enumerate(counterbore_positions[1:], 2):
+                gcode.append(f"X{center_x:.3f} Y{center_y:.3f} (PILOT DRILLING {i}: X{center_x:.1f},Y{center_y:.1f})")
+        else:
+            gcode.append(f"G82 Z{-centering_depth:.3f} R2.0 P1000 F50.0 (SPOT DRILLING CYCLE, DWELL 1 SECOND)")
+        
+        gcode.append("G80 (CANCEL FIXED CYCLE)")
+        
+        # 关闭切削液
+        gcode.append("M09 (COOLANT OFF)")
+        
+        # 移动到统一的安全高度，然后取消刀具长度补偿
+        gcode.append("G00 Z100.0 (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
+        gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
+        
+        # 2. 钻孔工艺 (使用T2 - φ14.5钻头)
+        gcode.append("")
+        gcode.append("(STEP 2: DRILLING OPERATION)")
+        gcode.append(f"(TOOL CHANGE - T02: DRILL BIT, HOLE DIAMETER {inner_diameter}mm)")
+        gcode.append("T2 M06 (TOOL CHANGE - DRILL BIT)")
+        gcode.append("M03 S800 (SPINDLE FORWARD, DRILLING SPEED)")
+        gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
+        
+        # 激活刀具长度补偿
+        gcode.append("G43 H2 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T2)")
+        
+        # 开启切削液
+        gcode.append("M08 (COOLANT ON)")
+        
+        # 钻孔循环
+        if counterbore_positions:
+            first_x, first_y = counterbore_positions[0]
+            gcode.append(f"G83 X{first_x:.3f} Y{first_y:.3f} Z{-drilling_depth:.3f} R2.0 Q1.0 F{drill_feed:.1f} (DEEP HOLE DRILLING CYCLE - φ{inner_diameter} THRU HOLE)")
+            
+            # 对于后续孔位置，只使用X、Y坐标
+            for i, (center_x, center_y) in enumerate(counterbore_positions[1:], 2):
+                gcode.append(f"X{center_x:.3f} Y{center_y:.3f} (DRILLING {i}: X{center_x:.1f},Y{center_y:.1f} - φ{inner_diameter} THRU HOLE)")
+        else:
+            gcode.append(f"G83 Z{-drilling_depth:.3f} R2.0 Q1.0 F{drill_feed:.1f} (DEEP HOLE DRILLING CYCLE - φ{inner_diameter} THRU HOLE)")
+        
+        gcode.append("G80 (CANCEL FIXED CYCLE)")
+        
+        # 关闭切削液
+        gcode.append("M09 (COOLANT OFF)")
+        
+        # 移动到统一的安全高度，然后取消刀具长度补偿
+        gcode.append("G00 Z100.0 (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
+        gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
+        
+        # 3. 锪孔工艺 (使用T4 - 锪孔刀)
+        gcode.append("")
     gcode.append("(STEP 3: COUNTERBORE OPERATION)")
     gcode.append(f"(TOOL CHANGE - T04: COUNTERBORE TOOL, φ{outer_diameter}mm)")
     

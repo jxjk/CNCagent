@@ -1,6 +1,7 @@
 """
 几何特征识别模块
 从图像中识别几何形状，如圆形、矩形、多边形等，并提取其尺寸和位置信息
+注意：此模块现在主要作为AI驱动系统的补充，提供传统图像处理能力
 """
 import cv2
 import numpy as np
@@ -10,6 +11,10 @@ import logging
 
 # 导入配置参数
 from ..config import IMAGE_PROCESSING_CONFIG, FEATURE_RECOGNITION_CONFIG, COORDINATE_CONFIG, OCR_CONFIG
+
+# 导入AI驱动模块和OCR模块
+from .ai_driven_generator import AIDrivenCNCGenerator
+from .ocr_ai_inference import extract_features_from_pdf_with_ai
 
 
 def identify_features(image: np.ndarray, min_area: float = None, min_perimeter: float = None, 

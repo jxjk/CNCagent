@@ -37,10 +37,13 @@ def analyze_user_description(description: str) -> Dict:
     # 提取参考点信息
     reference_points = _extract_reference_points(description)
     
+    # 提取沉孔直径信息
+    outer_diameter, inner_diameter = _extract_counterbore_diameters(description)
+    
     # 确定所需刀具
     tool_required = _identify_tool_required(processing_type)
     
-    return {
+    result = {
         "processing_type": processing_type,
         "tool_required": tool_required,
         "depth": depth,
@@ -52,6 +55,14 @@ def analyze_user_description(description: str) -> Dict:
         "reference_points": reference_points,  # 添加参考点信息
         "description": description
     }
+    
+    # 如果提取到沉孔直径信息，添加到结果中
+    if outer_diameter is not None:
+        result["outer_diameter"] = outer_diameter
+    if inner_diameter is not None:
+        result["inner_diameter"] = inner_diameter
+    
+    return result
 
 
 def _identify_processing_type(description: str) -> str:
@@ -59,14 +70,18 @@ def _identify_processing_type(description: str) -> str:
     description_lower = description.lower()
     
     # 关键词映射
+    counterbore_keywords = ['沉孔', 'counterbore', '锪孔', 'counter bore', 'counter-bore']
     drilling_keywords = ['drill', 'hole', '钻孔', '打孔', '孔', '钻']
     milling_keywords = ['mill', 'milling', 'cut', 'cutting', '铣', '铣削', '切削']
     turning_keywords = ['turn', 'turning', 'lathe', '车', '车削']
     grinding_keywords = ['grind', 'grinding', '磨', '磨削']
     tapping_keywords = ['tapping', 'tap', '螺纹', '攻丝', 'thread', '丝锥']
     
-    # 检查攻丝相关关键词（优先级高于钻孔）
-    if any(keyword in description_lower for keyword in tapping_keywords):
+    # 检查沉孔相关关键词（优先级最高）
+    if any(keyword in description_lower for keyword in counterbore_keywords):
+        return 'counterbore'
+    # 检查攻丝相关关键词
+    elif any(keyword in description_lower for keyword in tapping_keywords):
         return 'tapping'
     elif any(keyword in description_lower for keyword in drilling_keywords):
         return 'drilling'
@@ -88,7 +103,8 @@ def _identify_tool_required(processing_type: str) -> str:
         'milling': 'end_mill',
         'turning': 'cutting_tool',
         'grinding': 'grinding_wheel',
-        'tapping': 'tap'  # 新增攻丝类型
+        'tapping': 'tap',  # 新增攻丝类型
+        'counterbore': 'counterbore_tool'  # 新增沉孔类型
     }
     
     return tool_mapping.get(processing_type, 'general_tool')
@@ -369,3 +385,71 @@ def _extract_reference_points(description: str) -> Dict[str, Tuple[float, float]
                 reference_points[f'custom_{point_name}'] = (x, y)
     
     return reference_points
+
+
+def _extract_counterbore_diameters(description: str) -> tuple:
+    """
+    从描述中提取沉孔的外径和内径
+    
+    Args:
+        description: 用户描述字符串
+        
+    Returns:
+        tuple: (外径, 内径) 或 (None, None) 如果没有找到
+    """
+    description_lower = description.lower()
+    
+    # 匹配"φ22深20底孔φ14.5贯通"或类似格式的沉孔描述
+    # 使用更精确的模式，确保直径数字出现在沉孔相关上下文中，避免匹配坐标和无关数字
+    patterns = [
+        r'(?:加工|沉孔|counterbore|锪孔).*?φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔|深).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru)?.*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通)', # 加工φ22沉孔深20 φ14.5底孔/贯通
+        r'φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru)?.*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通)',  # φ22沉孔深20 φ14.5底孔/贯通
+        r'(?:沉孔|counterbore|锪孔).*?φ\s*(\d+(?:\.\d+)?).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru)?.*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通)',  # 沉孔φ22深20 φ14.5底孔/贯通
+        r'(\d+)\s*个.*?φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?.*?底孔\s*φ\s*(\d+(?:\.\d+)?)\s*贯通',  # 3个φ22沉孔深20 底孔φ14.5贯通
+        r'φ\s*(\d+(?:\.\d+)?).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:沉孔|counterbore|锪孔).*?底孔\s*φ\s*(\d+(?:\.\d+)?)\s*贯通',  # φ22深20沉孔 底孔φ14.5贯通
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, description_lower)
+        for match in matches:
+            try:
+                # 根据匹配的模式，提取外径和内径
+                if len(match) >= 3:  # 包含数量的模式
+                    outer_diameter = float(match[1])  # 外径
+                    inner_diameter = float(match[2])  # 内径
+                elif len(match) == 2:  # 外径和内径的模式
+                    outer_diameter = float(match[0])
+                    inner_diameter = float(match[1])
+                else:
+                    continue
+                
+                # 确保提取的直径在合理范围内，排除误匹配的数字（如φ234中的数字）
+                if outer_diameter > 50 or inner_diameter > 50:  # 假设正常沉孔直径不会超过50mm
+                    continue
+                
+                return outer_diameter, inner_diameter
+            except (ValueError, IndexError):
+                continue
+    
+    # 如果上述模式没有匹配到，尝试提取描述末尾的直径信息
+    # 格式如: "...φ22深20，φ14.5贯通底孔"
+    end_patterns = [
+        r'φ\s*(\d+(?:\.\d+)?)\s*深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:沉孔|counterbore|锪孔|，|\.|;).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|，|\.|;)',
+        r'φ\s*(\d+(?:\.\d+)?).*?深.*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|，|\.|;).*?(?:底孔|thru|贯通)',  # φ22深20，φ14.5贯通底孔
+    ]
+    
+    for pattern in end_patterns:
+        matches = re.findall(pattern, description_lower)
+        for match in matches:
+            try:
+                if len(match) == 2:
+                    outer_diameter = float(match[0])
+                    inner_diameter = float(match[1])
+                    # 确保提取的直径在合理范围内
+                    if outer_diameter > 50 or inner_diameter > 50:
+                        continue
+                    return outer_diameter, inner_diameter
+            except (ValueError, IndexError):
+                continue
+    
+    return None, None
