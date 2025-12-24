@@ -38,22 +38,24 @@ def _validate_inputs(user_description: str) -> None:
 
 def _extract_text_from_images(images: List, all_text: str) -> str:
     """从图像中提取文本"""
+    import logging
     ocr_success = True
     try:
         for img in images:
             ocr_result = ocr_image(img)
             all_text += ocr_result + "\n"
     except ImportError as e:
-        print(f"OCR库未安装: {str(e)}，跳过OCR步骤")
+        logging.warning(f"OCR库未安装: {str(e)}，跳过OCR步骤")
         ocr_success = False
     except Exception as e:
-        print(f"OCR处理失败: {str(e)}，跳过OCR步骤")
+        logging.warning(f"OCR处理失败: {str(e)}，跳过OCR步骤")
         ocr_success = False
     return all_text, ocr_success
 
 
 def _identify_features_from_images(images: List, drawing_text: str) -> List[Dict]:
     """从图像中识别几何特征"""
+    import logging
     features = []
     for img in images:
         # 将PIL图像转换为numpy数组（适用于OpenCV）
@@ -62,34 +64,35 @@ def _identify_features_from_images(images: List, drawing_text: str) -> List[Dict
         
         # 只保留置信度较高的特征
         high_confidence_features = [f for f in img_features if f.get('confidence', 0) > 0.7]
-        print(f"  从页面识别到 {len(img_features)} 个特征，其中高置信度特征 {len(high_confidence_features)} 个")
+        logging.info(f"  从页面识别到 {len(img_features)} 个特征，其中高置信度特征 {len(high_confidence_features)} 个")
         features.extend(high_confidence_features)
     return features
 
 
 def _analyze_and_validate_features(features: List[Dict], user_description: str) -> Tuple[Dict, List[Dict]]:
     """分析和验证识别的特征"""
-    print(f"总共识别到 {len(features)} 个高置信度特征")
+    import logging
+    logging.info(f"总共识别到 {len(features)} 个高置信度特征")
     
     # 验证识别出的特征
     if features:
         feature_errors = validate_features(features)
         if feature_errors:
-            print(f"警告: 特征验证发现问题: {', '.join(feature_errors)}")
+            logging.warning(f"特征验证发现问题: {', '.join(feature_errors)}")
         
         # 显示识别到的特征信息
-        print("识别到的特征:")
+        logging.info("识别到的特征:")
         for i, feature in enumerate(features):
             shape = feature['shape']
             center = feature['center']
             dims = feature['dimensions']
             conf = feature.get('confidence', 1.0)
             if shape == 'counterbore':
-                print(f"  特征 {i+1}: {shape}, 中心{center}, 沉孔直径{feature.get('outer_diameter', 0):.1f}mm, 底孔直径{feature.get('inner_diameter', 0):.1f}mm, 深度{feature.get('depth', 0):.1f}mm, 置信度{conf:.2f}")
+                logging.info(f"  特征 {i+1}: {shape}, 中心{center}, 沉孔直径{feature.get('outer_diameter', 0):.1f}mm, 底孔直径{feature.get('inner_diameter', 0):.1f}mm, 深度{feature.get('depth', 0):.1f}mm, 置信度{conf:.2f}")
             else:
-                print(f"  特征 {i+1}: {shape}, 中心{center}, 尺寸{dims}, 置信度{conf:.2f}")
+                logging.info(f"  特征 {i+1}: {shape}, 中心{center}, 尺寸{dims}, 置信度{conf:.2f}")
     else:
-        print("警告: 未识别到任何高置信度几何特征")
+        logging.warning("未识别到任何高置信度几何特征")
         # 如果没有识别到特征，基于用户描述生成通用程序
         features = [{
             "shape": "rectangle",
@@ -114,7 +117,7 @@ def _analyze_and_validate_features(features: List[Dict], user_description: str) 
     # 验证解析参数
     param_errors = validate_parameters(description_analysis)
     if param_errors:
-        print(f"警告: 参数验证发现问题: {', '.join(param_errors)}")
+        logging.warning(f"参数验证发现问题: {', '.join(param_errors)}")
     
     return description_analysis, features
 
@@ -122,8 +125,9 @@ def _analyze_and_validate_features(features: List[Dict], user_description: str) 
 def _select_and_adjust_coordinate_system(features: List[Dict], drawing_info: Any, description_analysis: Dict, 
                                        coordinate_strategy: str, custom_origin: Optional[Tuple[float, float]]) -> Tuple[List[Dict], Tuple[float, float]]:
     """选择并调整坐标系统"""
+    import logging
     # 选择坐标参考点
-    print(f"使用坐标基准策略: {coordinate_strategy}")
+    logging.info(f"使用坐标基准策略: {coordinate_strategy}")
     
     # 优先使用机械制图专家识别的参考点
     drawing_reference_points = {}
@@ -136,13 +140,13 @@ def _select_and_adjust_coordinate_system(features: List[Dict], drawing_info: Any
     
     # 如果机械制图专家识别到参考点，优先使用
     if drawing_reference_points:
-        print(f"检测到图纸中的参考点: {drawing_reference_points}")
+        logging.info(f"检测到图纸中的参考点: {drawing_reference_points}")
         # 使用图纸参考点
         first_drawing_ref = next(iter(drawing_reference_points.values()))
         origin_point = first_drawing_ref
     # 然后是用户在描述中指定的参考点
     elif reference_points:
-        print(f"检测到用户指定的参考点: {reference_points}")
+        logging.info(f"检测到用户指定的参考点: {reference_points}")
         # 使用第一个参考点作为坐标原点
         first_ref_point = next(iter(reference_points.values()))
         origin_point = first_ref_point
@@ -150,16 +154,16 @@ def _select_and_adjust_coordinate_system(features: List[Dict], drawing_info: Any
         # 使用指定的坐标策略选择参考点
         origin_point = select_coordinate_reference(features, coordinate_strategy, custom_origin)
     
-    print(f"设置坐标原点为: {origin_point}")
+    logging.info(f"设置坐标原点为: {origin_point}")
     
     # 调整所有特征的坐标
     adjusted_features = adjust_coordinate_system(features, origin_point, coordinate_strategy, custom_origin)
-    print("坐标系统调整完成")
+    logging.info("坐标系统调整完成")
     
     return adjusted_features, origin_point
 
 
-def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.0, 
+def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.0,
                         coordinate_strategy: str = "highest_y", custom_origin: Optional[Tuple[float, float]] = None) -> str:
     """
     完整流程：从PDF图纸和用户描述生成NC程序
@@ -174,21 +178,22 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
     Returns:
         str: 生成的NC程序代码
     """
-    print("开始处理PDF图纸...")
+    import logging
+    logging.info("开始处理PDF图纸...")
     
     # 1. 验证输入
     _validate_inputs(user_description)
     
     # 2. PDF转换为图像
-    print("正在将PDF转换为图像...")
+    logging.info("正在将PDF转换为图像...")
     try:
         images = pdf_to_images(pdf_path)
     except Exception as e:
-        print(f"PDF转换为图像失败: {str(e)}")
+        logging.error(f"PDF转换为图像失败: {str(e)}")
         raise
     
     # 3. OCR提取文字（如果Tesseract可用）
-    print("正在执行OCR识别...")
+    logging.info("正在执行OCR识别...")
     all_text = ""
     all_text, ocr_success = _extract_text_from_images(images, all_text)
     
@@ -197,16 +202,16 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
         pdf_text = extract_text_from_pdf(pdf_path)
         all_text += "\n" + pdf_text
     except Exception as e:
-        print(f"PDF文本提取失败: {str(e)}")
+        logging.warning(f"PDF文本提取失败: {str(e)}")
         pdf_text = ""
     
     # 使用机械制图专家分析图纸
-    print("正在使用机械制图专家分析图纸...")
+    logging.info("正在使用机械制图专家分析图纸...")
     drawing_expert = MechanicalDrawingExpert()
     drawing_info = drawing_expert.parse_drawing(all_text)
     
     # 4. 识别几何特征
-    print("正在识别几何特征...")
+    logging.info("正在识别几何特征...")
     features = _identify_features_from_images(images, all_text)
     
     # 分析和验证特征
@@ -220,24 +225,23 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
     scaled_features = extract_dimensions(features, scale)
     
     # 6. 生成NC程序
-    print("正在生成NC程序...")
+    logging.info("正在生成NC程序...")
     nc_program = generate_fanuc_nc(scaled_features, description_analysis, scale)
     
     # 验证NC程序
     nc_errors = validate_nc_code(nc_program)
     if nc_errors:
-        print(f"警告: NC程序验证发现问题: {', '.join(nc_errors)}")
+        logging.warning(f"NC程序验证发现问题: {', '.join(nc_errors)}")
     
     # 7. 生成模拟报告和可视化
-    print("正在生成模拟报告...")
+    logging.info("正在生成模拟报告...")
     try:
         generate_simulation_report(scaled_features, description_analysis, nc_program)
         visualize_features(scaled_features)
     except Exception as e:
-        print(f"生成模拟报告时出现警告: {str(e)}")
+        logging.warning(f"生成模拟报告时出现警告: {str(e)}")
     
     return nc_program
-
 
 def preprocess_image(image):
     """

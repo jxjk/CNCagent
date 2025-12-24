@@ -5,6 +5,7 @@
 import re
 from typing import Dict, List, Optional, Tuple
 from .mechanical_drawing_expert import MechanicalDrawingExpert
+from ..exceptions import InputValidationError, handle_exception
 
 
 def analyze_user_description(description: str) -> Dict:

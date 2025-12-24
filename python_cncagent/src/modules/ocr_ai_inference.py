@@ -12,7 +12,8 @@ try:
     HAS_PYMUPDF = True
 except ImportError:
     HAS_PYMUPDF = False
-    print("警告: 未安装PyMuPDF库，PDF功能将受限")
+    import logging
+    logging.warning("警告: 未安装PyMuPDF库，PDF功能将受限")
 
 try:
     import cv2
@@ -20,14 +21,16 @@ try:
     HAS_OPENCV = True
 except ImportError:
     HAS_OPENCV = False
-    print("警告: 未安装OpenCV库，图像处理功能将受限")
+    import logging
+    logging.warning("警告: 未安装OpenCV库，图像处理功能将受限")
 
 try:
     import pytesseract
     HAS_TESSERACT = True
 except ImportError:
     HAS_TESSERACT = False
-    print("警告: 未安装pytesseract库，OCR功能将受限")
+    import logging
+    logging.warning("警告: 未安装pytesseract库，OCR功能将受限")
 
 class PDFFeatureExtractor:
     """
@@ -442,7 +445,7 @@ class OCRProcessor:
                         ai_inferred["recommended_tool_sizes"].append(f"φ{num}")
                     elif 6 <= float(num) <= 20:  # 中等尺寸
                         ai_inferred["recommended_tool_sizes"].append(f"φ{num}")
-            except:
+            except (ValueError, TypeError):
                 continue
         
         # 推断加工顺序

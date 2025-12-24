@@ -11,6 +11,7 @@ import logging
 
 # 导入配置参数
 from ..config import IMAGE_PROCESSING_CONFIG, FEATURE_RECOGNITION_CONFIG, COORDINATE_CONFIG, OCR_CONFIG
+from ..exceptions import FeatureRecognitionError, handle_exception
 
 # 导入AI驱动模块和OCR模块
 from .ai_driven_generator import AIDrivenCNCGenerator
@@ -129,19 +130,20 @@ def identify_features(image: np.ndarray, min_area: float = None, min_perimeter: 
             elif shape == "ellipse":
                 # 拟合椭圆
                 if len(contour) >= 5:  # 至少需要5个点才能拟合椭圆
-                    try:
-                        ellipse = cv2.fitEllipse(contour)
-                        center, axes, angle = ellipse
-                        feature["ellipse_params"] = {
-                            "center": center,
-                            "axes": axes,
-                            "angle": angle
-                        }
-                        feature["major_axis"] = max(axes)
-                        feature["minor_axis"] = min(axes)
-                    except:
-                        pass  # 如果拟合失败，忽略椭圆参数
-            
+                                try:
+                                    ellipse = cv2.fitEllipse(contour)
+                                    center, axes, angle = ellipse
+                                    feature["ellipse_params"] = {
+                                        "center": center,
+                                        "axes": axes,
+                                        "angle": angle
+                                    }
+                                    feature["major_axis"] = max(axes)
+                                    feature["minor_axis"] = min(axes)
+                                except cv2.error:
+                                    pass  # 如果拟合失败，忽略椭圆参数
+                                except ValueError:
+                                    pass  # 如果其他错误，忽略椭圆参数            
             features.append(feature)
     
     # 过滤重复特征

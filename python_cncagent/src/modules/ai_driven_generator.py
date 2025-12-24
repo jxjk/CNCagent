@@ -14,7 +14,8 @@ try:
     HAS_PYMUPDF = True
 except ImportError:
     HAS_PYMUPDF = False
-    print("警告: 未安装PyMuPDF库，PDF功能将受限")
+    import logging
+    logging.warning("警告: 未安装PyMuPDF库，PDF功能将受限")
 
 try:
     import cv2
@@ -22,7 +23,8 @@ try:
     HAS_OPENCV = True
 except ImportError:
     HAS_OPENCV = False
-    print("警告: 未安装OpenCV库，图像处理功能将受限")
+    import logging
+    logging.warning("警告: 未安装OpenCV库，图像处理功能将受限")
 
 @dataclass
 class ProcessingRequirements:

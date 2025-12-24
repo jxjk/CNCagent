@@ -6,6 +6,7 @@ import logging
 from typing import Dict, Optional, List
 from pathlib import Path
 
+from ..exceptions import CNCError, InputValidationError, handle_exception
 from .ai_driven_generator import generate_nc_with_ai
 from .ocr_ai_inference import extract_features_from_pdf_with_ai
 from .gcode_generation import generate_fanuc_nc
@@ -44,11 +45,32 @@ class UnifiedCNCGenerator:
             
         Returns:
             str: 生成的NC程序代码
+            
+        Raises:
+            InputValidationError: 输入参数验证失败
+            CNCError: 生成过程中发生错误
         """
-        if use_ai_primary:
-            return self._generate_with_ai_approach(user_prompt, pdf_path, image_path)
-        else:
-            return self._generate_with_traditional_approach(user_prompt, pdf_path, image_path)
+        # 输入验证
+        if not user_prompt or not user_prompt.strip():
+            raise InputValidationError("用户需求描述不能为空")
+        
+        if pdf_path and not Path(pdf_path).exists():
+            raise InputValidationError(f"PDF文件不存在: {pdf_path}")
+        
+        if image_path and not Path(image_path).exists():
+            raise InputValidationError(f"图像文件不存在: {image_path}")
+        
+        try:
+            if use_ai_primary:
+                return self._generate_with_ai_approach(user_prompt, pdf_path, image_path)
+            else:
+                return self._generate_with_traditional_approach(user_prompt, pdf_path, image_path)
+        except CNCError:
+            # 如果已经是CNCError，直接重新抛出
+            raise
+        except Exception as e:
+            error = handle_exception(e, self.logger, "生成CNC程序时出错")
+            raise CNCError(f"生成CNC程序失败: {str(error)}", original_exception=e) from e
     
     def _generate_with_ai_approach(
         self, 

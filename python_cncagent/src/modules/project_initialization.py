@@ -11,6 +11,8 @@ def initialize_project():
     """
     初始化项目环境
     """
+    import logging
+    
     # 创建必要的目录
     directories = [
         "logs",
@@ -23,9 +25,9 @@ def initialize_project():
         path = Path(directory)
         if not path.exists():
             path.mkdir(parents=True, exist_ok=True)
-            print(f"创建目录: {directory}")
+            logging.info(f"创建目录: {directory}")
     
-    print("项目初始化完成")
+    logging.info("项目初始化完成")
 
 
 def setup_logging():
@@ -48,7 +50,7 @@ def setup_logging():
         ]
     )
     
-    print("日志系统已设置")
+    logging.info("日志系统已设置")
 
 
 if __name__ == "__main__":

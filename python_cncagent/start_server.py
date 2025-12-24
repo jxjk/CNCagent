@@ -299,7 +299,18 @@ def generate_nc():
 def download_nc(file_path):
     """下载生成的NC文件"""
     try:
-        return send_file(file_path, as_attachment=True, download_name="output.nc")
+        # 安全验证：确保文件路径在临时目录中，防止路径遍历攻击
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        resolved_path = os.path.abspath(file_path)
+        if not resolved_path.startswith(temp_dir):
+            return jsonify({"error": "非法文件路径"}), 400
+        
+        # 验证文件是否存在且为.nc文件
+        if not os.path.exists(resolved_path) or not resolved_path.endswith('.nc'):
+            return jsonify({"error": "文件不存在或格式不正确"}), 400
+            
+        return send_file(resolved_path, as_attachment=True, download_name="output.nc")
     except Exception as e:
         return jsonify({"error": f"下载文件时发生错误: {str(e)}"}), 500
 

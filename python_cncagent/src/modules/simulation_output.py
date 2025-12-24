@@ -19,6 +19,7 @@ def generate_simulation_report(features: List[Dict],
         nc_program: 生成的NC程序
         output_path: 报告输出路径
     """
+    import logging
     report = []
     report.append("=" * 60)
     report.append("CNC 加工模拟报告")
@@ -82,7 +83,7 @@ def generate_simulation_report(features: List[Dict],
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(report))
     
-    print(f"模拟报告已生成: {output_path}")
+    logging.info(f"模拟报告已生成: {output_path}")
 
 def visualize_features(features: List[Dict], output_path: str = "feature_visualization.html"):
     """
@@ -92,6 +93,7 @@ def visualize_features(features: List[Dict], output_path: str = "feature_visuali
         features: 识别出的特征列表
         output_path: 输出文件路径
     """
+    import logging
     html_content = """<!DOCTYPE html>
 <html>
 <head>
@@ -144,4 +146,4 @@ def visualize_features(features: List[Dict], output_path: str = "feature_visuali
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
     
-    print(f"特征可视化已生成: {output_path}")
+    logging.info(f"特征可视化已生成: {output_path}")

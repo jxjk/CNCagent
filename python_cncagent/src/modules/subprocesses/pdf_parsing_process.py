@@ -1092,7 +1092,8 @@ def pdf_parsing_process(file_path: str) -> Dict[str, Any]:
                         tolerances.extend(extracted['tolerances'])
                         surface_finishes.extend(extracted['surface_finishes'])
             except ImportError:
-                print("\u8b66告: 未安装PyPDF2，无法解析PDF文本内容")
+                import logging
+                logging.warning("警告: 未安装PyPDF2，无法解析PDF文本内容")
                 # 返回基本结构
                 geometry_elements = [
                     {'id': 'default_rectangle', 'type': 'rectangle', 'bounds': {'x': 10, 'y': 10, 'width': 80, 'height': 60}}

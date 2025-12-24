@@ -68,27 +68,29 @@ def ocr_image(image, lang='chi_sim+eng'):
     Returns:
         str: 识别出的文本
     """
+    import tempfile
     try:
         # 预处理图像
         processed_img = preprocess_image(image)
         
-        # 临时保存图像用于OCR
-        temp_path = "temp_ocr.png"
-        processed_img.save(temp_path)
+        # 使用安全的临时文件
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+            temp_path = temp_file.name
         
-        # OCR识别
-        text = pytesseract.image_to_string(Image.open(temp_path), lang=lang)
-        return text
+        try:
+            # 临时保存图像用于OCR
+            processed_img.save(temp_path)
+            
+            # OCR识别
+            text = pytesseract.image_to_string(Image.open(temp_path), lang=lang)
+            return text
+        finally:
+            # 确保临时文件被删除
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
     except Exception as e:
         logging.warning(f"OCR处理失败: {str(e)}。请确保已安装Tesseract OCR引擎并添加到系统PATH中。")
         return ""
-    finally:
-        # 清理临时文件
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except:
-                pass  # 忽略删除临时文件时的错误
 
 
 def extract_text_from_pdf(pdf_path):

@@ -116,9 +116,10 @@ def identify_features(image: np.ndarray, min_area: float = 100, min_perimeter: f
                         }
                         feature["major_axis"] = max(axes)
                         feature["minor_axis"] = min(axes)
-                    except:
+                    except cv2.error:
                         pass  # 如果拟合失败，忽略椭圆参数
-            
+                                except ValueError:
+                                    pass  # 如果其他错误，忽略椭圆参数            
             features.append(feature)
     
     # 过滤重复特征
@@ -164,21 +165,21 @@ def identify_shape_advanced(contour: np.ndarray, area: float, circle_area: float
     
     # 检查是否是椭圆（通过拟合椭圆或圆形度判断）
     if len(contour) >= 5 and area > 0 and circularity < 0.8:
-        try:
-            # 尝试拟合椭圆
-            ellipse = cv2.fitEllipse(contour)
-            center, axes, angle = ellipse
-            major_axis = max(axes)
-            minor_axis = min(axes)
-            eccentricity = math.sqrt(1 - (minor_axis / major_axis) ** 2) if major_axis > 0 else 0
-            
-            # 如果离心率适中（接近椭圆而非圆形），并且形状比较规则
-            if 0.4 <= eccentricity <= 0.9 and solidity > 0.7:
-                return "ellipse", min(1.0, solidity * extent * 0.8)
-        except:
-            pass  # 拟合失败则继续其他形状判断
-    
-    # 三角形判断
+                    try:
+                        # 尝试拟合椭圆
+                        ellipse = cv2.fitEllipse(contour)
+                        center, axes, angle = ellipse
+                        major_axis = max(axes)
+                        minor_axis = min(axes)
+                        eccentricity = math.sqrt(1 - (minor_axis / major_axis) ** 2) if major_axis > 0 else 0
+                        
+                        # 如果离心率适中（接近椭圆而非圆形），并且形状比较规则
+                        if 0.4 <= eccentricity <= 0.9 and solidity > 0.7:
+                            return "ellipse", min(1.0, solidity * extent * 0.8)
+                    except cv2.error:
+                        pass  # 拟合失败则继续其他形状判断
+                                except ValueError:
+                                    pass  # 其他错误则继续其他形状判断    # 三角形判断
     if num_vertices == 3 and solidity > 0.7:
         return "triangle", min(1.0, solidity * 1.2)
     
