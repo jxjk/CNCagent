@@ -1,0 +1,1902 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>几何特征可视化</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .feature { margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .shape { display: inline-block; margin-right: 10px; }
+        .circle { width: 50px; height: 50px; border-radius: 50%; background-color: lightblue; }
+        .rectangle { width: 60px; height: 40px; background-color: lightgreen; }
+        .triangle { width: 0; height: 0; border-left: 25px solid transparent; border-right: 25px solid transparent; border-bottom: 50px solid lightcoral; }
+        .info { display: inline-block; }
+    </style>
+</head>
+<body>
+    <h1>识别的几何特征</h1>
+    <div class="container">
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 1</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (72.00, 1552.00)</p>
+                <p><strong>尺寸:</strong> (48.012, 96.024)</p>
+                <p><strong>面积:</strong> 197.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 2</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (36.00, 1552.00)</p>
+                <p><strong>尺寸:</strong> (84.021, 96.024)</p>
+                <p><strong>面积:</strong> 226.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 3</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (61.00, 1552.00)</p>
+                <p><strong>尺寸:</strong> (128.032, 140.03500000000003)</p>
+                <p><strong>面积:</strong> 1047.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 4</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (27.00, 1552.00)</p>
+                <p><strong>尺寸:</strong> (128.032, 140.03500000000003)</p>
+                <p><strong>面积:</strong> 1018.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 5</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (-75.00, 1551.00)</p>
+                <p><strong>尺寸:</strong> (128.032, 140.03500000000003)</p>
+                <p><strong>面积:</strong> 1050.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 6</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (62.00, 1497.00)</p>
+                <p><strong>尺寸:</strong> (80.02000000000001, 60.01500000000001)</p>
+                <p><strong>面积:</strong> 222.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 7</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-108.00, 1520.00)</p>
+                <p><strong>尺寸:</strong> (128.032, 384.096)</p>
+                <p><strong>面积:</strong> 2839.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 8</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-141.00, 1520.00)</p>
+                <p><strong>尺寸:</strong> (128.032, 384.096)</p>
+                <p><strong>面积:</strong> 2842.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 9</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (61.00, 1486.00)</p>
+                <p><strong>尺寸:</strong> (128.032, 364.091)</p>
+                <p><strong>面积:</strong> 2782.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 10</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (27.00, 1486.00)</p>
+                <p><strong>尺寸:</strong> (128.032, 364.091)</p>
+                <p><strong>面积:</strong> 2778.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 11</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-7.00, 1487.00)</p>
+                <p><strong>尺寸:</strong> (128.032, 364.091)</p>
+                <p><strong>面积:</strong> 2748.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 12</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-40.00, 1486.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 360.09000000000003)</p>
+                <p><strong>面积:</strong> 2722.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 13</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-74.00, 1485.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 364.091)</p>
+                <p><strong>面积:</strong> 2762.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 14</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-107.00, 1422.00)</p>
+                <p><strong>尺寸:</strong> (124.031, 384.096)</p>
+                <p><strong>面积:</strong> 2826.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 15</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-866.00, 1297.00)</p>
+                <p><strong>尺寸:</strong> (60.01500000000001, 56.014)</p>
+                <p><strong>面积:</strong> 112.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 16</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (-312.00, 1215.00)</p>
+                <p><strong>尺寸:</strong> (60.01500000000001, 56.014)</p>
+                <p><strong>面积:</strong> 129.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 17</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-865.00, 1211.00)</p>
+                <p><strong>尺寸:</strong> (60.01500000000001, 60.01500000000001)</p>
+                <p><strong>面积:</strong> 133.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 18</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (62.00, 1310.00)</p>
+                <p><strong>尺寸:</strong> (136.03400000000002, 1028.257)</p>
+                <p><strong>面积:</strong> 7972.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 19</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (28.00, 1310.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 1028.257)</p>
+                <p><strong>面积:</strong> 7826.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 20</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-6.00, 1310.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 1028.257)</p>
+                <p><strong>面积:</strong> 7933.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 21</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-39.00, 1310.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 1032.258)</p>
+                <p><strong>面积:</strong> 7896.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 22</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-73.00, 1310.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 1032.258)</p>
+                <p><strong>面积:</strong> 7895.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 23</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-776.00, 1105.00)</p>
+                <p><strong>尺寸:</strong> (136.03400000000002, 20.005000000000003)</p>
+                <p><strong>面积:</strong> 130.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 24</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (64.00, 1125.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 440.11)</p>
+                <p><strong>面积:</strong> 3415.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 25</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (30.00, 1125.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 440.11)</p>
+                <p><strong>面积:</strong> 3328.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 26</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-4.00, 1125.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 440.11)</p>
+                <p><strong>面积:</strong> 3379.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 27</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-38.00, 1124.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 436.10900000000004)</p>
+                <p><strong>面积:</strong> 3320.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 28</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-72.00, 1124.00)</p>
+                <p><strong>尺寸:</strong> (128.032, 440.11)</p>
+                <p><strong>面积:</strong> 3346.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 29</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-778.00, 1073.00)</p>
+                <p><strong>尺寸:</strong> (140.03500000000003, 216.05400000000003)</p>
+                <p><strong>面积:</strong> 1672.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 30</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-806.00, 1059.00)</p>
+                <p><strong>尺寸:</strong> (80.02000000000001, 104.02600000000001)</p>
+                <p><strong>面积:</strong> 440.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 31</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-776.00, 1041.00)</p>
+                <p><strong>尺寸:</strong> (140.03500000000003, 20.005000000000003)</p>
+                <p><strong>面积:</strong> 132.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape triangle"></div>
+            <div class="info">
+                <h3>特征 32</h3>
+                <p><strong>类型:</strong> triangle</p>
+                <p><strong>位置:</strong> (-697.00, 1038.00)</p>
+                <p><strong>尺寸:</strong> (220.055, 24.006)</p>
+                <p><strong>面积:</strong> 163.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 33</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (96.00, 1048.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 216.05400000000003)</p>
+                <p><strong>面积:</strong> 1352.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 34</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-597.00, 1074.00)</p>
+                <p><strong>尺寸:</strong> (504.12600000000003, 508.12700000000007)</p>
+                <p><strong>面积:</strong> 11833.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 35</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (65.00, 1021.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 380.095)</p>
+                <p><strong>面积:</strong> 2933.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 36</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (31.00, 1020.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 380.095)</p>
+                <p><strong>面积:</strong> 2893.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 37</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-4.00, 1020.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 384.096)</p>
+                <p><strong>面积:</strong> 2938.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 38</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-38.00, 1020.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 384.096)</p>
+                <p><strong>面积:</strong> 2893.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 39</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-71.00, 1019.00)</p>
+                <p><strong>尺寸:</strong> (132.03300000000002, 384.096)</p>
+                <p><strong>面积:</strong> 2891.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape triangle"></div>
+            <div class="info">
+                <h3>特征 40</h3>
+                <p><strong>类型:</strong> triangle</p>
+                <p><strong>位置:</strong> (-229.00, 971.00)</p>
+                <p><strong>尺寸:</strong> (164.04100000000003, 20.005000000000003)</p>
+                <p><strong>面积:</strong> 118.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 41</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (96.00, 992.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 216.05400000000003)</p>
+                <p><strong>面积:</strong> 1352.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 42</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-329.00, 953.00)</p>
+                <p><strong>尺寸:</strong> (36.009, 68.01700000000001)</p>
+                <p><strong>面积:</strong> 115.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 43</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-311.00, 952.00)</p>
+                <p><strong>尺寸:</strong> (60.01500000000001, 120.03000000000002)</p>
+                <p><strong>面积:</strong> 306.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 44</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (53.00, 929.00)</p>
+                <p><strong>尺寸:</strong> (16.004, 140.03500000000003)</p>
+                <p><strong>面积:</strong> 102.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 45</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (97.00, 936.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 216.05400000000003)</p>
+                <p><strong>面积:</strong> 1342.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 46</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (39.00, 888.00)</p>
+                <p><strong>尺寸:</strong> (148.037, 144.036)</p>
+                <p><strong>面积:</strong> 880.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 47</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (97.00, 880.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 216.05400000000003)</p>
+                <p><strong>面积:</strong> 1362.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 48</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (99.00, 828.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 204.05100000000002)</p>
+                <p><strong>面积:</strong> 1101.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 49</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (73.00, 807.00)</p>
+                <p><strong>尺寸:</strong> (76.019, 96.024)</p>
+                <p><strong>面积:</strong> 333.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 50</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-66.00, 806.00)</p>
+                <p><strong>尺寸:</strong> (112.028, 116.02900000000001)</p>
+                <p><strong>面积:</strong> 545.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 51</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (73.00, 785.00)</p>
+                <p><strong>尺寸:</strong> (76.019, 96.024)</p>
+                <p><strong>面积:</strong> 331.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 52</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (99.00, 764.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 212.05300000000003)</p>
+                <p><strong>面积:</strong> 1163.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 53</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-190.00, 838.00)</p>
+                <p><strong>尺寸:</strong> (160.04000000000002, 1056.2640000000001)</p>
+                <p><strong>面积:</strong> 10013.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 54</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-366.00, 707.00)</p>
+                <p><strong>尺寸:</strong> (84.021, 52.013000000000005)</p>
+                <p><strong>面积:</strong> 145.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 55</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (-774.00, 702.00)</p>
+                <p><strong>尺寸:</strong> (68.01700000000001, 80.02000000000001)</p>
+                <p><strong>面积:</strong> 180.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 56</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (99.00, 712.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 220.055)</p>
+                <p><strong>面积:</strong> 1366.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 57</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-595.00, 665.00)</p>
+                <p><strong>尺寸:</strong> (504.12600000000003, 64.016)</p>
+                <p><strong>面积:</strong> 1662.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 58</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-363.00, 666.00)</p>
+                <p><strong>尺寸:</strong> (80.02000000000001, 144.036)</p>
+                <p><strong>面积:</strong> 663.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 59</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-894.00, 652.00)</p>
+                <p><strong>尺寸:</strong> (52.013000000000005, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 354.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 60</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (99.00, 656.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 216.05400000000003)</p>
+                <p><strong>面积:</strong> 1316.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 61</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-894.00, 653.00)</p>
+                <p><strong>尺寸:</strong> (80.02000000000001, 188.04700000000003)</p>
+                <p><strong>面积:</strong> 872.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 62</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-545.00, 637.00)</p>
+                <p><strong>尺寸:</strong> (68.01700000000001, 76.019)</p>
+                <p><strong>面积:</strong> 178.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 63</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (-363.00, 636.00)</p>
+                <p><strong>尺寸:</strong> (80.02000000000001, 80.02000000000001)</p>
+                <p><strong>面积:</strong> 359.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 64</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-189.00, 656.00)</p>
+                <p><strong>尺寸:</strong> (160.04000000000002, 384.096)</p>
+                <p><strong>面积:</strong> 3609.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 65</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (-894.00, 617.00)</p>
+                <p><strong>尺寸:</strong> (84.021, 80.02000000000001)</p>
+                <p><strong>面积:</strong> 369.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 66</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-827.00, 614.00)</p>
+                <p><strong>尺寸:</strong> (80.02000000000001, 64.016)</p>
+                <p><strong>面积:</strong> 246.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 67</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-816.00, 606.00)</p>
+                <p><strong>尺寸:</strong> (28.007, 132.03300000000002)</p>
+                <p><strong>面积:</strong> 143.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 68</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (-469.00, 596.00)</p>
+                <p><strong>尺寸:</strong> (76.019, 68.01700000000001)</p>
+                <p><strong>面积:</strong> 174.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 69</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (-499.00, 600.00)</p>
+                <p><strong>尺寸:</strong> (168.042, 176.044)</p>
+                <p><strong>面积:</strong> 1300.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 70</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-546.00, 605.00)</p>
+                <p><strong>尺寸:</strong> (140.03500000000003, 212.05300000000003)</p>
+                <p><strong>面积:</strong> 1338.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 71</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-665.00, 618.00)</p>
+                <p><strong>尺寸:</strong> (52.013000000000005, 300.07500000000005)</p>
+                <p><strong>面积:</strong> 859.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 72</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (100.00, 601.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 216.05400000000003)</p>
+                <p><strong>面积:</strong> 1353.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 73</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-473.00, 574.00)</p>
+                <p><strong>尺寸:</strong> (336.084, 52.013000000000005)</p>
+                <p><strong>面积:</strong> 933.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 74</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-726.00, 583.00)</p>
+                <p><strong>尺寸:</strong> (116.02900000000001, 132.03300000000002)</p>
+                <p><strong>面积:</strong> 836.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 75</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-712.00, 616.00)</p>
+                <p><strong>尺寸:</strong> (340.08500000000004, 356.08900000000006)</p>
+                <p><strong>面积:</strong> 5806.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 76</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-826.00, 563.00)</p>
+                <p><strong>尺寸:</strong> (84.021, 188.04700000000003)</p>
+                <p><strong>面积:</strong> 915.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 77</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (100.00, 545.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 216.05400000000003)</p>
+                <p><strong>面积:</strong> 1321.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 78</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (-825.00, 528.00)</p>
+                <p><strong>尺寸:</strong> (84.021, 80.02000000000001)</p>
+                <p><strong>面积:</strong> 374.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 79</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-847.00, 525.00)</p>
+                <p><strong>尺寸:</strong> (84.021, 68.01700000000001)</p>
+                <p><strong>面积:</strong> 315.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 80</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-410.00, 539.00)</p>
+                <p><strong>尺寸:</strong> (172.043, 216.05400000000003)</p>
+                <p><strong>面积:</strong> 1940.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape triangle"></div>
+            <div class="info">
+                <h3>特征 81</h3>
+                <p><strong>类型:</strong> triangle</p>
+                <p><strong>位置:</strong> (-455.00, 538.00)</p>
+                <p><strong>尺寸:</strong> (204.05100000000002, 212.05300000000003)</p>
+                <p><strong>面积:</strong> 361.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape triangle"></div>
+            <div class="info">
+                <h3>特征 82</h3>
+                <p><strong>类型:</strong> triangle</p>
+                <p><strong>位置:</strong> (-502.00, 541.00)</p>
+                <p><strong>尺寸:</strong> (212.05300000000003, 216.05400000000003)</p>
+                <p><strong>面积:</strong> 381.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 83</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-594.00, 545.00)</p>
+                <p><strong>尺寸:</strong> (504.12600000000003, 272.06800000000004)</p>
+                <p><strong>面积:</strong> 8208.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape triangle"></div>
+            <div class="info">
+                <h3>特征 84</h3>
+                <p><strong>类型:</strong> triangle</p>
+                <p><strong>位置:</strong> (-682.00, 536.00)</p>
+                <p><strong>尺寸:</strong> (200.05, 200.05)</p>
+                <p><strong>面积:</strong> 357.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 85</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-452.00, 482.00)</p>
+                <p><strong>尺寸:</strong> (84.021, 40.010000000000005)</p>
+                <p><strong>面积:</strong> 116.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 86</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-185.00, 486.00)</p>
+                <p><strong>尺寸:</strong> (88.022, 80.02000000000001)</p>
+                <p><strong>面积:</strong> 308.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 87</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-724.00, 472.00)</p>
+                <p><strong>尺寸:</strong> (76.019, 296.074)</p>
+                <p><strong>面积:</strong> 1282.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 88</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (41.00, 688.00)</p>
+                <p><strong>尺寸:</strong> (352.088, 2228.5570000000002)</p>
+                <p><strong>面积:</strong> 43762.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 89</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-64.00, 691.00)</p>
+                <p><strong>尺寸:</strong> (516.129, 2232.558)</p>
+                <p><strong>面积:</strong> 68594.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 90</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-187.00, 509.00)</p>
+                <p><strong>尺寸:</strong> (164.04100000000003, 776.1940000000001)</p>
+                <p><strong>面积:</strong> 7332.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 91</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-19.00, 363.00)</p>
+                <p><strong>尺寸:</strong> (168.042, 384.096)</p>
+                <p><strong>面积:</strong> 3782.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 92</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-104.00, 363.00)</p>
+                <p><strong>尺寸:</strong> (164.04100000000003, 384.096)</p>
+                <p><strong>面积:</strong> 3663.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 93</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-261.00, 313.00)</p>
+                <p><strong>尺寸:</strong> (60.01500000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 448.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 94</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-288.00, 309.00)</p>
+                <p><strong>尺寸:</strong> (60.01500000000001, 120.03000000000002)</p>
+                <p><strong>面积:</strong> 364.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 95</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-262.00, 350.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 484.12100000000004)</p>
+                <p><strong>面积:</strong> 3024.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 96</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-290.00, 349.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 484.12100000000004)</p>
+                <p><strong>面积:</strong> 2986.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 97</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-318.00, 350.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 484.12100000000004)</p>
+                <p><strong>面积:</strong> 3020.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 98</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-347.00, 349.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 484.12100000000004)</p>
+                <p><strong>面积:</strong> 2988.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 99</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-375.00, 349.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 484.12100000000004)</p>
+                <p><strong>面积:</strong> 3000.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 100</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-402.00, 349.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 484.12100000000004)</p>
+                <p><strong>面积:</strong> 2976.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 101</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-235.00, 303.00)</p>
+                <p><strong>尺寸:</strong> (76.019, 152.038)</p>
+                <p><strong>面积:</strong> 497.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 102</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-524.00, 279.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 965.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 103</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-552.00, 278.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 955.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 104</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-580.00, 278.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 939.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 105</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-607.00, 278.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 958.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 106</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-635.00, 278.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 971.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 107</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-663.00, 278.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 973.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 108</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-691.00, 278.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 996.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 109</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-720.00, 278.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 968.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 110</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-748.00, 278.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 977.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 111</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-776.00, 278.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 961.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 112</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (-897.00, 250.00)</p>
+                <p><strong>尺寸:</strong> (84.021, 96.024)</p>
+                <p><strong>面积:</strong> 264.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 113</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-13.00, 246.00)</p>
+                <p><strong>尺寸:</strong> (36.009, 84.021)</p>
+                <p><strong>面积:</strong> 111.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 114</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-22.00, 246.00)</p>
+                <p><strong>尺寸:</strong> (32.008, 80.02000000000001)</p>
+                <p><strong>面积:</strong> 104.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 115</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-523.00, 231.00)</p>
+                <p><strong>尺寸:</strong> (52.013000000000005, 68.01700000000001)</p>
+                <p><strong>面积:</strong> 166.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 116</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-103.00, 265.00)</p>
+                <p><strong>尺寸:</strong> (164.04100000000003, 384.096)</p>
+                <p><strong>面积:</strong> 3651.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 117</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-185.00, 314.00)</p>
+                <p><strong>尺寸:</strong> (164.04100000000003, 776.1940000000001)</p>
+                <p><strong>面积:</strong> 7333.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 118</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-229.00, 315.00)</p>
+                <p><strong>尺寸:</strong> (168.042, 772.1930000000001)</p>
+                <p><strong>面积:</strong> 6439.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 119</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-261.00, 252.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 280.07000000000005)</p>
+                <p><strong>面积:</strong> 1744.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 120</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-524.00, 237.00)</p>
+                <p><strong>尺寸:</strong> (100.025, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 932.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 121</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-289.00, 252.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 284.071)</p>
+                <p><strong>面积:</strong> 1712.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 122</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-317.00, 252.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 284.071)</p>
+                <p><strong>面积:</strong> 1780.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 123</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-346.00, 251.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 284.071)</p>
+                <p><strong>面积:</strong> 1612.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 124</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-374.00, 251.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 284.071)</p>
+                <p><strong>面积:</strong> 1626.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 125</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-402.00, 252.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 284.071)</p>
+                <p><strong>面积:</strong> 1559.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 126</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-446.00, 316.00)</p>
+                <p><strong>尺寸:</strong> (224.056, 776.1940000000001)</p>
+                <p><strong>面积:</strong> 9478.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape triangle"></div>
+            <div class="info">
+                <h3>特征 127</h3>
+                <p><strong>类型:</strong> triangle</p>
+                <p><strong>位置:</strong> (-565.00, 237.00)</p>
+                <p><strong>尺寸:</strong> (20.005000000000003, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 127.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 128</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-579.00, 236.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 953.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 129</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-607.00, 236.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 959.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 130</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-634.00, 236.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 936.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 131</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-663.00, 236.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 1003.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 132</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-691.00, 236.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 973.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 133</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-719.00, 236.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 973.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 134</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-747.00, 236.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 971.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 135</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-775.00, 236.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 970.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 136</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-101.00, 207.00)</p>
+                <p><strong>尺寸:</strong> (160.04000000000002, 80.02000000000001)</p>
+                <p><strong>面积:</strong> 583.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 137</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-917.00, 201.00)</p>
+                <p><strong>尺寸:</strong> (68.01700000000001, 44.011)</p>
+                <p><strong>面积:</strong> 140.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 138</h3>
+                <p><strong>类型:</strong> square</p>
+                <p><strong>位置:</strong> (-897.00, 192.00)</p>
+                <p><strong>尺寸:</strong> (80.02000000000001, 96.024)</p>
+                <p><strong>面积:</strong> 257.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 139</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-523.00, 195.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 960.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 140</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-551.00, 195.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 156.03900000000002)</p>
+                <p><strong>面积:</strong> 948.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 141</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-579.00, 195.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 156.03900000000002)</p>
+                <p><strong>面积:</strong> 929.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 142</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-606.00, 194.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 943.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 143</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-634.00, 194.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 970.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 144</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-662.00, 194.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 970.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 145</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-691.00, 194.00)</p>
+                <p><strong>尺寸:</strong> (108.02700000000002, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 1006.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 146</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-719.00, 194.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 971.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 147</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-747.00, 194.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 973.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 148</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-775.00, 194.00)</p>
+                <p><strong>尺寸:</strong> (104.02600000000001, 160.04000000000002)</p>
+                <p><strong>面积:</strong> 970.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape triangle"></div>
+            <div class="info">
+                <h3>特征 149</h3>
+                <p><strong>类型:</strong> triangle</p>
+                <p><strong>位置:</strong> (-620.00, 192.00)</p>
+                <p><strong>尺寸:</strong> (24.006, 168.042)</p>
+                <p><strong>面积:</strong> 126.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 150</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-650.00, 236.00)</p>
+                <p><strong>尺寸:</strong> (1140.285, 524.1310000000001)</p>
+                <p><strong>面积:</strong> 36340.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape triangle"></div>
+            <div class="info">
+                <h3>特征 151</h3>
+                <p><strong>类型:</strong> triangle</p>
+                <p><strong>位置:</strong> (-77.00, 169.00)</p>
+                <p><strong>尺寸:</strong> (28.007, 148.037)</p>
+                <p><strong>面积:</strong> 170.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape triangle"></div>
+            <div class="info">
+                <h3>特征 152</h3>
+                <p><strong>类型:</strong> triangle</p>
+                <p><strong>位置:</strong> (-81.00, 149.00)</p>
+                <p><strong>尺寸:</strong> (20.005000000000003, 156.03900000000002)</p>
+                <p><strong>面积:</strong> 116.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 153</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-100.00, 128.00)</p>
+                <p><strong>尺寸:</strong> (160.04000000000002, 80.02000000000001)</p>
+                <p><strong>面积:</strong> 548.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 154</h3>
+                <p><strong>类型:</strong> polygon</p>
+                <p><strong>位置:</strong> (-915.00, 121.00)</p>
+                <p><strong>尺寸:</strong> (68.01700000000001, 44.011)</p>
+                <p><strong>面积:</strong> 139.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 155</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (68.00, 218.00)</p>
+                <p><strong>尺寸:</strong> (180.04500000000002, 1556.3890000000001)</p>
+                <p><strong>面积:</strong> 15396.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 156</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-16.00, 119.00)</p>
+                <p><strong>尺寸:</strong> (172.043, 776.1940000000001)</p>
+                <p><strong>面积:</strong> 7808.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 157</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-58.00, 118.00)</p>
+                <p><strong>尺寸:</strong> (168.042, 776.1940000000001)</p>
+                <p><strong>面积:</strong> 6041.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 158</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-183.00, 118.00)</p>
+                <p><strong>尺寸:</strong> (164.04100000000003, 776.1940000000001)</p>
+                <p><strong>面积:</strong> 7314.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 159</h3>
+                <p><strong>类型:</strong> rectangle</p>
+                <p><strong>位置:</strong> (-261.00, 118.00)</p>
+                <p><strong>尺寸:</strong> (124.031, 776.1940000000001)</p>
+                <p><strong>面积:</strong> 5570.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 160</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-374.00, 118.00)</p>
+                <p><strong>尺寸:</strong> (768.192, 780.195)</p>
+                <p><strong>面积:</strong> 36464.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape triangle"></div>
+            <div class="info">
+                <h3>特征 161</h3>
+                <p><strong>类型:</strong> triangle</p>
+                <p><strong>位置:</strong> (-162.00, 35.00)</p>
+                <p><strong>尺寸:</strong> (24.006, 136.03400000000002)</p>
+                <p><strong>面积:</strong> 102.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape rectangle"></div>
+            <div class="info">
+                <h3>特征 162</h3>
+                <p><strong>类型:</strong> ellipse</p>
+                <p><strong>位置:</strong> (-447.00, 793.00)</p>
+                <p><strong>尺寸:</strong> (4753.188, 6673.668000000001)</p>
+                <p><strong>面积:</strong> 1957750.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape circle"></div>
+            <div class="info">
+                <h3>特征 163</h3>
+                <p><strong>类型:</strong> circle</p>
+                <p><strong>位置:</strong> (-14.00, 1588.00)</p>
+                <p><strong>尺寸:</strong> (64.016, 48.012)</p>
+                <p><strong>面积:</strong> 134.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape circle"></div>
+            <div class="info">
+                <h3>特征 164</h3>
+                <p><strong>类型:</strong> circle</p>
+                <p><strong>位置:</strong> (-139.00, 1539.00)</p>
+                <p><strong>尺寸:</strong> (76.019, 64.016)</p>
+                <p><strong>面积:</strong> 241.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape circle"></div>
+            <div class="info">
+                <h3>特征 165</h3>
+                <p><strong>类型:</strong> circle</p>
+                <p><strong>位置:</strong> (28.00, 897.00)</p>
+                <p><strong>尺寸:</strong> (52.013000000000005, 52.013000000000005)</p>
+                <p><strong>面积:</strong> 132.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape circle"></div>
+            <div class="info">
+                <h3>特征 166</h3>
+                <p><strong>类型:</strong> circle</p>
+                <p><strong>位置:</strong> (-791.00, 695.00)</p>
+                <p><strong>尺寸:</strong> (60.01500000000001, 44.011)</p>
+                <p><strong>面积:</strong> 119.50</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape circle"></div>
+            <div class="info">
+                <h3>特征 167</h3>
+                <p><strong>类型:</strong> circle</p>
+                <p><strong>位置:</strong> (-920.00, 345.00)</p>
+                <p><strong>尺寸:</strong> (68.01700000000001, 48.012)</p>
+                <p><strong>面积:</strong> 144.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape circle"></div>
+            <div class="info">
+                <h3>特征 168</h3>
+                <p><strong>类型:</strong> circle</p>
+                <p><strong>位置:</strong> (-287.00, 253.00)</p>
+                <p><strong>尺寸:</strong> (60.01500000000001, 40.010000000000005)</p>
+                <p><strong>面积:</strong> 113.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape circle"></div>
+            <div class="info">
+                <h3>特征 169</h3>
+                <p><strong>类型:</strong> circle</p>
+                <p><strong>位置:</strong> (-315.00, 253.00)</p>
+                <p><strong>尺寸:</strong> (60.01500000000001, 40.010000000000005)</p>
+                <p><strong>面积:</strong> 114.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape circle"></div>
+            <div class="info">
+                <h3>特征 170</h3>
+                <p><strong>类型:</strong> circle</p>
+                <p><strong>位置:</strong> (-916.00, 139.00)</p>
+                <p><strong>尺寸:</strong> (68.01700000000001, 48.012)</p>
+                <p><strong>面积:</strong> 145.00</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="shape circle"></div>
+            <div class="info">
+                <h3>特征 171</h3>
+                <p><strong>类型:</strong> circle</p>
+                <p><strong>位置:</strong> (0.00, 0.00)</p>
+                <p><strong>尺寸:</strong> (64.016, 48.012)</p>
+                <p><strong>面积:</strong> 143.00</p>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>

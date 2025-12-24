@@ -12,7 +12,7 @@ from .config import (
     OCR_CONFIG,
     VALIDATION_CONFIG
 )
-from ..exceptions import ConfigurationError
+from src.exceptions import ConfigurationError
 
 
 class ConfigValidator:

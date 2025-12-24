@@ -7,12 +7,12 @@ import math
 import datetime
 
 # 导入配置参数
-from ..config import GCODE_GENERATION_CONFIG, THREAD_PITCH_MAP
-from ..exceptions import NCGenerationError, handle_exception
+from src.config import GCODE_GENERATION_CONFIG, THREAD_PITCH_MAP
+from src.exceptions import NCGenerationError, handle_exception
 
 # 导入优化模块
 try:
-    from .fanuc_optimization import optimize_tapping_cycle, optimize_drilling_cycle, get_thread_pitch
+    from src.modules.fanuc_optimization import optimize_tapping_cycle, optimize_drilling_cycle, get_thread_pitch
 except ImportError:
     # 如果无法导入优化模块，使用基础实现
     def get_thread_pitch(thread_type: str) -> float:
@@ -197,7 +197,7 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
 def _get_tool_number(tool_type: str) -> int:
     """根据刀具类型返回刀具编号"""
     # 使用配置中的刀具映射
-    from ..config import TOOL_MAPPING
+    from src.config import TOOL_MAPPING
     return TOOL_MAPPING.get(tool_type, 5)
 
 
@@ -205,15 +205,17 @@ def _generate_drilling_code(features: List[Dict], description_analysis: Dict) ->
     """生成钻孔加工代码"""
     gcode = []
     
-    # 设置钻孔循环参数 - 安全处理None值
+    # 设置钻孔参数 - 优先使用从用户描述中提取的参数
     depth = description_analysis.get("depth")
     if depth is None or not isinstance(depth, (int, float)):
+        # 如果描述分析中没有提供深度，使用配置中的默认值
         depth = GCODE_GENERATION_CONFIG['drilling']['default_depth']  # 使用配置中的默认值
     else:
         depth = float(depth)
     
     feed_rate = description_analysis.get("feed_rate")
     if feed_rate is None or not isinstance(feed_rate, (int, float)):
+        # 如果描述分析中没有提供进给率，使用配置中的默认值
         feed_rate = GCODE_GENERATION_CONFIG['drilling']['default_feed_rate']  # 使用配置中的默认值
     else:
         feed_rate = float(feed_rate)
@@ -258,7 +260,7 @@ def _generate_drilling_code(features: List[Dict], description_analysis: Dict) ->
     return gcode
 
 
-def _extract_counterbore_parameters(features: List[Dict], description_analysis: Dict) -> Tuple[float, float, float, int, List[Tuple[float, float]], float, float, float, float]:
+def _extract_counterbore_parameters(features: List[Dict], description_analysis: Dict) -> Tuple[float, float, float, int, List[Tuple[float, float]], float, float, float, float, float]:
     """提取沉孔加工参数"""
     # 默认参数
     outer_diameter = GCODE_GENERATION_CONFIG['counterbore']['default_outer_diameter']  # 沉孔直径
@@ -268,59 +270,71 @@ def _extract_counterbore_parameters(features: List[Dict], description_analysis: 
     # 优先从描述分析中提取直径信息（最高优先级）
     if "outer_diameter" in description_analysis and description_analysis["outer_diameter"] is not None:
         outer_diameter = description_analysis["outer_diameter"]
+        print(f"DEBUG: 使用描述分析中的外径: {outer_diameter}")
     if "inner_diameter" in description_analysis and description_analysis["inner_diameter"] is not None:
         inner_diameter = description_analysis["inner_diameter"]
+        print(f"DEBUG: 使用描述分析中的内径: {inner_diameter}")
     
-    # 从沉孔特征中提取实际参数（次优先级）
-    counterbore_features = [f for f in features if f.get("shape") == "counterbore"]
-    if counterbore_features:
-        # 使用第一个沉孔特征的参数，但只有在描述分析中没有提供时才使用
-        first_counterbore = counterbore_features[0]
-        if outer_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_outer_diameter']:  # 如果还是默认值
-            outer_diameter = first_counterbore.get("outer_diameter", outer_diameter)
-        if inner_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_inner_diameter']:  # 如果还是默认值
-            inner_diameter = first_counterbore.get("inner_diameter", inner_diameter)
-        counterbore_depth = first_counterbore.get("depth", counterbore_depth)
-        # 确保直径值有效
-        if outer_diameter is None or outer_diameter <= 0:
-            outer_diameter = 22.0
-        if inner_diameter is None or inner_diameter <= 0:
-            inner_diameter = 14.5
-    
-    # 也可以从用户描述中提取参数
+    # 从用户描述中提取参数（第二优先级）
     description = description_analysis.get("description", "").lower()
     import re
+    
     # 尝试从描述中提取沉孔信息
-    outer_matches = re.findall(r'沉孔.*?φ?(\d+\.?\d*)', description)
-    if outer_matches:
-        try:
-            outer_diameter = float(outer_matches[0])
-        except ValueError:
-            pass
+    if outer_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_outer_diameter']:  # 如果还是默认值，尝试从描述中提取
+        outer_matches = re.findall(r'沉孔.*?φ?(\d+\.?\d*)', description)
+        if outer_matches:
+            try:
+                outer_diameter = float(outer_matches[0])
+                print(f"DEBUG: 从描述中提取外径: {outer_diameter}")
+            except ValueError:
+                pass
     
-    inner_matches = re.findall(r'(?:底孔|贯通孔|钻孔).*?φ?(\d+\.?\d*)', description)
-    if not inner_matches:
-        inner_matches = re.findall(r'φ?(\d+\.?\d*).*?底孔', description)
-    if inner_matches:
-        try:
-            inner_diameter = float(inner_matches[0])
-        except ValueError:
-            pass
+    if inner_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_inner_diameter']:  # 如果还是默认值，尝试从描述中提取
+        inner_matches = re.findall(r'(?:底孔|贯通孔|钻孔).*?φ?(\d+\.?\d*)', description)
+        if not inner_matches:
+            inner_matches = re.findall(r'φ?(\d+\.?\d*).*?底孔', description)
+        if inner_matches:
+            try:
+                inner_diameter = float(inner_matches[0])
+                print(f"DEBUG: 从描述中提取内径: {inner_diameter}")
+            except ValueError:
+                pass
     
-    depth_matches = re.findall(r'深.*?(\d+\.?\d*)\s*mm', description)
-    if depth_matches:
-        try:
-            counterbore_depth = float(depth_matches[0])
-        except ValueError:
-            pass
+    # 从沉孔特征中提取实际参数（第三优先级）
+    counterbore_features = [f for f in features if f.get("shape") == "counterbore"]
+    if counterbore_features and outer_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_outer_diameter'] and inner_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_inner_diameter']:
+        # 使用第一个沉孔特征的参数，但只有在描述分析和用户描述中都没有提供时才使用
+        first_counterbore = counterbore_features[0]
+        outer_diameter = first_counterbore.get("outer_diameter", outer_diameter)
+        inner_diameter = first_counterbore.get("inner_diameter", inner_diameter)
+        counterbore_depth = first_counterbore.get("depth", counterbore_depth)
+        print(f"DEBUG: 从特征中提取参数 - 外径: {outer_diameter}, 内径: {inner_diameter}, 深度: {counterbore_depth}")
+    
+    # 从描述中提取深度（如果在特征中没有找到或描述中明确给出）
+    if counterbore_depth == GCODE_GENERATION_CONFIG['counterbore']['default_depth']:
+        depth_matches = re.findall(r'深.*?(\d+\.?\d*)\s*mm', description)
+        if depth_matches:
+            try:
+                counterbore_depth = float(depth_matches[0])
+                print(f"DEBUG: 从描述中提取深度: {counterbore_depth}")
+            except ValueError:
+                pass
+    
+    # 确保直径值有效
+    if outer_diameter is None or outer_diameter <= 0:
+        print(f"DEBUG: 修正外径为默认值 22.0")
+        outer_diameter = 22.0
+    if inner_diameter is None or inner_diameter <= 0:
+        print(f"DEBUG: 修正内径为默认值 14.5")
+        inner_diameter = 14.5
     
     # 检查用户描述中的孔数量信息
-    from ..config import OCR_CONFIG
-    hole_count = OCR_CONFIG['default_hole_count']  # 默认3个孔
+    hole_count = 3  # 默认3个孔
     count_matches = re.findall(r'(\d+)\s*个', description)
     if count_matches:
         try:
             hole_count = int(count_matches[0])
+            print(f"DEBUG: 从描述中提取孔数量: {hole_count}")
         except ValueError:
             hole_count = 3
     
@@ -336,16 +350,19 @@ def _extract_counterbore_parameters(features: List[Dict], description_analysis: 
         user_hole_positions = description_analysis.get("hole_positions", [])
         if user_hole_positions:
             counterbore_positions = user_hole_positions
+            print(f"DEBUG: 从描述分析中获取孔位置: {counterbore_positions}")
     
     # 根据用户描述的孔数量限制实际加工的孔数量
     if len(counterbore_positions) > hole_count:
         # 如果识别到的孔数量超过用户要求的数量，只取前几个
         counterbore_positions = counterbore_positions[:hole_count]
+        print(f"DEBUG: 限制孔位置数量为 {hole_count}")
     
     # 如果仍然没有孔位置，但用户要求加工沉孔，提供一个默认位置
     if not counterbore_positions:
         if "沉孔" in description or "counterbore" in description or "锪孔" in description:
             counterbore_positions = [(50.0, 50.0)]  # 默认位置
+            print(f"DEBUG: 使用默认孔位置: {counterbore_positions}")
     
     # 计算钻孔参数
     centering_depth = GCODE_GENERATION_CONFIG['drilling']['center_drill_depth']    # 点孔深度
@@ -353,6 +370,8 @@ def _extract_counterbore_parameters(features: List[Dict], description_analysis: 
     drill_feed = GCODE_GENERATION_CONFIG['drilling']['default_feed_rate']  # 钻孔进给
     counterbore_spindle_speed = GCODE_GENERATION_CONFIG['counterbore']['counterbore_spindle_speed']  # 锪孔时较低的转速
     counterbore_feed = GCODE_GENERATION_CONFIG['counterbore']['counterbore_feed_rate']  # 锪孔进给
+    
+    print(f"DEBUG: 最终提取的参数 - 外径: {outer_diameter}, 内径: {inner_diameter}, 深度: {counterbore_depth}, 孔数: {hole_count}, 位置数: {len(counterbore_positions)}")
     
     return (outer_diameter, inner_diameter, counterbore_depth, hole_count, counterbore_positions,
             centering_depth, drilling_depth, drill_feed, counterbore_spindle_speed, counterbore_feed)
@@ -375,7 +394,7 @@ def _generate_polar_coordinate_counterbore_code(
         return False
     
     # 检查用户描述中是否提到极坐标
-    from ..config import OCR_CONFIG
+    from src.config import OCR_CONFIG
     description = OCR_CONFIG.get("description", "").lower()  # 需要从description_analysis获取
     use_polar_coordinates = "极坐标" in description or "polar" in description.lower()
     
@@ -648,8 +667,22 @@ def _generate_counterbore_code(features: List[Dict], description_analysis: Dict)
     (outer_diameter, inner_diameter, counterbore_depth, hole_count, counterbore_positions,
      centering_depth, drilling_depth, drill_feed, counterbore_spindle_speed, counterbore_feed) = _extract_counterbore_parameters(features, description_analysis)
     
+    # 验证提取的参数
+    if outer_diameter <= 0 or inner_diameter <= 0:
+        print(f"ERROR: 无效的直径参数 - 外径: {outer_diameter}, 内径: {inner_diameter}")
+        raise NCGenerationError(f"无效的直径参数 - 外径: {outer_diameter}, 内径: {inner_diameter}")
+    
+    if outer_diameter <= inner_diameter:
+        print(f"ERROR: 外径应大于内径 - 外径: {outer_diameter}, 内径: {inner_diameter}")
+        raise NCGenerationError(f"外径应大于内径 - 外径: {outer_diameter}, 内径: {inner_diameter}")
+    
+    if counterbore_depth <= 0:
+        print(f"ERROR: 无效的沉孔深度: {counterbore_depth}")
+        raise NCGenerationError(f"无效的沉孔深度: {counterbore_depth}")
+    
+    print(f"DEBUG: 验证通过 - 外径: {outer_diameter}, 内径: {inner_diameter}, 深度: {counterbore_depth}, 孔数: {hole_count}")
+    
     # 检查是否需要使用极坐标
-    from ..config import OCR_CONFIG
     description = description_analysis.get("description", "").lower()
     use_polar_coordinates = "极坐标" in description or "polar" in description.lower()
     if use_polar_coordinates:
@@ -680,25 +713,45 @@ def _generate_tapping_code_with_full_process(features: List[Dict], description_a
     """生成完整的螺纹孔加工代码 - 使用点孔、钻孔、攻丝3把刀的完整工艺"""
     gcode = []
     
-    # 根据螺纹规格确定钻孔尺寸
+    # 优先使用从描述分析中提取的螺纹规格信息
     description = description_analysis.get("description", "").lower()
-    drill_diameter = 8.5  # 默认M10螺纹底孔直径
-    if "m3" in description:
-        drill_diameter = 2.5  # M3螺纹底孔直径
-    elif "m4" in description:
-        drill_diameter = 3.3  # M4螺纹底孔直径
-    elif "m5" in description:
-        drill_diameter = 4.2  # M5螺纹底孔直径
-    elif "m6" in description:
-        drill_diameter = 5.0  # M6螺纹底孔直径
-    elif "m8" in description:
-        drill_diameter = 6.8  # M8螺纹底孔直径
-    elif "m10" in description:
-        drill_diameter = 8.5  # M10螺纹底孔直径
-    elif "m12" in description:
-        drill_diameter = 10.2  # M12螺纹底孔直径
-
-    # 计算点孔、钻孔、攻丝的深度
+    
+    # 从描述分析中获取螺纹规格（如果存在）
+    thread_size = description_analysis.get("thread_size", None)
+    
+    # 如果没有从描述分析中获取到螺纹规格，则根据描述中的关键词确定
+    if thread_size is None:
+        if "m3" in description:
+            thread_size = "M3"
+        elif "m4" in description:
+            thread_size = "M4"
+        elif "m5" in description:
+            thread_size = "M5"
+        elif "m6" in description:
+            thread_size = "M6"
+        elif "m8" in description:
+            thread_size = "M8"
+        elif "m10" in description:
+            thread_size = "M10"
+        elif "m12" in description:
+            thread_size = "M12"
+        else:
+            thread_size = "M10"  # 默认
+    
+    # 根据螺纹规格确定钻孔尺寸
+    thread_to_drill = {
+        "M3": 2.5,
+        "M4": 3.3,
+        "M5": 4.2,
+        "M6": 5.0,
+        "M8": 6.8,
+        "M10": 8.5,
+        "M12": 10.2
+    }
+    
+    drill_diameter = thread_to_drill.get(thread_size, 8.5)
+    
+    # 计算点孔、钻孔、攻丝的深度 - 优先使用描述分析中的深度
     centering_depth = 1    # 点孔深度
     # 根据用户要求：钻孔深度 = 螺纹深度 + 1/3底孔直径 + 1.5
     depth = description_analysis.get("depth")
@@ -792,7 +845,13 @@ def _generate_tapping_code_with_full_process(features: List[Dict], description_a
     gcode.append("M08 (COOLANT ON)")
     
     # 钻孔循环 - 首先在第一个孔位置执行完整循环
-    drill_feed = 100  # 钻孔进给
+    # 优先使用描述分析中的进给率
+    drill_feed = description_analysis.get("feed_rate")
+    if drill_feed is None or not isinstance(drill_feed, (int, float)):
+        drill_feed = 100  # 默认钻孔进给
+    else:
+        drill_feed = float(drill_feed)
+    
     if hole_positions:
         first_x, first_y = hole_positions[0]
         gcode.append(f"G83 X{first_x:.3f} Y{first_y:.3f} Z{-drilling_depth:.3f} R2.0 Q1.0 F{drill_feed:.1f} (DEEP HOLE DRILLING CYCLE)")
@@ -818,7 +877,7 @@ def _generate_tapping_code_with_full_process(features: List[Dict], description_a
     gcode.append("(STEP 3: TAPPING OPERATION)")
     gcode.append("(TOOL CHANGE - T03: TAP)")
     
-    # 获取攻丝参数
+    # 获取攻丝参数 - 优先使用描述分析中的参数
     tapping_spindle_speed = description_analysis.get("spindle_speed")
     if tapping_spindle_speed is None or not isinstance(tapping_spindle_speed, (int, float)):
         tapping_spindle_speed = 300  # 攻丝时较低的转速
@@ -826,22 +885,17 @@ def _generate_tapping_code_with_full_process(features: List[Dict], description_a
         tapping_spindle_speed = float(tapping_spindle_speed)
     
     # 根据螺纹规格计算攻丝进给 (进给 = 转速 * 螺距)
-    thread_pitch = 1.5  # 默认M10粗牙螺纹螺距
-    if "m3" in description:
-        thread_pitch = 0.5   # M3螺纹螺距 (粗牙)
-    elif "m4" in description:
-        thread_pitch = 0.7   # M4螺纹螺距 (粗牙)
-    elif "m5" in description:
-        thread_pitch = 0.8   # M5螺纹螺距 (粗牙)
-    elif "m6" in description:
-        thread_pitch = 1.0   # M6螺纹螺距 (粗牙)
-    elif "m8" in description:
-        thread_pitch = 1.25  # M8螺纹螺距 (粗牙)
-    elif "m10" in description:
-        thread_pitch = 1.5   # M10螺纹螺距 (粗牙)
-    elif "m12" in description:
-        thread_pitch = 1.75  # M12螺纹螺距 (粗牙)
+    thread_pitch_map = {
+        "M3": 0.5,   # M3螺纹螺距 (粗牙)
+        "M4": 0.7,   # M4螺纹螺距 (粗牙)
+        "M5": 0.8,   # M5螺纹螺距 (粗牙)
+        "M6": 1.0,   # M6螺纹螺距 (粗牙)
+        "M8": 1.25,  # M8螺纹螺距 (粗牙)
+        "M10": 1.5,  # M10螺纹螺距 (粗牙)
+        "M12": 1.75  # M12螺纹螺距 (粗牙)
+    }
     
+    thread_pitch = thread_pitch_map.get(thread_size, 1.5)  # 默认M10螺纹螺距
     tapping_feed = tapping_spindle_speed * thread_pitch  # F = S * 螺距 (mm/rev)，不需要除以60
     # 确保攻丝进给率不低于1，避免系统报错
     tapping_feed = max(tapping_feed, 1.0)
@@ -857,31 +911,13 @@ def _generate_tapping_code_with_full_process(features: List[Dict], description_a
     gcode.append("M08 (COOLANT ON)")
     
     # 攻丝循环 - 首先在第一个孔位置执行完整循环
-    thread_type = ""
-    if "m3" in description:
-        thread_type = "M3"
-    elif "m4" in description:
-        thread_type = "M4"
-    elif "m5" in description:
-        thread_type = "M5"
-    elif "m6" in description:
-        thread_type = "M6"
-    elif "m8" in description:
-        thread_type = "M8"
-    elif "m10" in description:
-        thread_type = "M10"
-    elif "m12" in description:
-        thread_type = "M12"
-    else:
-        thread_type = "M10"  # 默认
-    
     if hole_positions:
         first_x, first_y = hole_positions[0]
-        gcode.append(f"G84 X{first_x:.3f} Y{first_y:.3f} Z{-tapping_depth:.3f} R2.0 F{tapping_feed:.1f} (TAPPING 1: X{first_x:.1f},Y{first_y:.1f} - {thread_type} THREAD)")
+        gcode.append(f"G84 X{first_x:.3f} Y{first_y:.3f} Z{-tapping_depth:.3f} R2.0 F{tapping_feed:.1f} (TAPPING 1: X{first_x:.1f},Y{first_y:.1f} - {thread_size} THREAD)")
         
         # 对于后续孔位置，只使用X、Y坐标，简化编程
         for i, (center_x, center_y) in enumerate(hole_positions[1:], 2):
-            gcode.append(f"X{center_x:.3f} Y{center_y:.3f} (TAPPING {i}: X{center_x:.1f},Y{center_y:.1f} - {thread_type} THREAD)")
+            gcode.append(f"X{center_x:.3f} Y{center_y:.3f} (TAPPING {i}: X{center_x:.1f},Y{center_y:.1f} - {thread_size} THREAD)")
     else:
         # 如果没有孔位置，仍保留原始循环指令
         gcode.append(f"G84 Z{-tapping_depth:.3f} R2.0 F{tapping_feed:.1f} (TAPPING CYCLE - NO SPECIFIC POSITION)")
@@ -905,7 +941,7 @@ def _generate_milling_code(features: List[Dict], description_analysis: Dict) -> 
     """生成铣削加工代码"""
     gcode = []
     
-    # 设置铣削参数 - 安全处理None值
+    # 设置铣削参数 - 优先使用从用户描述中提取的参数
     depth = description_analysis.get("depth")
     if depth is None or not isinstance(depth, (int, float)):
         depth = 5  # 默认值
@@ -1007,7 +1043,7 @@ def _generate_turning_code(features: List[Dict], description_analysis: Dict) -> 
     """生成车削加工代码"""
     gcode = []
     
-    # 设置车削参数 - 安全处理None值
+    # 设置车削参数 - 优先使用从用户描述中提取的参数
     depth = description_analysis.get("depth")
     if depth is None or not isinstance(depth, (int, float)):
         depth = 2  # 默认值

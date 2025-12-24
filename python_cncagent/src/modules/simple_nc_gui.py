@@ -7,7 +7,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 import cv2
 import numpy as np
 import os
-from .ai_nc_helper import AI_NC_Helper
+from src.modules.ai_nc_helper import AI_NC_Helper
 import threading
 from PIL import Image, ImageTk
 
@@ -138,7 +138,7 @@ class SimpleNC_GUI:
                 _, ext = os.path.splitext(file_path.lower())
                 if ext in ['.pdf']:
                     # 处理PDF文件
-                    from .pdf_parsing_process import pdf_to_images
+                    from src.modules.pdf_parsing_process import pdf_to_images
                     images = pdf_to_images(file_path)
                     if images:
                         # 使用第一页

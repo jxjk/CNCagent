@@ -13,6 +13,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Tuple, Optional, Dict, Any
+from .modules.unified_generator import generate_cnc_with_unified_approach
 from .modules.pdf_parsing_process import pdf_to_images, ocr_image, extract_text_from_pdf
 from .modules.feature_definition import identify_features, extract_dimensions, extract_highest_y_center_point, adjust_coordinate_system, select_coordinate_reference
 from .modules.material_tool_matcher import analyze_user_description
@@ -181,63 +182,21 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
     import logging
     logging.info("开始处理PDF图纸...")
     
-    # 1. 验证输入
-    _validate_inputs(user_description)
+    # 优先使用AI驱动的统一生成器，确保用户描述被优先考虑
+    logging.info("使用AI优先策略生成NC程序...")
+    nc_program = generate_cnc_with_unified_approach(
+        user_description, 
+        pdf_path=pdf_path, 
+        use_ai_primary=True
+    )
     
-    # 2. PDF转换为图像
-    logging.info("正在将PDF转换为图像...")
-    try:
-        images = pdf_to_images(pdf_path)
-    except Exception as e:
-        logging.error(f"PDF转换为图像失败: {str(e)}")
-        raise
-    
-    # 3. OCR提取文字（如果Tesseract可用）
-    logging.info("正在执行OCR识别...")
-    all_text = ""
-    all_text, ocr_success = _extract_text_from_images(images, all_text)
-    
-    # 也可以直接从PDF提取文本（如果PDF包含可选择的文本）
-    try:
-        pdf_text = extract_text_from_pdf(pdf_path)
-        all_text += "\n" + pdf_text
-    except Exception as e:
-        logging.warning(f"PDF文本提取失败: {str(e)}")
-        pdf_text = ""
-    
-    # 使用机械制图专家分析图纸
-    logging.info("正在使用机械制图专家分析图纸...")
-    drawing_expert = MechanicalDrawingExpert()
-    drawing_info = drawing_expert.parse_drawing(all_text)
-    
-    # 4. 识别几何特征
-    logging.info("正在识别几何特征...")
-    features = _identify_features_from_images(images, all_text)
-    
-    # 分析和验证特征
-    description_analysis, features = _analyze_and_validate_features(features, user_description)
-    
-    # 选择并调整坐标系统
-    features, origin_point = _select_and_adjust_coordinate_system(features, drawing_info, description_analysis, 
-                                                                coordinate_strategy, custom_origin)
-    
-    # 根据比例尺提取实际尺寸
-    scaled_features = extract_dimensions(features, scale)
-    
-    # 6. 生成NC程序
-    logging.info("正在生成NC程序...")
-    nc_program = generate_fanuc_nc(scaled_features, description_analysis, scale)
-    
-    # 验证NC程序
-    nc_errors = validate_nc_code(nc_program)
-    if nc_errors:
-        logging.warning(f"NC程序验证发现问题: {', '.join(nc_errors)}")
-    
-    # 7. 生成模拟报告和可视化
+    # 生成模拟报告和可视化
     logging.info("正在生成模拟报告...")
     try:
-        generate_simulation_report(scaled_features, description_analysis, nc_program)
-        visualize_features(scaled_features)
+        # 尝试从AI生成的NC程序中提取一些信息用于报告
+        # 这里我们创建一个简化的特征列表用于生成报告
+        description_analysis = analyze_user_description(user_description)
+        generate_simulation_report([], description_analysis, nc_program)
     except Exception as e:
         logging.warning(f"生成模拟报告时出现警告: {str(e)}")
     

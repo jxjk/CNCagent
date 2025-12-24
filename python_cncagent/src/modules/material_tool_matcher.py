@@ -5,7 +5,7 @@
 import re
 from typing import Dict, List, Optional, Tuple
 from .mechanical_drawing_expert import MechanicalDrawingExpert
-from ..exceptions import InputValidationError, handle_exception
+from src.exceptions import InputValidationError, handle_exception
 
 
 def analyze_user_description(description: str) -> Dict:
@@ -44,6 +44,9 @@ def analyze_user_description(description: str) -> Dict:
     # 确定所需刀具
     tool_required = _identify_tool_required(processing_type)
     
+    # 从描述中提取孔数量
+    hole_count = _extract_hole_count(description)
+    
     result = {
         "processing_type": processing_type,
         "tool_required": tool_required,
@@ -54,6 +57,7 @@ def analyze_user_description(description: str) -> Dict:
         "precision": precision,
         "hole_positions": hole_positions,  # 添加孔位置信息
         "reference_points": reference_points,  # 添加参考点信息
+        "hole_count": hole_count,  # 添加孔数量信息
         "description": description
     }
     
@@ -70,30 +74,60 @@ def _identify_processing_type(description: str) -> str:
     """识别加工类型"""
     description_lower = description.lower()
     
-    # 关键词映射
-    counterbore_keywords = ['沉孔', 'counterbore', '锪孔', 'counter bore', 'counter-bore']
-    drilling_keywords = ['drill', 'hole', '钻孔', '打孔', '孔', '钻']
-    milling_keywords = ['mill', 'milling', 'cut', 'cutting', '铣', '铣削', '切削']
-    turning_keywords = ['turn', 'turning', 'lathe', '车', '车削']
-    grinding_keywords = ['grind', 'grinding', '磨', '磨削']
-    tapping_keywords = ['tapping', 'tap', '螺纹', '攻丝', 'thread', '丝锥']
+    # 关键词映射 - 改进关键词匹配，增加更多变体
+    counterbore_keywords = [
+        '沉孔', 'counterbore', '锪孔', 'counter bore', 'counter-bore', 
+        '沉头孔', '锪平孔', '埋头孔'
+    ]
+    drilling_keywords = [
+        'drill', 'hole', '钻孔', '打孔', '孔', '钻', '钻削', '钻床'
+    ]
+    milling_keywords = [
+        'mill', 'milling', 'cut', 'cutting', '铣', '铣削', '切削', 
+        '铣床', '平面', '轮廓', '铣加工'
+    ]
+    turning_keywords = [
+        'turn', 'turning', 'lathe', '车', '车削', '车床', '外圆', '内孔车削'
+    ]
+    grinding_keywords = [
+        'grind', 'grinding', '磨', '磨削', '磨床', '精磨', '抛光'
+    ]
+    tapping_keywords = [
+        'tapping', 'tap', '螺纹', '攻丝', 'thread', '丝锥', 
+        '螺纹孔', '攻螺纹', '套丝'
+    ]
     
     # 检查沉孔相关关键词（优先级最高）
-    if any(keyword in description_lower for keyword in counterbore_keywords):
-        return 'counterbore'
+    for keyword in counterbore_keywords:
+        if keyword in description_lower:
+            return 'counterbore'
+    
     # 检查攻丝相关关键词
-    elif any(keyword in description_lower for keyword in tapping_keywords):
-        return 'tapping'
-    elif any(keyword in description_lower for keyword in drilling_keywords):
-        return 'drilling'
-    elif any(keyword in description_lower for keyword in milling_keywords):
-        return 'milling'
-    elif any(keyword in description_lower for keyword in turning_keywords):
-        return 'turning'
-    elif any(keyword in description_lower for keyword in grinding_keywords):
-        return 'grinding'
-    else:
-        return 'general'
+    for keyword in tapping_keywords:
+        if keyword in description_lower:
+            return 'tapping'
+    
+    # 检查钻孔相关关键词
+    for keyword in drilling_keywords:
+        if keyword in description_lower:
+            return 'drilling'
+    
+    # 检查铣削相关关键词
+    for keyword in milling_keywords:
+        if keyword in description_lower:
+            return 'milling'
+    
+    # 检查车削相关关键词
+    for keyword in turning_keywords:
+        if keyword in description_lower:
+            return 'turning'
+    
+    # 检查磨削相关关键词
+    for keyword in grinding_keywords:
+        if keyword in description_lower:
+            return 'grinding'
+    
+    return 'general'
 
 
 def _identify_tool_required(processing_type: str) -> str:
@@ -113,20 +147,24 @@ def _identify_tool_required(processing_type: str) -> str:
 
 def _extract_depth(description: str) -> Optional[float]:
     """提取加工深度"""
-    # 匹配 "深度5mm" 或 "5mm深" 或简单的 "深度6" 等模式
+    # 匹配 "深度5mm" 或 "5mm深" 或简单的 "深度6" 等模式 - 增强正则表达式
     patterns = [
-        r'深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM])',
-        r'(\d+\.?\d*)\s*([mM]?[mM])\s*深',
-        r'depth[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM])',
-        r'深[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM])',
-        r'螺纹深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM])',  # 螺纹深度
-        r'攻丝深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM])',   # 攻丝深度
+        r'深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',  # 支持"深度20mm"或"深度20"
+        r'(\d+\.?\d*)\s*([mM]?[mM]?)\s*深',  # 支持"20mm深"或"20深"
+        r'depth[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',  # 英文支持
+        r'深[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',  # 支持"深20mm"
+        r'螺纹深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',  # 螺纹深度
+        r'攻丝深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',   # 攻丝深度
+        r'锪孔深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',   # 锪孔深度
+        r'沉孔深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',   # 沉孔深度
+        r'钻孔深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',   # 钻孔深度
         r'深度\s*(\d+\.?\d*)\s*(?=，|。|;|:| |$)',  # 匹配 "深度6" 这格式
         r'(\d+\.?\d*)\s*(?=深度|mm深|深)',  # 匹配 "6深度" 格式
+        r'(\d+\.?\d*)\s*mm\s*(?=锪孔|沉孔|钻孔|攻丝|螺纹)',  # 如"20mm锪孔"
     ]
     
     for pattern in patterns:
-        matches = re.findall(pattern, description)
+        matches = re.findall(pattern, description, re.IGNORECASE)
         for match in matches:
             try:
                 # 如果匹配结果是元组（有多个组），取第一个
@@ -134,11 +172,13 @@ def _extract_depth(description: str) -> Optional[float]:
                     value = float(match[0])
                     # 如果还有单位信息
                     if len(match) > 1:
-                        unit = match[1].lower()
+                        unit = match[1].lower().strip()
                         if 'cm' in unit:
                             return value * 10
                         elif 'm' in unit and 'mm' not in unit:
                             return value * 1000
+                        elif 'mm' in unit or unit == '':  # 默认为mm，或明确指定mm
+                            return value
                         else:
                             return value  # 默认为mm
                     else:
@@ -154,20 +194,31 @@ def _extract_depth(description: str) -> Optional[float]:
 
 def _extract_feed_rate(description: str) -> Optional[float]:
     """提取进给速度"""
+    # 改进的进给速度提取模式，支持更多格式
     patterns = [
-        r'进给[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev)',
-        r'feed[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev)',
-        r'速度[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev)',
+        r'(?:进给|feed|进刀|走刀)[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev|mm/min|mm/s|mm/rev|f)',
+        r'(?:进给|feed|进刀|走刀)\s*[：:]?\s*(\d+\.?\d*)',
+        r'f\s*(\d+\.?\d*)\s*(?:mm/min|mm/s|mm/rev|mm/min|mm/s|mm/rev)?',  # F100格式
+        r'(?:速度|speed)[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev|mm/min|mm/s|mm/rev)',
         r'攻丝进给[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev)',  # 攻丝进给
-        r'螺纹进给[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev)'   # 螺纹进给
+        r'螺纹进给[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev)',   # 螺纹进给
+        r'钻孔进给[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev)',   # 钻孔进给
+        r'铣削进给[：:]?\s*(\d+\.?\d*)\s*(mm/min|mm/s|mm/rev)',   # 铣削进给
     ]
     
     for pattern in patterns:
-        match = re.search(pattern, description)
+        match = re.search(pattern, description, re.IGNORECASE)
         if match:
             try:
-                return float(match.group(1))
-            except (ValueError, TypeError):
+                value = float(match.group(1))
+                # 检查单位，如果没有单位，默认为mm/min
+                if len(match.groups()) > 1 and match.group(2):
+                    unit = match.group(2).lower()
+                    # 这里可以根据单位进行转换，当前统一返回数值
+                    return value
+                else:
+                    return value  # 默认为mm/min
+            except (ValueError, TypeError, IndexError):
                 continue  # 如果转换失败，继续尝试下一个模式
     
     return None
@@ -175,20 +226,32 @@ def _extract_feed_rate(description: str) -> Optional[float]:
 
 def _extract_spindle_speed(description: str) -> Optional[float]:
     """提取主轴转速"""
+    # 改进的主轴转速提取模式，支持更多格式
     patterns = [
-        r'转速[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|转/分钟)',
-        r'speed[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|rev/min)',
-        r'主轴[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM)',
+        r'(?:转速|speed|spindle|主轴)[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|转/分钟|转每分钟|转/min)',
+        r'(?:转速|speed|spindle|主轴)\s*[：:]?\s*(\d+\.?\d*)',
+        r's\s*(\d+\.?\d*)\s*(?:rpm|RPM|转/分钟|转每分钟)?',  # S1000格式
+        r'(?:主轴|spindle)[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|转/分钟)',
         r'攻丝转速[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|转/分钟)',  # 攻丝转速
-        r'螺纹转速[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|转/分钟)'   # 螺纹转速
+        r'螺纹转速[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|转/分钟)',   # 螺纹转速
+        r'钻孔转速[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|转/分钟)',   # 钻孔转速
+        r'铣削转速[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|转/分钟)',   # 铣削转速
+        r'车削转速[：:]?\s*(\d+\.?\d*)\s*(rpm|RPM|转/分钟)',   # 车削转速
     ]
     
     for pattern in patterns:
-        match = re.search(pattern, description)
+        match = re.search(pattern, description, re.IGNORECASE)
         if match:
             try:
-                return float(match.group(1))
-            except (ValueError, TypeError):
+                value = float(match.group(1))
+                # 检查单位，如果没有单位，默认为rpm
+                if len(match.groups()) > 1 and match.group(2):
+                    unit = match.group(2).lower()
+                    # 这里可以根据单位进行转换，当前统一返回数值
+                    return value
+                else:
+                    return value  # 默认为rpm
+            except (ValueError, TypeError, IndexError):
                 continue  # 如果转换失败，继续尝试下一个模式
     
     return None
@@ -196,12 +259,36 @@ def _extract_spindle_speed(description: str) -> Optional[float]:
 
 def _extract_material(description: str) -> Optional[str]:
     """提取材料信息"""
-    materials = ['steel', 'aluminum', 'aluminium', 'titanium', 'copper', 'brass', 
-                 'plastic', 'wood', 'steel', '不锈钢', '铝合金', '钛合金', '铜', 
-                 '塑料', '木材', 'steel', '铁', 'metal', '金属']
+    # 改进的材料识别模式，包含更多材料类型
+    patterns = [
+        r'(?:材料|material)\s*[：:]?\s*([a-zA-Z\u4e00-\u9fa5]+)',
+        r'([a-zA-Z\u4e00-\u9fa5]+)\s*(?:材料|material)',
+        r'(\w+)\s*(?:板|件|工件)',
+    ]
     
+    # 通用材料关键词
+    materials = [
+        'steel', 'aluminum', 'aluminium', 'titanium', 'copper', 'brass', 
+        'plastic', 'wood', 'steel', '不锈钢', '铝合金', '钛合金', '铜', 
+        '塑料', '木材', 'steel', '铁', 'metal', '金属', '碳钢', '合金钢',
+        '铸铁', '青铜', '黄铜', '有机玻璃', '亚克力', 'abs', 'pc', 'pvc',
+        '45号钢', '40cr', '304', '316', '6061', '7075', 'a356'
+    ]
+    
+    # 首先尝试正则表达式匹配
+    for pattern in patterns:
+        match = re.search(pattern, description, re.IGNORECASE)
+        if match:
+            material = match.group(1).lower()
+            # 验证是否为真实材料
+            for valid_material in materials:
+                if valid_material in material or material in valid_material:
+                    return material
+    
+    # 然后尝试关键词匹配
+    description_lower = description.lower()
     for material in materials:
-        if material in description.lower():
+        if material in description_lower:
             return material
     
     return None
@@ -403,11 +490,15 @@ def _extract_counterbore_diameters(description: str) -> tuple:
     # 匹配"φ22深20底孔φ14.5贯通"或类似格式的沉孔描述
     # 使用更精确的模式，确保直径数字出现在沉孔相关上下文中，避免匹配坐标和无关数字
     patterns = [
-        r'(?:加工|沉孔|counterbore|锪孔).*?φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔|深).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru)?.*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通)', # 加工φ22沉孔深20 φ14.5底孔/贯通
-        r'φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru)?.*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通)',  # φ22沉孔深20 φ14.5底孔/贯通
-        r'(?:沉孔|counterbore|锪孔).*?φ\s*(\d+(?:\.\d+)?).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru)?.*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通)',  # 沉孔φ22深20 φ14.5底孔/贯通
+        r'(?:加工|沉孔|counterbore|锪孔).*?φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔|深|，|\.|;).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru|，|\.|;).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|贯通孔|钻孔)', # 加工φ22沉孔深20 φ14.5底孔/贯通
+        r'φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru|，|\.|;).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|贯通孔|钻孔)',  # φ22沉孔深20 φ14.5底孔/贯通
+        r'φ\s*(\d+(?:\.\d+)?).*?沉孔.*?深.*?φ\s*(\d+(?:\.\d+)?)\s*底孔',  # φ22沉孔深20 φ14.5底孔
+        r'沉孔.*?φ\s*(\d+(?:\.\d+)?).*?深.*?φ\s*(\d+(?:\.\d+)?)\s*底孔',  # 沉孔φ22深20 φ14.5底孔
         r'(\d+)\s*个.*?φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?.*?底孔\s*φ\s*(\d+(?:\.\d+)?)\s*贯通',  # 3个φ22沉孔深20 底孔φ14.5贯通
         r'φ\s*(\d+(?:\.\d+)?).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:沉孔|counterbore|锪孔).*?底孔\s*φ\s*(\d+(?:\.\d+)?)\s*贯通',  # φ22深20沉孔 底孔φ14.5贯通
+        r'φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通)',  # φ22锪孔 φ14.5底孔
+        r'沉孔.*?φ\s*(\d+(?:\.\d+)?)\s*.*?底孔.*?φ\s*(\d+(?:\.\d+)?)',  # 沉孔φ22 底孔φ14.5
+        r'锪孔.*?φ\s*(\d+(?:\.\d+)?)\s*.*?钻孔.*?φ\s*(\d+(?:\.\d+)?)',  # 锪孔φ22 钻孔φ14.5
     ]
     
     for pattern in patterns:
@@ -425,7 +516,12 @@ def _extract_counterbore_diameters(description: str) -> tuple:
                     continue
                 
                 # 确保提取的直径在合理范围内，排除误匹配的数字（如φ234中的数字）
-                if outer_diameter > 50 or inner_diameter > 50:  # 假设正常沉孔直径不会超过50mm
+                # 并确保外径大于内径
+                if outer_diameter > 100 or inner_diameter > 100:  # 扩大合理范围到100mm
+                    continue
+                if outer_diameter <= inner_diameter:  # 外径应该大于内径
+                    continue
+                if outer_diameter <= 0 or inner_diameter <= 0:  # 确保直径为正数
                     continue
                 
                 return outer_diameter, inner_diameter
@@ -435,8 +531,7 @@ def _extract_counterbore_diameters(description: str) -> tuple:
     # 如果上述模式没有匹配到，尝试提取描述末尾的直径信息
     # 格式如: "...φ22深20，φ14.5贯通底孔"
     end_patterns = [
-        r'φ\s*(\d+(?:\.\d+)?)\s*深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:沉孔|counterbore|锪孔|，|\.|;).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|，|\.|;)',
-        r'φ\s*(\d+(?:\.\d+)?).*?深.*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|，|\.|;).*?(?:底孔|thru|贯通)',  # φ22深20，φ14.5贯通底孔
+        r'φ\s*(\d+(?:\.\d+)?)\s*深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:沉孔|counterbore|锪孔|，|\.|;).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|，|\.|;)',  # φ22深20，φ14.5贯通底孔
     ]
     
     for pattern in end_patterns:
@@ -447,10 +542,55 @@ def _extract_counterbore_diameters(description: str) -> tuple:
                     outer_diameter = float(match[0])
                     inner_diameter = float(match[1])
                     # 确保提取的直径在合理范围内
-                    if outer_diameter > 50 or inner_diameter > 50:
+                    # 并确保外径大于内径
+                    if outer_diameter > 100 or inner_diameter > 100:
+                        continue
+                    if outer_diameter <= inner_diameter:  # 外径应该大于内径
+                        continue
+                    if outer_diameter <= 0 or inner_diameter <= 0:  # 确保直径为正数
                         continue
                     return outer_diameter, inner_diameter
             except (ValueError, IndexError):
                 continue
     
     return None, None
+
+
+def _extract_hole_count(description: str) -> int:
+    """
+    从描述中提取孔的数量
+    
+    Args:
+        description: 用户描述字符串
+        
+    Returns:
+        int: 孔的数量，如果没有找到则返回1
+    """
+    # 匹配"3个φ22沉孔"或"3个孔"等模式
+    patterns = [
+        r'(\d+)\s*个.*?(?:沉孔|孔|hole|holes)',
+        r'(\d+)\s*个',
+        r'总共.*?(\d+)\s*个',
+        r'共计.*?(\d+)\s*个',
+        r'(\d+)\s*个.*?(?:螺纹|钻|锪|沉)',
+        r'([一二三四五六七八九十])\s*个.*?(?:沉孔|孔|hole|holes)',  # 支持中文数字
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, description, re.IGNORECASE)
+        for match in matches:
+            try:
+                if match in ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']:
+                    # 中文数字转换
+                    chinese_to_num = {
+                        '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+                        '六': 6, '七': 7, '八': 8, '九': 9, '十': 10
+                    }
+                    return chinese_to_num.get(match, 1)
+                else:
+                    return int(match)
+            except (ValueError, TypeError):
+                continue
+    
+    # 如果没有找到明确数量，默认为1个
+    return 1

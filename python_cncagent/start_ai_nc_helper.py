@@ -28,7 +28,16 @@ def main():
     if command == "gui":
         # 启动图形界面
         try:
-            from src.modules.simple_nc_gui import run_gui
+            import os
+            from pathlib import Path
+            
+            # 确保src目录在Python路径中
+            project_root = Path(__file__).parent
+            src_path = project_root / "src"
+            if str(src_path) not in sys.path:
+                sys.path.insert(0, str(src_path))
+            
+            from modules.simple_nc_gui import run_gui
             print("启动AI辅助NC编程工具界面...")
             run_gui()
         except ImportError as e:

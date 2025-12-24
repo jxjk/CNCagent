@@ -5,9 +5,9 @@ AI辅助NC编程工具核心模块
 import cv2
 import numpy as np
 from typing import List, Dict, Tuple, Optional
-from .feature_definition import identify_features
-from .gcode_generation import generate_fanuc_nc
-from .validation import validate_nc_program
+from src.modules.feature_definition import identify_features
+from src.modules.gcode_generation import generate_fanuc_nc
+from src.modules.validation import validate_nc_program
 
 
 class QuickFeatureDetector:
@@ -360,8 +360,7 @@ class AI_NC_Helper:
         Returns:
             str: 生成的NC代码
         """
-        from .pdf_parsing_process import pdf_to_images
-        
+        from src.modules.pdf_parsing_process import pdf_to_images        
         # 只处理PDF的第一页，避免处理大型PDF文件时的性能问题
         images = pdf_to_images(pdf_path)
         if images:

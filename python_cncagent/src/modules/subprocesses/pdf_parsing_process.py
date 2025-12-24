@@ -8,8 +8,8 @@ from typing import Dict, List, Any, Tuple, Optional
 from datetime import datetime
 import uuid
 
-from ..validation import validate_geometry_elements
-from ..mechanical_drawing_expert import MechanicalDrawingExpert
+from src.modules.validation import validate_geometry_elements
+from src.modules.mechanical_drawing_expert import MechanicalDrawingExpert
 
 def extract_geometric_info_from_text(text: str) -> Dict[str, Any]:
     """

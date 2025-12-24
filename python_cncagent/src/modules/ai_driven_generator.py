@@ -70,10 +70,10 @@ class AIDrivenCNCGenerator:
         # 模拟AI解析过程，实际应用中应调用AI模型API
         requirements = ProcessingRequirements(user_prompt=user_prompt)
         
-        # 使用规则匹配作为AI解析的模拟
+        # 使用更精确的规则匹配作为AI解析的模拟
         user_lower = user_prompt.lower()
         
-        # 识别加工类型
+        # 识别加工类型 - 增加更详细的识别逻辑
         if any(keyword in user_lower for keyword in ['沉孔', 'counterbore', '锪孔']):
             requirements.processing_type = 'counterbore'
         elif any(keyword in user_lower for keyword in ['攻丝', 'tapping', '螺纹']):
@@ -82,38 +82,73 @@ class AIDrivenCNCGenerator:
             requirements.processing_type = 'drilling'
         elif any(keyword in user_lower for keyword in ['铣', 'mill', 'cut']):
             requirements.processing_type = 'milling'
+        elif any(keyword in user_lower for keyword in ['车', 'turn']):
+            requirements.processing_type = 'turning'
         else:
             requirements.processing_type = 'general'
         
-        # 提取深度信息
+        # 更精确地提取深度信息，考虑更多格式
         import re
-        depth_pattern = r'深\s*(\d+\.?\d*)\s*mm?'
-        depth_matches = re.findall(depth_pattern, user_prompt)
-        if depth_matches:
+        depth_patterns = [
+            r'深\s*(\d+\.?\d*)\s*mm?',
+            r'(\d+\.?\d*)\s*mm\s*深',
+            r'深度[：:]?\s*(\d+\.?\d*)',
+            r'depth[：:]?\s*(\d+\.?\d*)'
+        ]
+        for pattern in depth_patterns:
+            depth_matches = re.findall(pattern, user_prompt)
+            if depth_matches:
+                try:
+                    requirements.depth = float(depth_matches[0])
+                    break  # 找到第一个匹配就停止
+                except ValueError:
+                    continue
+        
+        # 提取孔位置信息，支持更多格式
+        pos_patterns = [
+            r'X\s*(\d+\.?\d*)\s*Y\s*([+-]?\d+\.?\d*)',
+            r'X[=:]\s*(\d+\.?\d*)\s*[,，]\s*Y[=:]\s*([+-]?\d+\.?\d*)',
+            r'位置[：:]?\s*X?\s*(\d+\.?\d*)\s*[，,]\s*Y?\s*([+-]?\d+\.?\d*)',
+            r'\((\d+\.?\d*)\s*[，,]\s*([+-]?\d+\.?\d*)\)'  # 坐标形式 (x,y)
+        ]
+        for pattern in pos_patterns:
+            pos_matches = re.findall(pattern, user_prompt)
+            for match in pos_matches:
+                try:
+                    x = float(match[0])
+                    y = float(match[1])
+                    requirements.hole_positions.append((x, y))
+                except (ValueError, IndexError):
+                    continue
+        
+        # 更精确地提取直径信息，特别是沉孔的内外径
+        dia_matches = re.findall(r'φ\s*(\d+\.?\d*)', user_prompt)
+        
+        # 特别处理沉孔格式 "φ22沉孔深20，φ14.5贯通底孔"
+        counterbore_pattern = r'φ\s*(\d+\.?\d*)\s*(?:沉孔|counterbore|锪孔).*?φ\s*(\d+\.?\d*)\s*(?:贯通|thru|底孔)'
+        counterbore_match = re.search(counterbore_pattern, user_prompt)
+        if counterbore_match:
             try:
-                requirements.depth = float(depth_matches[0])
-            except ValueError:
+                outer_dia = float(counterbore_match.group(1))
+                inner_dia = float(counterbore_match.group(2))
+                requirements.tool_diameters['outer'] = outer_dia
+                requirements.tool_diameters['inner'] = inner_dia
+            except (ValueError, IndexError):
                 pass
-        
-        # 提取孔位置信息
-        pos_pattern = r'X\s*(\d+\.?\d*)\s*Y\s*([+-]?\d+\.?\d*)'
-        pos_matches = re.findall(pos_pattern, user_prompt)
-        for match in pos_matches:
+        elif len(dia_matches) >= 2:
+            # 假设第一个是外径，第二个是内径（对于沉孔）
+            # 或者是多个不同直径的孔
             try:
-                x = float(match[0])
-                y = float(match[1])
-                requirements.hole_positions.append((x, y))
-            except ValueError:
-                continue
-        
-        # 提取直径信息
-        dia_pattern = r'φ\s*(\d+\.?\d*)'
-        dia_matches = re.findall(dia_pattern, user_prompt)
-        if len(dia_matches) >= 2:
-            # 假设第一个是外径，第二个是内径
-            try:
-                requirements.tool_diameters['outer'] = float(dia_matches[0])
-                requirements.tool_diameters['inner'] = float(dia_matches[1])
+                # 如果是沉孔类型，按大小排序，大直径为外径，小直径为内径
+                dia_values = [float(d) for d in dia_matches]
+                if requirements.processing_type == 'counterbore':
+                    dia_values.sort(reverse=True)  # 降序排列，大直径在前
+                    requirements.tool_diameters['outer'] = dia_values[0]
+                    requirements.tool_diameters['inner'] = dia_values[1] if len(dia_values) > 1 else dia_values[0]
+                else:
+                    requirements.tool_diameters['default'] = dia_values[0]
+                    if len(dia_values) > 1:
+                        requirements.tool_diameters['secondary'] = dia_values[1]
             except ValueError:
                 pass
         elif len(dia_matches) == 1:
@@ -121,6 +156,21 @@ class AIDrivenCNCGenerator:
                 requirements.tool_diameters['default'] = float(dia_matches[0])
             except ValueError:
                 pass
+        
+        # 提取孔数量信息
+        count_matches = re.findall(r'(\d+)\s*个', user_prompt)
+        if count_matches:
+            try:
+                requirements.special_requirements.append(f"数量:{count_matches[0]}")
+            except ValueError:
+                pass
+        
+        # 提取材料信息
+        material_keywords = ['钢', '铝', '铜', '铁', '不锈钢', '铝合金', '塑料', 'wood', 'steel', 'aluminum', 'copper']
+        for keyword in material_keywords:
+            if keyword in user_lower:
+                requirements.material = keyword
+                break
         
         return requirements
     

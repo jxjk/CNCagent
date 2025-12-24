@@ -10,12 +10,12 @@ import math
 import logging
 
 # 导入配置参数
-from ..config import IMAGE_PROCESSING_CONFIG, FEATURE_RECOGNITION_CONFIG, COORDINATE_CONFIG, OCR_CONFIG
-from ..exceptions import FeatureRecognitionError, handle_exception
+from src.config import IMAGE_PROCESSING_CONFIG, FEATURE_RECOGNITION_CONFIG, COORDINATE_CONFIG, OCR_CONFIG
+from src.exceptions import FeatureRecognitionError, handle_exception
 
 # 导入AI驱动模块和OCR模块
-from .ai_driven_generator import AIDrivenCNCGenerator
-from .ocr_ai_inference import extract_features_from_pdf_with_ai
+from src.modules.ai_driven_generator import AIDrivenCNCGenerator
+from src.modules.ocr_ai_inference import extract_features_from_pdf_with_ai
 
 
 def identify_features(image: np.ndarray, min_area: float = None, min_perimeter: float = None, 
@@ -319,6 +319,9 @@ def identify_counterbore_features(features: List[Dict], user_description: str = 
     识别沉孔（Counterbore）特征，即φ22沉孔深20mm + φ14.5贯通底孔的组合特征
     根据机械制图规则，通过几何特征和工程关系进行智能识别
     
+    注意：此函数现在主要作为AI驱动系统的补充，
+    在AI系统未能充分解析用户需求时提供后备支持
+    
     Args:
         features: 识别出的几何特征列表
         user_description: 用户描述，用于辅助判断是否需要识别沉孔特征
@@ -553,6 +556,8 @@ def identify_counterbore_features(features: List[Dict], user_description: str = 
     # 添加沉孔特征到最终列表
     filtered_features.extend(counterbore_features)
     
+    # 重要：如果AI优先模式被使用，我们应减少对几何特征的依赖
+    # 这里我们只保留那些与用户描述高度匹配的特征
     return filtered_features
 
 
