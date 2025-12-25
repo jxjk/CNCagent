@@ -694,6 +694,16 @@ def _extract_counterbore_diameters(description: str) -> tuple:
     Returns:
         tuple: (外径, 内径) 或 (None, None) 如果没有找到
     """
+    # 输入验证
+    if not isinstance(description, str):
+        return None, None
+    
+    # 检查是否存在潜在的安全问题
+    dangerous_keywords = ['../', '..\\', 'exec', 'eval', 'import', 'system', 'shell', 'cmd']
+    for keyword in dangerous_keywords:
+        if keyword.lower() in description.lower():
+            return None, None  # 如果发现危险关键词，直接返回None
+    
     description_lower = description.lower()
     
     # 优化的模式，能更好地匹配目标描述 "加工3个φ22深20底孔φ14.5贯通的沉孔特征"
@@ -723,37 +733,45 @@ def _extract_counterbore_diameters(description: str) -> tuple:
     ]
     
     for pattern in patterns:
-        matches = re.findall(pattern, description_lower)
-        for match in matches:
-            try:
-                # 根据匹配的模式，提取外径和内径
-                if len(match) >= 3:  # 包含数量的模式
-                    outer_diameter = float(match[1])  # 外径
-                    inner_diameter = float(match[2])  # 内径
-                elif len(match) == 2:  # 外径和内径的模式
-                    outer_diameter = float(match[0])
-                    inner_diameter = float(match[1])
-                else:
+        try:
+            matches = re.findall(pattern, description_lower)
+            for match in matches:
+                try:
+                    # 根据匹配的模式，提取外径和内径
+                    if len(match) >= 3:  # 包含数量的模式
+                        outer_diameter = float(match[1])  # 外径
+                        inner_diameter = float(match[2])  # 内径
+                    elif len(match) == 2:  # 外径和内径的模式
+                        outer_diameter = float(match[0])
+                        inner_diameter = float(match[1])
+                    else:
+                        continue
+                    
+                    # 确保提取的直径在合理范围内，排除误匹配的数字
+                    # 并确保外径大于内径
+                    if outer_diameter > 100 or inner_diameter > 100:  # 扩大合理范围到100mm
+                        continue
+                    if outer_diameter <= inner_diameter:  # 外径应该大于内径
+                        continue
+                    if outer_diameter <= 0 or inner_diameter <= 0:  # 确保直径为正数
+                        continue
+                    if inner_diameter >= outer_diameter * 0.9:  # 确保内外径差异合理（内径不应接近外径）
+                        continue
+                    
+                    return outer_diameter, inner_diameter
+                except (ValueError, IndexError, TypeError):
                     continue
-                
-                # 确保提取的直径在合理范围内，排除误匹配的数字
-                # 并确保外径大于内径
-                if outer_diameter > 100 or inner_diameter > 100:  # 扩大合理范围到100mm
-                    continue
-                if outer_diameter <= inner_diameter:  # 外径应该大于内径
-                    continue
-                if outer_diameter <= 0 or inner_diameter <= 0:  # 确保直径为正数
-                    continue
-                if inner_diameter >= outer_diameter * 0.9:  # 确保内外径差异合理（内径不应接近外径）
-                    continue
-                
-                return outer_diameter, inner_diameter
-            except (ValueError, IndexError):
-                continue
+        except re.error:
+            # 如果正则表达式有问题，跳过该模式
+            continue
     
     # 如果上面的模式都没匹配到，尝试更通用的提取方法
     # 先提取所有直径
-    diameter_matches = re.findall(r'φ\s*(\d+(?:\.\d+)?)', description_lower)
+    try:
+        diameter_matches = re.findall(r'φ\s*(\d+(?:\.\d+)?)', description_lower)
+    except re.error:
+        diameter_matches = []
+        
     if len(diameter_matches) >= 2:
         try:
             # 检查描述中是否包含"沉孔"或"锪孔"等关键词
@@ -764,26 +782,32 @@ def _extract_counterbore_diameters(description: str) -> tuple:
                 
                 # 查找与沉孔加工相关的直径描述
                 # 匹配 "φXX沉孔" 或 "沉孔φXX" 格式
-                counterbore_dia_matches = re.findall(r'(?:沉孔|锪孔|counterbore|锪平|沉头).*?φ\s*(\d+(?:\.\d+)?)|φ\s*(\d+(?:\.\d+)?).*?(?:沉孔|锪孔|counterbore|锪平|沉头)', description_lower)
-                for match in counterbore_dia_matches:
-                    # match 是一个元组，取非空的值
-                    dia = match[0] if match[0] else match[1]
-                    if dia:
-                        try:
-                            relevant_diameters.append(float(dia))
-                        except ValueError:
-                            continue
+                try:
+                    counterbore_dia_matches = re.findall(r'(?:沉孔|锪孔|counterbore|锪平|沉头).*?φ\s*(\d+(?:\.\d+)?)|φ\s*(\d+(?:\.\d+)?).*?(?:沉孔|锪孔|counterbore|锪平|沉头)', description_lower)
+                    for match in counterbore_dia_matches:
+                        # match 是一个元组，取非空的值
+                        dia = match[0] if match[0] else match[1]
+                        if dia:
+                            try:
+                                relevant_diameters.append(float(dia))
+                            except ValueError:
+                                continue
+                except re.error:
+                    pass
                 
                 # 查找与底孔相关的直径
-                bottom_hole_dia_matches = re.findall(r'(?:底孔|贯通|thru|通孔|钻孔).*?φ\s*(\d+(?:\.\d+)?)|φ\s*(\d+(?:\.\d+)?).*?(?:底孔|贯通|thru|通孔|钻孔)', description_lower)
-                for match in bottom_hole_dia_matches:
-                    # match 是一个元组，取非空的值
-                    dia = match[0] if match[0] else match[1]
-                    if dia:
-                        try:
-                            relevant_diameters.append(float(dia))
-                        except ValueError:
-                            continue
+                try:
+                    bottom_hole_dia_matches = re.findall(r'(?:底孔|贯通|thru|通孔|钻孔).*?φ\s*(\d+(?:\.\d+)?)|φ\s*(\d+(?:\.\d+)?).*?(?:底孔|贯通|thru|通孔|钻孔)', description_lower)
+                    for match in bottom_hole_dia_matches:
+                        # match 是一个元组，取非空的值
+                        dia = match[0] if match[0] else match[1]
+                        if dia:
+                            try:
+                                relevant_diameters.append(float(dia))
+                            except ValueError:
+                                continue
+                except re.error:
+                    pass
                 
                 # 如果找到了相关直径，使用它们
                 if len(relevant_diameters) >= 2:

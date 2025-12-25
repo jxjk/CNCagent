@@ -313,21 +313,22 @@ if __name__ == "__main__":
                 print("自定义原点坐标必须是数字")
                 sys.exit(1)
         
-            # 安全验证PDF路径
-            pdf_path = os.path.abspath(pdf_path)
-            pdf_file = Path(pdf_path)
-            if not pdf_file.exists():
-                print(f"错误: PDF文件 {pdf_path} 不存在")
-                sys.exit(1)
-            if pdf_file.suffix.lower() != '.pdf':
-                print(f"错误: 文件 {pdf_path} 不是PDF文件")
-                sys.exit(1)
-            # 防止路径遍历攻击
-            base_path = Path.cwd().resolve()
-            resolved_path = pdf_file.resolve()
-            if not resolved_path.is_relative_to(base_path):
-                print(f"错误: 文件路径 {pdf_path} 超出允许范围")
-                sys.exit(1)        
+        # 安全验证PDF路径
+        pdf_path = os.path.abspath(pdf_path)
+        pdf_file = Path(pdf_path)
+        if not pdf_file.exists():
+            print(f"错误: PDF文件 {pdf_path} 不存在")
+            sys.exit(1)
+        if pdf_file.suffix.lower() != '.pdf':
+            print(f"错误: 文件 {pdf_path} 不是PDF文件")
+            sys.exit(1)
+        # 防止路径遍历攻击
+        base_path = Path.cwd().resolve()
+        resolved_path = pdf_file.resolve()
+        if not resolved_path.is_relative_to(base_path):
+            print(f"错误: 文件路径 {pdf_path} 超出允许范围")
+            sys.exit(1)
+        
         print(f"正在处理PDF文件: {pdf_path}")
         print(f"用户描述: {user_description}")
         print(f"比例: {scale}")
@@ -362,64 +363,4 @@ if __name__ == "__main__":
         print("使用 'python main.py help' 查看帮助信息")
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("用法: python main.py <pdf_path> <user_description> [scale] [coordinate_strategy] [custom_origin_x] [custom_origin_y]")
-        print("示例: python main.py part_design.pdf \"请加工一个100mm x 50mm的矩形，使用铣削加工\" 1.0 highest_y")
-        print("坐标策略选项: highest_y, lowest_y, leftmost_x, rightmost_x, center, custom, geometric_center")
-        sys.exit(1)
-    
-    pdf_path = sys.argv[1]
-    user_description = sys.argv[2]
-    scale = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0
-    coordinate_strategy = sys.argv[4] if len(sys.argv) > 4 else "highest_y"
-    
-    custom_origin = None
-    if len(sys.argv) > 6:
-        try:
-            custom_origin_x = float(sys.argv[5])
-            custom_origin_y = float(sys.argv[6])
-            custom_origin = (custom_origin_x, custom_origin_y)
-        except ValueError:
-            print("自定义原点坐标必须是数字")
-            sys.exit(1)
-    
-    # 安全验证PDF路径
-    pdf_path = os.path.abspath(pdf_path)
-    pdf_file = Path(pdf_path)
-    if not pdf_file.exists():
-        print(f"错误: PDF文件 {pdf_path} 不存在")
-        sys.exit(1)
-    if pdf_file.suffix.lower() != '.pdf':
-        print(f"错误: 文件 {pdf_path} 不是PDF文件")
-        sys.exit(1)
-    # 防止路径遍历攻击
-    base_path = Path.cwd().resolve()
-    resolved_path = pdf_file.resolve()
-    if not resolved_path.is_relative_to(base_path):
-        print(f"错误: 文件路径 {pdf_path} 超出允许范围")
-        sys.exit(1)
-    
-    print(f"正在处理PDF文件: {pdf_path}")
-    print(f"用户描述: {user_description}")
-    print(f"比例: {scale}")
-    print(f"坐标策略: {coordinate_strategy}")
-    if custom_origin:
-        print(f"自定义原点: {custom_origin}")
-    
-    try:
-        nc_program = generate_nc_from_pdf(pdf_path, user_description, scale, coordinate_strategy, custom_origin)
-        print("\n生成的NC程序:")
-        print(nc_program)
-        
-        # 保存NC程序到文件
-        output_path = "output.nc"
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(nc_program)
-        print(f"\nNC程序已保存到: {output_path}")
-        
-    except Exception as e:
-        print(f"处理过程中出现错误: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+

@@ -8,7 +8,11 @@ import pytesseract
 import numpy as np
 import os
 import logging
-pytesseract.pytesseract.tesseract_cmd = r'D:\Program Files\Tesseract-OCR\tesseract.exe'
+# 设置Tesseract路径 - 优先使用环境变量或系统PATH
+import os
+tesseract_path = os.environ.get('TESSERACT_PATH', '')
+if tesseract_path and os.path.exists(tesseract_path):
+    pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
 
 def pdf_to_images(pdf_path, dpi=150):  # 降低DPI以兼容性更好

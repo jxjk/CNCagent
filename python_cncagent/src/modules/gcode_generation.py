@@ -57,6 +57,25 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
     Raises:
         NCGenerationError: NC代码生成过程中发生错误
     """
+    # 输入验证
+    if not isinstance(features, list):
+        raise NCGenerationError("特征列表必须是list类型")
+    
+    if not isinstance(description_analysis, dict):
+        raise NCGenerationError("描述分析结果必须是dict类型")
+    
+    if not isinstance(scale, (int, float)):
+        raise NCGenerationError("比例尺必须是数字类型")
+    
+    if scale <= 0:
+        raise NCGenerationError("比例尺必须是正数")
+    
+    # 验证每个特征
+    for i, feature in enumerate(features):
+        feature_errors = _validate_feature(feature)
+        if feature_errors:
+            raise NCGenerationError(f"特征 {i} 验证失败: {', '.join(feature_errors)}")
+    
     try:
         gcode = []
         
@@ -1355,6 +1374,12 @@ def validate_nc_code(nc_code: str) -> List[str]:
         list: 验证错误列表，如果无错误则返回空列表
     """
     errors = []
+    
+    # 检查输入是否为字符串
+    if not isinstance(nc_code, str):
+        errors.append("NC代码必须是字符串类型")
+        return errors
+    
     lines = nc_code.split('\n')
     
     # 检查是否存在必要的G代码指令
@@ -1369,5 +1394,57 @@ def validate_nc_code(nc_code: str) -> List[str]:
     has_coordinate_mode = any('G90' in line or 'G91' in line for line in lines)
     if not has_coordinate_mode:
         errors.append("缺少坐标模式设定指令 (G90 或 G91)")
+    
+    return errors
+
+
+def _validate_feature(feature: Dict) -> List[str]:
+    """
+    验证单个特征的有效性
+    
+    Args:
+        feature (dict): 几何特征字典
+    
+    Returns:
+        list: 验证错误列表
+    """
+    errors = []
+    
+    if not isinstance(feature, dict):
+        errors.append("特征必须是字典类型")
+        return errors
+    
+    # 验证必需的键
+    required_keys = ['shape', 'center', 'dimensions']
+    for key in required_keys:
+        if key not in feature:
+            errors.append(f"特征缺少必需的键: {key}")
+    
+    # 验证shape值
+    valid_shapes = ['circle', 'rectangle', 'square', 'triangle', 'counterbore', 'ellipse', 'polygon']
+    if feature.get('shape') not in valid_shapes:
+        errors.append(f"无效的形状类型: {feature.get('shape')}")
+    
+    # 验证center
+    center = feature.get('center')
+    if center is not None:
+        if not isinstance(center, (list, tuple)) or len(center) != 2:
+            errors.append("中心点必须是包含两个元素的列表或元组")
+        else:
+            for coord in center:
+                if not isinstance(coord, (int, float)):
+                    errors.append("中心点坐标必须是数字")
+                    break
+    
+    # 验证dimensions
+    dimensions = feature.get('dimensions')
+    if dimensions is not None:
+        if not isinstance(dimensions, (list, tuple)):
+            errors.append("尺寸必须是列表或元组")
+        else:
+            for dim in dimensions:
+                if not isinstance(dim, (int, float)) or dim <= 0:
+                    errors.append("尺寸值必须是正数")
+                    break
     
     return errors
