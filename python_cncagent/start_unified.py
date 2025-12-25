@@ -35,6 +35,39 @@ src_path = project_root / "src"
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(src_path))
 
+# 预加载必要的模块以避免线程间的导入冲突
+def preload_modules():
+    """预加载所有可能在多线程中使用的模块"""
+    try:
+        # 预加载Web服务器模块
+        import start_server
+        logger.info("预加载 start_server 模块成功")
+    except ImportError as e:
+        logger.warning(f"预加载 start_server 模块失败: {e}")
+    
+    try:
+        # 预加载GUI模块
+        from src.modules.simple_nc_gui import run_gui
+        logger.info("预加载 simple_nc_gui 模块成功")
+    except ImportError as e:
+        logger.warning(f"预加载 simple_nc_gui 模块失败: {e}")
+    
+    # 预加载主要的模块以避免后续导入冲突
+    try:
+        import src.modules.fanuc_optimization
+        import src.modules.gcode_generation
+        import src.modules.ai_driven_generator
+        import src.modules.feature_definition
+        import src.modules.material_tool_matcher
+        import src.modules.pdf_parsing_process
+        import src.modules.unified_generator
+        logger.info("预加载核心模块成功")
+    except ImportError as e:
+        logger.warning(f"预加载核心模块失败: {e}")
+
+# 在程序开始时预加载模块
+preload_modules()
+
 # 全局变量用于控制服务器线程
 web_thread = None
 
@@ -47,6 +80,8 @@ def start_web_server_simple(port=5000, host='0.0.0.0'):
         if str(src_path) not in sys.path:
             sys.path.insert(0, str(src_path))
         
+        # 使用延迟导入避免线程冲突
+        import start_server
         from start_server import app
         logger.info(f"启动Web服务器，地址: {host}:{port}")
         app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)
@@ -67,6 +102,7 @@ def start_gui():
         if str(src_path) not in sys.path:
             sys.path.insert(0, str(src_path))
         
+        # 使用延迟导入避免线程冲突
         from modules.simple_nc_gui import run_gui
         logger.info("启动GUI界面...")
         run_gui()

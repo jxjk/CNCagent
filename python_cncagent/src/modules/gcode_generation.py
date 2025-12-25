@@ -932,19 +932,33 @@ def _generate_counterbore_code(features: List[Dict], description_analysis: Dict)
           "极坐标模式" in description or 
           "polar mode" in description or
           "polar coordinate" in description):
-        # 如果只是提到极坐标但没有"使用极坐标位置"，仍需检查是否有笛卡尔坐标
+        # 当描述中明确提及"使用极坐标"等关键词时，优先考虑极坐标模式
+        # 即使检测到笛卡尔坐标，如果同时有明确的极坐标指示，也应使用极坐标
         import re
         # 检查是否包含X数字Y数字格式的坐标
         cartesian_coord_pattern = r'X\s*\d+\.?\d*\s*Y\s*[+-]?\d+\.?\d*'
         cartesian_coords_found = re.findall(cartesian_coord_pattern, description_analysis.get("description", ""))
         
-        # 如果找到笛卡尔坐标格式，且没有"使用极坐标位置"，则优先使用笛卡尔坐标
-        if cartesian_coords_found and len(cartesian_coords_found) > 0:
+        # 检查是否包含极坐标相关的关键词
+        has_polar_keyword = ("使用极坐标" in description or 
+                            "极坐标模式" in description or 
+                            "polar mode" in description or
+                            "polar coordinate" in description)
+        
+        # 如果同时包含极坐标关键词和笛卡尔坐标，则使用极坐标模式
+        if cartesian_coords_found and len(cartesian_coords_found) > 0 and has_polar_keyword:
+            use_polar_coordinates = True
+            gcode.append(f"(FOUND {len(cartesian_coords_found)} CARTESIAN COORDINATES AND POLAR KEYWORD - USING POLAR COORDINATE MODE)")
+            for coord in cartesian_coords_found:
+                gcode.append(f"(COORD: {coord})")
+        elif cartesian_coords_found and len(cartesian_coords_found) > 0:
+            # 如果只有笛卡尔坐标没有极坐标关键词，则使用笛卡尔坐标
             use_polar_coordinates = False
             gcode.append(f"(FOUND {len(cartesian_coords_found)} CARTESIAN COORDINATES IN DESCRIPTION - USING CARTESIAN MODE)")
             for coord in cartesian_coords_found:
                 gcode.append(f"(COORD: {coord})")
         else:
+            # 如果没有笛卡尔坐标但有极坐标关键词，则使用极坐标
             use_polar_coordinates = True
     
     # 如果用户明确要求使用极坐标，才使用极坐标模式

@@ -165,9 +165,11 @@ def _select_and_adjust_coordinate_system(features: List[Dict], drawing_info: Any
 
 
 def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.0,
-                        coordinate_strategy: str = "highest_y", custom_origin: Optional[Tuple[float, float]] = None) -> str:
+                        coordinate_strategy: str = "highest_y", custom_origin: Optional[Tuple[float, float]] = None,
+                        api_key: Optional[str] = None, model: str = "gpt-3.5-turbo") -> str:
     """
-    完整流程：从PDF图纸和用户描述生成NC程序
+    完整流程：从PDF图纸和用户描述生成NC程序（重构版）
+    直接使用大模型生成，PDF特征仅作为辅助参考
     
     Args:
         pdf_path (str): PDF图纸路径
@@ -175,6 +177,8 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
         scale (float): 比例尺因子
         coordinate_strategy (str): 坐标基准策略
         custom_origin (Tuple[float, float]): 自定义原点坐标
+        api_key (str): 大模型API密钥
+        model (str): 使用的模型名称
     
     Returns:
         str: 生成的NC程序代码
@@ -182,12 +186,13 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
     import logging
     logging.info("开始处理PDF图纸...")
     
-    # 优先使用AI驱动的统一生成器，确保用户描述被优先考虑
-    logging.info("使用AI优先策略生成NC程序...")
+    # 使用重构后的AI优先生成器，直接调用大模型生成NC代码
+    logging.info("使用大模型直接生成NC程序，PDF特征仅作为辅助参考...")
     nc_program = generate_cnc_with_unified_approach(
         user_description, 
-        pdf_path=pdf_path, 
-        use_ai_primary=True
+        pdf_path=pdf_path,
+        api_key=api_key,
+        model=model
     )
     
     # 生成模拟报告和可视化
@@ -274,6 +279,13 @@ if __name__ == "__main__":
         print('  示例: python main.py process part_design.pdf "请加工一个100mm x 50mm的矩形，使用铣削加工" 1.0 highest_y')
         print("  坐标策略选项: highest_y, lowest_y, leftmost_x, rightmost_x, center, custom, geometric_center")
         print("")
+        print("环境变量设置:")
+        print("  DEEPSEEK_API_KEY    设置DeepSeek API密钥（优先使用）")
+        print("  DEEPSEEK_MODEL      设置DeepSeek使用的模型名称（默认: deepseek-chat）")
+        print("  DEEPSEEK_API_BASE   设置DeepSeek API基础URL（默认: https://api.deepseek.com）")
+        print("  OPENAI_API_KEY      设置OpenAI API密钥")
+        print("  OPENAI_MODEL        设置OpenAI使用的模型名称（默认: gpt-3.5-turbo）")
+        print("")
         print("新功能: 统一启动器 (推荐)")
         print("  python start_unified.py                    # 同时启动GUI和Web服务器")
         print("  python start_unified.py gui               # 仅启动GUI界面")
@@ -337,7 +349,20 @@ if __name__ == "__main__":
             print(f"自定义原点: {custom_origin}")
         
         try:
-            nc_program = generate_nc_from_pdf(pdf_path, user_description, scale, coordinate_strategy, custom_origin)
+            # 检查是否提供了API密钥（优先使用DeepSeek，然后是OpenAI）
+            import os
+            api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')  # 优先使用DeepSeek API密钥
+            model = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))  # 优先使用DeepSeek模型，默认deepseek-chat
+            
+            nc_program = generate_nc_from_pdf(
+                pdf_path, 
+                user_description, 
+                scale, 
+                coordinate_strategy, 
+                custom_origin,
+                api_key=api_key,
+                model=model
+            )
             print("\n生成的NC程序:")
             print(nc_program)
             
