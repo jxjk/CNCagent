@@ -1083,6 +1083,12 @@ def pdf_parsing_process(file_path: str) -> Dict[str, Any]:
                     for page_num in range(len(pdf_reader.pages)):
                         page = pdf_reader.pages[page_num]
                         page_text = page.extract_text()
+                        # 确保文本内容使用UTF-8编码处理
+                        if isinstance(page_text, bytes):
+                            try:
+                                page_text = page_text.decode('utf-8')
+                            except UnicodeError:
+                                page_text = page_text.decode('utf-8', errors='ignore')
                         text_content += page_text + ' '
                         
                         # 从文本中提取几何信息

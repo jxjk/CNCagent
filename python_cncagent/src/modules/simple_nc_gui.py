@@ -28,6 +28,7 @@ class SimpleNC_GUI:
         self.material = tk.StringVar(value="Aluminum")
         self.processing_type = tk.StringVar(value="general")
         self.description = tk.StringVar(value="")
+        self.only_description_mode = tk.BooleanVar(value=False)  # 新增：仅描述模式
         self.file_types = [
             ("图像文件", "*.png *.jpg *.jpeg *.bmp *.tiff"),
             ("PDF文件", "*.pdf"),
@@ -61,8 +62,12 @@ class SimpleNC_GUI:
         ttk.Button(control_frame, text="导出代码", command=self.export_nc).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(control_frame, text="验证代码", command=self.validate_nc).pack(side=tk.LEFT, padx=(0, 5))
         
+        # 仅描述模式复选框
+        description_mode_check = ttk.Checkbutton(control_frame, text="仅描述模式", variable=self.only_description_mode, command=self.toggle_description_mode)
+        description_mode_check.pack(side=tk.LEFT, padx=(20, 10))
+        
         # 材料选择
-        ttk.Label(control_frame, text="材料:").pack(side=tk.LEFT, padx=(20, 5))
+        ttk.Label(control_frame, text="材料:").pack(side=tk.LEFT, padx=(10, 5))
         material_combo = ttk.Combobox(control_frame, textvariable=self.material, values=["Aluminum", "Steel", "Stainless Steel", "Brass", "Plastic"], state="readonly")
         material_combo.pack(side=tk.LEFT, padx=(0, 20))
         
@@ -124,6 +129,40 @@ class SimpleNC_GUI:
         self.status_var = tk.StringVar(value="就绪")
         status_bar = ttk.Label(main_frame, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10, 0))
+    
+    def toggle_description_mode(self):
+        """切换仅描述模式"""
+        if self.only_description_mode.get():
+            self.status_var.set("已切换到仅描述模式 - 无需导入图纸")
+            # 在仅描述模式下，自动创建虚拟图像
+            self.create_virtual_image()
+            # 更新画布以显示虚拟图像
+            self.display_cv_image()
+        else:
+            self.status_var.set("已切换到正常模式 - 请导入图纸")
+            # 重置当前图像
+            self.current_image = None
+            self.show_welcome_message()
+    
+    def create_virtual_image(self):
+        """创建虚拟图像用于仅描述模式"""
+        # 创建一个空白的虚拟图像
+        width, height = 800, 600
+        virtual_image = np.zeros((height, width, 3), dtype=np.uint8)
+        
+        # 添加一些简单的几何图形作为示例
+        # 在图像中央添加一个矩形
+        cv2.rectangle(virtual_image, (300, 200), (500, 400), (255, 255, 255), 2)
+        
+        # 添加一个圆形
+        cv2.circle(virtual_image, (400, 300), 50, (255, 255, 255), 2)
+        
+        # 添加一些文本说明
+        cv2.putText(virtual_image, "虚拟图纸", (350, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.putText(virtual_image, "仅描述模式", (330, 500), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        
+        self.current_image = virtual_image
+        self.current_image_path = None  # 表示这是虚拟图像
     
     def load_drawing(self):
         """加载图纸文件"""
@@ -199,6 +238,13 @@ class SimpleNC_GUI:
     
     def detect_features(self):
         """检测图纸中的特征"""
+        # 检查是否处于仅描述模式
+        if self.only_description_mode.get():
+            self.status_var.set("仅描述模式：跳过特征检测，直接使用描述信息")
+            # 仅描述模式不需要检测特征，直接使用描述信息
+            messagebox.showinfo("提示", "当前为仅描述模式，已跳过特征检测步骤。\n请直接点击'生成NC'按钮。")
+            return
+        
         if self.current_image is None:
             messagebox.showwarning("警告", "请先加载图纸")
             return
@@ -225,41 +271,68 @@ class SimpleNC_GUI:
     
     def generate_nc(self):
         """生成NC代码"""
-        if self.current_image is None:
-            messagebox.showwarning("警告", "请先加载图纸并检测特征")
+        # 检查是否在仅描述模式下，且没有描述
+        if self.only_description_mode.get() and not self.description.get().strip():
+            messagebox.showwarning("警告", "请在仅描述模式下输入加工描述")
             return
         
-        self.status_var.set("正在生成NC代码...")
-        self.root.update()
-        
+        # 在仅描述模式下，不应使用图像，直接从描述生成NC代码
+        if self.only_description_mode.get():
+            self.generate_nc_from_description_only()
+        elif self.current_image is None:
+            messagebox.showwarning("警告", "请先加载图纸并检测特征")
+            return
+        else:
+            self.status_var.set("正在生成NC代码...")
+            self.root.update()
+            
+            try:
+                # 从用户描述中获取额外信息
+                drawing_text = self.description.get()
+                material = self.material.get()
+                user_description = self.description.get()
+                
+                # 在后台线程中生成NC代码
+                def generate_in_thread():
+                    try:
+                        nc_code = self.nc_helper.quick_nc_generation(
+                            self.current_image, 
+                            drawing_text, 
+                            material, 
+                            user_description
+                        )
+                        self.current_nc_code = nc_code
+                        self.root.after(0, self.display_nc_code, nc_code)
+                        self.root.after(0, self.update_report)
+                        self.root.after(0, lambda: self.status_var.set("NC代码生成完成"))
+                    except Exception as e:
+                        self.root.after(0, lambda: messagebox.showerror("错误", f"生成NC代码时出错: {str(e)}"))
+                        self.root.after(0, lambda: self.status_var.set("就绪"))
+                
+                thread = threading.Thread(target=generate_in_thread)
+                thread.daemon = True
+                thread.start()
+            except Exception as e:
+                messagebox.showerror("错误", f"生成NC代码时出错: {str(e)}")
+                self.status_var.set("就绪")
+    
+    def generate_nc_from_description_only(self):
+        """从仅描述生成NC代码的备选方法"""
         try:
-            # 从用户描述中获取额外信息
-            drawing_text = self.description.get()
-            material = self.material.get()
-            user_description = self.description.get()
+            from src.modules.unified_generator import unified_generator  # 导入全局实例
             
-            # 在后台线程中生成NC代码
-            def generate_in_thread():
-                try:
-                    nc_code = self.nc_helper.quick_nc_generation(
-                        self.current_image, 
-                        drawing_text, 
-                        material, 
-                        user_description
-                    )
-                    self.current_nc_code = nc_code
-                    self.root.after(0, self.display_nc_code, nc_code)
-                    self.root.after(0, self.update_report)
-                    self.root.after(0, lambda: self.status_var.set("NC代码生成完成"))
-                except Exception as e:
-                    self.root.after(0, lambda: messagebox.showerror("错误", f"生成NC代码时出错: {str(e)}"))
-                    self.root.after(0, lambda: self.status_var.set("就绪"))
+            # 使用统一生成器的描述分析功能
+            nc_code = unified_generator.generate_from_description_only(
+                self.description.get(),
+                self.material.get()
+            )
             
-            thread = threading.Thread(target=generate_in_thread)
-            thread.daemon = True
-            thread.start()
+            self.current_nc_code = nc_code
+            self.display_nc_code(nc_code)
+            self.update_report()
+            self.status_var.set("NC代码生成完成（仅描述模式）")
         except Exception as e:
-            messagebox.showerror("错误", f"生成NC代码时出错: {str(e)}")
+            messagebox.showerror("错误", f"从描述生成NC代码失败: {str(e)}")
             self.status_var.set("就绪")
     
     def display_nc_code(self, nc_code):
@@ -320,9 +393,32 @@ class SimpleNC_GUI:
                 else:
                     export_code = self.current_nc_code
                 
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(export_code)
+                # 确保导出代码使用UTF-8编码处理中文字符
+                if isinstance(export_code, str):
+                    # 如果是字符串，直接使用UTF-8写入
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(export_code)
+                else:
+                    # 如果是字节串，先解码再写入
+                    try:
+                        export_code_str = export_code.decode('utf-8')
+                    except UnicodeError:
+                        export_code_str = export_code.decode('utf-8', errors='replace')
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(export_code_str)
                 messagebox.showinfo("成功", f"NC代码已保存到: {file_path}")
+            except UnicodeError as e:
+                # 如果出现编码错误，尝试其他处理方法
+                try:
+                    # 以二进制模式写入
+                    with open(file_path, 'wb') as f:
+                        if isinstance(export_code, str):
+                            f.write(export_code.encode('utf-8'))
+                        else:
+                            f.write(export_code)
+                    messagebox.showinfo("成功", f"NC代码已保存到: {file_path} (使用二进制模式)")
+                except Exception as binary_error:
+                    messagebox.showerror("错误", f"保存文件时出错: {str(binary_error)}")
             except Exception as e:
                 messagebox.showerror("错误", f"保存文件时出错: {str(e)}")
     

@@ -14,13 +14,19 @@ def main():
     """主入口函数"""
     if len(sys.argv) < 2:
         print("AI辅助NC编程工具")
-        print("=" * 50)
+        print("=" * 60)
         print("使用方法:")
         print("  python start_ai_nc_helper.py gui          # 启动图形界面")
         print("  python start_ai_nc_helper.py process      # 处理PDF生成NC代码")
         print("  python start_ai_nc_helper.py demo         # 运行演示")
         print("  python start_ai_nc_helper.py help         # 显示帮助")
-        print("=" * 50)
+        print("")
+        print("新功能: 统一启动器")
+        print("  python start_unified.py                   # 同时启动GUI和Web服务器")
+        print("  python start_unified.py gui               # 仅启动GUI界面")
+        print("  python start_unified.py web               # 仅启动Web服务器")
+        print("  python start_unified.py both --port 8080  # 同时启动，自定义端口")
+        print("=" * 60)
         sys.exit(1)
     
     command = sys.argv[1].lower()
@@ -84,7 +90,7 @@ def main():
     elif command == "demo":
         # 运行演示
         print("AI辅助NC编程工具 - 演示模式")
-        print("=" * 50)
+        print("=" * 60)
         print("此工具包含以下功能:")
         print("1. 快速特征识别 - 自动识别图纸中的几何特征")
         print("2. 智能工艺推荐 - 根据特征推荐合适的加工工艺")
@@ -92,12 +98,20 @@ def main():
         print("4. 多格式导出 - 支持多种CAM软件格式")
         print("5. 参数快速调整 - 简单的滑块和下拉菜单")
         print("")
+        print("新功能: 统一启动器")
+        print("现在可以使用统一启动器同时运行GUI和Web服务器:")
+        print("  python start_unified.py                   # 同时启动GUI和Web服务器")
+        print("  python start_unified.py gui               # 仅启动GUI界面")
+        print("  python start_unified.py web               # 仅启动Web服务器")
+        print("  python start_unified.py both --port 8080  # 同时启动，自定义端口")
+        print("")
         print("使用 'python start_ai_nc_helper.py gui' 启动图形界面开始使用")
+        print("=" * 60)
     
     elif command == "help":
         # 显示帮助信息
         print("AI辅助NC编程工具 - 帮助信息")
-        print("=" * 50)
+        print("=" * 60)
         print("命令说明:")
         print("  gui      - 启动图形界面，提供可视化操作")
         print("  process  - 命令行模式处理PDF文件")
@@ -112,11 +126,19 @@ def main():
         print("  - 点击特征直接调整相关参数")
         print("  - 支持导出到CamBam、Mastercam、Fusion 360等格式")
         print("")
+        print("新功能: 统一启动器")
+        print("统一启动器支持同时运行GUI和Web服务器:")
+        print("  python start_unified.py                   # 同时启动GUI和Web服务器")
+        print("  python start_unified.py gui               # 仅启动GUI界面")
+        print("  python start_unified.py web               # 仅启动Web服务器")
+        print("  python start_unified.py both --port 8080  # 同时启动，自定义端口")
+        print("")
         print("技术特点:")
         print("  - 插件式架构设计，易于扩展")
         print("  - 基于现有CNCagent项目，稳定可靠")
         print("  - 支持多种材料类型和加工工艺")
         print("  - 内置代码验证功能，确保生成代码的正确性")
+        print("=" * 60)
     
     else:
         print(f"未知命令: {command}")

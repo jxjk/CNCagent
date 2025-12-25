@@ -656,6 +656,29 @@ def analyze_pcd_features(circle_features: List[Dict], baseline_feature: Dict, ho
                 except ValueError:
                     continue
     
+    # 还要支持极坐标格式如 "R=50 θ=30°" 或 "R50θ30" 等
+    polar_patterns = [
+        r'R\s*[=:]\s*(\d+\.?\d*)\s*(?:θ|theta|角度|θ=|θ:)\s*(\d+\.?\d*)\s*(?:°|度)?',  # R=50 θ=30°
+        r'R\s*(\d+\.?\d*)\s*(?:θ|theta|角度)\s*(\d+\.?\d*)\s*(?:°|度)?',  # R50θ30
+        r'(?:极径|半径)\s*(\d+\.?\d*)\s*(?:极角|角度)\s*(\d+\.?\d*)\s*(?:°|度)?',  # 极径50 极角30度
+    ]
+    
+    for pattern in polar_patterns:
+        polar_matches = re.findall(pattern, user_description, re.IGNORECASE)
+        for match in polar_matches:
+            try:
+                radius = float(match[0])
+                angle_deg = float(match[1])
+                # 添加到极坐标列表中
+                if not angles:
+                    angles = [angle_deg]
+                    pcd_diameter = radius * 2  # 使用极径作为PCD直径
+                else:
+                    angles.append(angle_deg)
+                    # 如果极径与当前PCD直径差异较大，可能需要处理多个PCD
+            except (ValueError, TypeError):
+                continue
+    
     baseline_center = baseline_feature["center"]
     baseline_x, baseline_y = baseline_center
     pcd_radius = pcd_diameter / 2
@@ -701,6 +724,10 @@ def analyze_pcd_features(circle_features: List[Dict], baseline_feature: Dict, ho
             
             # 检查距离是否接近PCD半径
             if abs(distance - pcd_radius) <= pcd_tolerance:
+                # 计算角度信息
+                angle_rad = math.atan2(dy, dx)
+                angle_deg = math.degrees(angle_rad)
+                feature["polar_angle"] = angle_deg  # 添加极坐标角度信息
                 pcd_features.append(feature)
         
         # 如果找到的特征数量符合预期，返回这些特征
@@ -752,21 +779,68 @@ def extract_depth_from_description(description: str) -> float:
 
 
 def extract_highest_y_center_point(features: List[Dict]) -> Tuple[float, float]:
+
+
     """
+
+
     提取所有圆形特征中Y坐标最高的圆心点作为坐标原点
+
+
     
+
+
     Args:
+
+
         features: 包含圆形特征的特征列表
+
+
     
+
+
     Returns:
+
+
         Tuple[float, float]: 最高Y坐标圆心点的坐标 (x, y)
+
+
     """
+
+
     circle_features = [f for f in features if f.get("shape") in ["circle", "counterbore"]]
+
+
+
+
+
     if not circle_features:
-        return (0.0, 0.0)  # 如果没有圆形特征，返回原点
+
+
+        # 如果没有圆形特征，则在所有特征中查找
+
+
+        if not features:
+
+
+            return (0.0, 0.0)
+
+
+        highest_point = min(features, key=lambda f: f["center"][1])
+
+
+        return highest_point["center"]
+
+
     
+
+
     # 找到Y坐标最小的圆心点（在图像坐标系中，Y越小越靠上）
+
+
     highest_point = min(circle_features, key=lambda f: f["center"][1])
+
+
     return highest_point["center"]
 
 
@@ -779,7 +853,7 @@ def adjust_coordinate_system(features: List[Dict], origin: Tuple[float, float],
     Args:
         features: 特征列表
         origin: 新的坐标原点 (x, y)
-        reference_strategy: 坐标基准策略 ("absolute", "relative", "custom", "highest_y")
+        reference_strategy: 坐标基准策略 ("absolute", "relative", "custom", "highest_y", "lowest_y", "leftmost_x", "rightmost_x", "center", "geometric_center")
         custom_origin: 自定义原点坐标，当reference_strategy为"custom"时使用
     
     Returns:
@@ -793,6 +867,16 @@ def adjust_coordinate_system(features: List[Dict], origin: Tuple[float, float],
         actual_origin = custom_origin
     elif reference_strategy == "highest_y":
         actual_origin = extract_highest_y_center_point(features)
+    elif reference_strategy == "lowest_y":
+        actual_origin = extract_lowest_y_center_point(features)
+    elif reference_strategy == "leftmost_x":
+        actual_origin = extract_leftmost_x_point(features)
+    elif reference_strategy == "rightmost_x":
+        actual_origin = extract_rightmost_x_point(features)
+    elif reference_strategy == "center":
+        actual_origin = calculate_geometric_center(features)
+    elif reference_strategy == "geometric_center":
+        actual_origin = calculate_all_features_center(features)
     elif reference_strategy == "relative":
         # 相对坐标策略：以第一个特征的中心点为原点
         if features:

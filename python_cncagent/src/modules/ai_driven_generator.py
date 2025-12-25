@@ -66,6 +66,15 @@ class AIDrivenCNCGenerator:
         Returns:
             ProcessingRequirements: 解析后的需求对象
         """
+        # 确保用户提示是字符串并正确处理中文字符
+        if isinstance(user_prompt, bytes):
+            try:
+                user_prompt = user_prompt.decode('utf-8')
+            except UnicodeError:
+                user_prompt = user_prompt.decode('utf-8', errors='replace')
+        elif not isinstance(user_prompt, str):
+            user_prompt = str(user_prompt)
+        
         # 这里使用AI模型来解析用户需求
         # 模拟AI解析过程，实际应用中应调用AI模型API
         requirements = ProcessingRequirements(user_prompt=user_prompt)
@@ -74,16 +83,21 @@ class AIDrivenCNCGenerator:
         user_lower = user_prompt.lower()
         
         # 识别加工类型 - 增加更详细的识别逻辑
-        if any(keyword in user_lower for keyword in ['沉孔', 'counterbore', '锪孔']):
+        # 使用正则表达式进行更精确的匹配，避免关键词冲突
+        import re
+        
+        # 优化：先识别复合加工类型（如沉孔），再识别单一类型，防止误判
+        if re.search(r'(?:沉孔|counterbore|锪孔)', user_lower):
             requirements.processing_type = 'counterbore'
-        elif any(keyword in user_lower for keyword in ['攻丝', 'tapping', '螺纹']):
+        elif re.search(r'(?:攻丝|tapping|螺纹)', user_lower):
             requirements.processing_type = 'tapping'
-        elif any(keyword in user_lower for keyword in ['钻孔', 'drill', 'hole']):
+        elif re.search(r'(?:钻孔|drill|hole|钻)', user_lower) and not re.search(r'(?:沉孔|counterbore|锪孔)', user_lower):
             requirements.processing_type = 'drilling'
-        elif any(keyword in user_lower for keyword in ['铣', 'mill', 'cut']):
-            requirements.processing_type = 'milling'
-        elif any(keyword in user_lower for keyword in ['车', 'turn']):
+        elif re.search(r'(?:车|turn)', user_lower):
             requirements.processing_type = 'turning'
+        elif re.search(r'(?:铣|mill|cut)', user_lower) and not any(re.search(keyword, user_lower) for keyword in [r'沉孔', r'counterbore', r'锪孔', r'钻孔', r'drill']):
+            # 铣削类型放在后面，防止与沉孔/锪孔/钻孔混淆
+            requirements.processing_type = 'milling'
         else:
             requirements.processing_type = 'general'
         
@@ -122,40 +136,57 @@ class AIDrivenCNCGenerator:
                     continue
         
         # 更精确地提取直径信息，特别是沉孔的内外径
-        dia_matches = re.findall(r'φ\s*(\d+\.?\d*)', user_prompt)
+        # 使用优化的函数来提取沉孔直径
+        from src.modules.material_tool_matcher import _extract_counterbore_diameters
+        outer_dia, inner_dia = _extract_counterbore_diameters(user_prompt)
         
-        # 特别处理沉孔格式 "φ22沉孔深20，φ14.5贯通底孔"
-        counterbore_pattern = r'φ\s*(\d+\.?\d*)\s*(?:沉孔|counterbore|锪孔).*?φ\s*(\d+\.?\d*)\s*(?:贯通|thru|底孔)'
-        counterbore_match = re.search(counterbore_pattern, user_prompt)
-        if counterbore_match:
-            try:
-                outer_dia = float(counterbore_match.group(1))
-                inner_dia = float(counterbore_match.group(2))
-                requirements.tool_diameters['outer'] = outer_dia
-                requirements.tool_diameters['inner'] = inner_dia
-            except (ValueError, IndexError):
-                pass
-        elif len(dia_matches) >= 2:
-            # 假设第一个是外径，第二个是内径（对于沉孔）
-            # 或者是多个不同直径的孔
-            try:
-                # 如果是沉孔类型，按大小排序，大直径为外径，小直径为内径
-                dia_values = [float(d) for d in dia_matches]
+        if outer_dia is not None and inner_dia is not None:
+            # 成功提取到沉孔的内外径
+            requirements.tool_diameters['outer'] = outer_dia
+            requirements.tool_diameters['inner'] = inner_dia
+        else:
+            # 如果没有提取到沉孔直径，使用原始方法
+            dia_matches = re.findall(r'φ\s*(\d+\.?\d*)', user_prompt)
+            
+            # 如果提取到φ234这样的大直径，可能不是沉孔直径，需要特殊处理
+            dia_values = [float(d) for d in dia_matches if 5 <= float(d) <= 50]  # 过滤明显不是孔径的数字
+            
+            # 特别处理沉孔格式 "φ22沉孔深20，φ14.5贯通底孔"
+            counterbore_pattern = r'φ\s*(\d+\.?\d*)\s*(?:沉孔|counterbore|锪孔).*?φ\s*(\d+\.?\d*)\s*(?:贯通|thru|底孔)'
+            counterbore_match = re.search(counterbore_pattern, user_prompt)
+            if counterbore_match:
+                try:
+                    outer_dia = float(counterbore_match.group(1))
+                    inner_dia = float(counterbore_match.group(2))
+                    requirements.tool_diameters['outer'] = outer_dia
+                    requirements.tool_diameters['inner'] = inner_dia
+                except (ValueError, IndexError):
+                    pass
+            elif len(dia_values) >= 2:
+                # 如果有至少2个在合理范围内的直径值，按大小排序
+                dia_values.sort(reverse=True)  # 降序排列
                 if requirements.processing_type == 'counterbore':
-                    dia_values.sort(reverse=True)  # 降序排列，大直径在前
+                    # 对于沉孔，假设较大的是外径，较小的是内径
                     requirements.tool_diameters['outer'] = dia_values[0]
-                    requirements.tool_diameters['inner'] = dia_values[1] if len(dia_values) > 1 else dia_values[0]
+                    requirements.tool_diameters['inner'] = dia_values[1]
                 else:
                     requirements.tool_diameters['default'] = dia_values[0]
                     if len(dia_values) > 1:
                         requirements.tool_diameters['secondary'] = dia_values[1]
-            except ValueError:
-                pass
-        elif len(dia_matches) == 1:
-            try:
-                requirements.tool_diameters['default'] = float(dia_matches[0])
-            except ValueError:
-                pass
+            elif len(dia_matches) >= 2:
+                # 如果直径值不在合理范围内，可能是其他尺寸，仅用于非沉孔类型
+                if requirements.processing_type != 'counterbore':
+                    try:
+                        requirements.tool_diameters['default'] = float(dia_matches[0])
+                        if len(dia_matches) > 1:
+                            requirements.tool_diameters['secondary'] = float(dia_matches[1])
+                    except ValueError:
+                        pass
+            elif len(dia_matches) == 1:
+                try:
+                    requirements.tool_diameters['default'] = float(dia_matches[0])
+                except ValueError:
+                    pass
         
         # 提取孔数量信息
         count_matches = re.findall(r'(\d+)\s*个', user_prompt)
@@ -274,7 +305,32 @@ class AIDrivenCNCGenerator:
         
         # 模拟AI生成（在实际应用中，这里应调用AI模型API）
         # 为了演示，我将生成一个符合要求的NC程序
-        nc_program = self._generate_nc_code(requirements)
+        try:
+            nc_program = self._generate_nc_code(requirements)
+        except UnicodeError as e:
+            self.logger.error(f"处理中文字符时出现编码错误: {str(e)}")
+            # 尝试使用UTF-8编码处理
+            if isinstance(requirements.user_prompt, str):
+                requirements.user_prompt = requirements.user_prompt.encode('utf-8').decode('utf-8')
+            elif isinstance(requirements.user_prompt, bytes):
+                try:
+                    requirements.user_prompt = requirements.user_prompt.decode('utf-8')
+                except UnicodeError:
+                    requirements.user_prompt = requirements.user_prompt.decode('utf-8', errors='replace')
+            nc_program = self._generate_nc_code(requirements)
+        except Exception as e:
+            self.logger.error(f"处理用户需求时出现未知错误: {str(e)}")
+            # 通用错误处理
+            if isinstance(requirements.user_prompt, str):
+                pass  # 已经是字符串，无需处理
+            elif isinstance(requirements.user_prompt, bytes):
+                try:
+                    requirements.user_prompt = requirements.user_prompt.decode('utf-8')
+                except UnicodeError:
+                    requirements.user_prompt = requirements.user_prompt.decode('utf-8', errors='replace')
+            else:
+                requirements.user_prompt = str(requirements.user_prompt)
+            nc_program = self._generate_nc_code(requirements)
         
         return nc_program
     
@@ -288,31 +344,53 @@ class AIDrivenCNCGenerator:
         Returns:
             str: 构建的提示词
         """
+        # 优化的提示词，能够更好处理中文描述
         prompt = f"""
-        作为专业的FANUC加工中心编程专家，请根据以下要求生成完整的NC程序：
+        作为专业的FANUC加工中心编程专家，请仔细分析以下中文加工需求并生成完整的NC程序。
 
-        加工要求:
+        用户加工需求: {requirements.user_prompt}
+
+        已识别的关键信息:
         - 加工类型: {requirements.processing_type}
-        - 用户需求: {requirements.user_prompt}
         """
         
         if requirements.depth:
             prompt += f"- 加工深度: {requirements.depth}mm\n"
         
         if requirements.hole_positions:
-            prompt += f"- 孔位置: {requirements.hole_positions}\n"
+            prompt += f"- 孔位置坐标: {requirements.hole_positions}\n"
         
         if requirements.tool_diameters:
-            prompt += f"- 刀具直径: {requirements.tool_diameters}\n"
+            prompt += f"- 刀具直径信息: {requirements.tool_diameters}\n"
         
+        if requirements.material:
+            prompt += f"- 材料类型: {requirements.material}\n"
+        
+        # 添加对中文描述的特别指导
         prompt += """
+        
+        重要提示:
+        1. 仔细分析用户描述中的中文术语，特别是：
+           - 沉孔/锪孔: 指Counterbore，需要分步骤加工（点孔→钻孔→锪孔）
+           - 贯通: 指孔是通孔
+           - 极坐标位置: 指相对于某个基准点的角度和半径位置
+           - φXX: 表示直径为XXmm的孔
+        2. 如果用户描述中包含多个加工步骤（如"使用点孔、钻孔、沉孔工艺"），请严格按照多步骤工艺生成程序
+        3. 对于沉孔加工，必须包含完整的三步工艺：先点孔定位，再钻底孔，最后锪沉孔
+        4. 注意用户提到的坐标原点选择策略，如"坐标原点选择正视图φ234的圆的圆心最高点"
+        5. 严格按照FANUC编程规范生成程序
+        6. 使用G90绝对坐标系统
+        7. 包含必要的安全高度和刀具补偿指令
+        8. 程序应包含详细注释，特别是每个加工步骤的说明
+
         请生成:
         1. 完整的FANUC兼容NC程序
         2. 包含详细的安全指令和初始化代码
-        3. 适当的注释说明
+        3. 适当的中文注释说明
         4. 符合加工工艺的刀具路径
         5. 安全高度和回零操作
         6. 符合FANUC编程规范
+        7. 对于多步骤工艺（如沉孔、攻丝），按正确顺序生成各步骤代码
         """
         
         return prompt
@@ -390,6 +468,7 @@ class AIDrivenCNCGenerator:
             # 点孔
             lines.extend([
                 "T1 M06 (TOOL CHANGE - CENTER DRILL)",
+                "G54 (ENSURE WORK COORDINATE SYSTEM IS SELECTED)",
                 "G43 H1 Z100. (TOOL LENGTH COMPENSATION)",
                 "M03 S1000 (SPINDLE SPEED)",
                 "M08 (COOLANT ON)"
@@ -416,6 +495,7 @@ class AIDrivenCNCGenerator:
             lines.extend([
                 f"(STEP 2: DRILLING φ{inner_dia} THRU HOLES)",
                 "T2 M06 (TOOL CHANGE - DRILL BIT)",
+                "G54 (ENSURE WORK COORDINATE SYSTEM IS SELECTED)",
                 f"G43 H2 Z100. (TOOL LENGTH COMPENSATION FOR φ{inner_dia} DRILL)",
                 "M03 S800 (SPINDLE SPEED)",
                 "M08 (COOLANT ON)"
@@ -441,6 +521,7 @@ class AIDrivenCNCGenerator:
             lines.extend([
                 f"(STEP 3: COUNTERBORING φ{outer_dia} HOLES)",
                 "T3 M06 (TOOL CHANGE - COUNTERBORING TOOL)",
+                "G54 (ENSURE WORK COORDINATE SYSTEM IS SELECTED)",
                 f"G43 H3 Z100. (TOOL LENGTH COMPENSATION FOR φ{outer_dia} COUNTERBORING TOOL)",
                 "M03 S600 (SPINDLE SPEED)",
                 "M08 (COOLANT ON)"
@@ -466,6 +547,7 @@ class AIDrivenCNCGenerator:
         if requirements.hole_positions:
             depth = requirements.depth or 15.0
             lines.extend([
+                "G54 (ENSURE WORK COORDINATE SYSTEM IS SELECTED)",
                 "G43 H3 Z100. (TOOL LENGTH COMPENSATION)",
                 f"M03 S200 (TAPPING SPINDLE SPEED)"
             ])
@@ -496,6 +578,7 @@ class AIDrivenCNCGenerator:
             dia = requirements.tool_diameters.get('default', 10.0)
             lines.extend([
                 f"T2 M06 (TOOL CHANGE - φ{dia} DRILL)",
+                "G54 (ENSURE WORK COORDINATE SYSTEM IS SELECTED)",
                 f"G43 H2 Z100. (TOOL LENGTH COMPENSATION FOR φ{dia} DRILL)",
                 "M03 S1000 (SPINDLE SPEED)",
                 "M08 (COOLANT ON)"
@@ -526,6 +609,7 @@ class AIDrivenCNCGenerator:
             depth = requirements.depth or 5.0
             lines.extend([
                 "T4 M06 (TOOL CHANGE - END MILL)",
+                "G54 (ENSURE WORK COORDINATE SYSTEM IS SELECTED)",
                 "G43 H4 Z100. (TOOL LENGTH COMPENSATION)",
                 "M03 S1200 (SPINDLE SPEED)",
                 "M08 (COOLANT ON)"

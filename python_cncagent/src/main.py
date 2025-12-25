@@ -273,6 +273,12 @@ if __name__ == "__main__":
         print("  python main.py process <pdf_path> <user_description> [scale] [coordinate_strategy] [custom_origin_x] [custom_origin_y]")
         print('  示例: python main.py process part_design.pdf "请加工一个100mm x 50mm的矩形，使用铣削加工" 1.0 highest_y')
         print("  坐标策略选项: highest_y, lowest_y, leftmost_x, rightmost_x, center, custom, geometric_center")
+        print("")
+        print("新功能: 统一启动器 (推荐)")
+        print("  python start_unified.py                    # 同时启动GUI和Web服务器")
+        print("  python start_unified.py gui               # 仅启动GUI界面")
+        print("  python start_unified.py web               # 仅启动Web服务器")
+        print("  python start_unified.py both --port 8080  # 同时启动，自定义端口")
         sys.exit(1)
     
     command = sys.argv[1].lower()

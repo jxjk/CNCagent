@@ -18,6 +18,15 @@ def analyze_user_description(description: str) -> Dict:
     Returns:
         dict: 包含提取信息的字典
     """
+    # 确保描述字符串使用UTF-8编码处理中文字符
+    if isinstance(description, bytes):
+        try:
+            description = description.decode('utf-8')
+        except UnicodeError:
+            description = description.decode('utf-8', errors='replace')
+    elif not isinstance(description, str):
+        description = str(description)
+    
     # 分析加工类型
     processing_type = _identify_processing_type(description)
     
@@ -74,57 +83,72 @@ def _identify_processing_type(description: str) -> str:
     """识别加工类型"""
     description_lower = description.lower()
     
-    # 关键词映射 - 改进关键词匹配，增加更多变体
-    counterbore_keywords = [
-        '沉孔', 'counterbore', '锪孔', 'counter bore', 'counter-bore', 
-        '沉头孔', '锪平孔', '埋头孔'
-    ]
-    drilling_keywords = [
-        'drill', 'hole', '钻孔', '打孔', '孔', '钻', '钻削', '钻床'
-    ]
-    milling_keywords = [
-        'mill', 'milling', 'cut', 'cutting', '铣', '铣削', '切削', 
-        '铣床', '平面', '轮廓', '铣加工'
-    ]
-    turning_keywords = [
-        'turn', 'turning', 'lathe', '车', '车削', '车床', '外圆', '内孔车削'
-    ]
-    grinding_keywords = [
-        'grind', 'grinding', '磨', '磨削', '磨床', '精磨', '抛光'
-    ]
-    tapping_keywords = [
-        'tapping', 'tap', '螺纹', '攻丝', 'thread', '丝锥', 
-        '螺纹孔', '攻螺纹', '套丝'
+    # 改进关键词匹配逻辑，使用更精确的模式匹配，避免冲突
+    # 使用正则表达式和更复杂的匹配逻辑
+    
+    # 沉孔相关关键词（最高优先级）
+    counterbore_patterns = [
+        r'(?:沉孔|counterbore|锪孔|counter bore|counter-bore|沉头孔|锪平孔|埋头孔)',
+        r'(?:沉孔|锪孔).*?(?:深|深度|φ\d+|底孔)',
+        r'φ\d+.*?(?:沉孔|锪孔)',
     ]
     
-    # 检查沉孔相关关键词（优先级最高）
-    for keyword in counterbore_keywords:
-        if keyword in description_lower:
+    # 攻丝相关关键词（第二优先级）
+    tapping_patterns = [
+        r'(?:tapping|tap|螺纹|攻丝|thread|丝锥|螺纹孔|攻螺纹|套丝)',
+        r'(?:攻丝|螺纹).*?(?:M\d+|螺纹)',
+    ]
+    
+    # 钻孔相关关键词（第三优先级）
+    drilling_patterns = [
+        r'(?:drill|hole|钻孔|打孔|孔|钻|钻削|钻床)',
+        r'(?:钻|孔).*?(?:深|深度|φ\d+)',
+        r'φ\d+.*?(?:钻|孔)',
+    ]
+    
+    # 铣削相关关键词（第四优先级，避免与沉孔混淆）
+    milling_patterns = [
+        r'(?<!锪)(?<!沉)(?<!攻)(?<!钻)(?:mill|milli|铣|铣削|铣床|切削|平面|轮廓|铣加工)',
+        r'(?:铣|mill).*?(?:平面|轮廓|外形|周边)',
+    ]
+    
+    # 车削相关关键词（第五优先级）
+    turning_patterns = [
+        r'(?:turn|turning|lathe|车|车削|车床|外圆|内孔车削)',
+    ]
+    
+    # 磨削相关关键词（第六优先级）
+    grinding_patterns = [
+        r'(?:grind|grinding|磨|磨削|磨床|精磨|抛光)',
+    ]
+    
+    # 按优先级顺序检查
+    for pattern in counterbore_patterns:
+        if re.search(pattern, description_lower):
             return 'counterbore'
     
-    # 检查攻丝相关关键词
-    for keyword in tapping_keywords:
-        if keyword in description_lower:
+    for pattern in tapping_patterns:
+        if re.search(pattern, description_lower):
             return 'tapping'
     
-    # 检查钻孔相关关键词
-    for keyword in drilling_keywords:
-        if keyword in description_lower:
+    for pattern in drilling_patterns:
+        if re.search(pattern, description_lower):
             return 'drilling'
     
-    # 检查铣削相关关键词
-    for keyword in milling_keywords:
-        if keyword in description_lower:
+    # 特别处理铣削，避免与沉孔/锪孔混淆
+    for pattern in milling_patterns:
+        if re.search(pattern, description_lower):
+            # 额外检查是否包含锪孔/沉孔关键词，如果有则优先返回counterbore
+            if re.search(r'(?:沉孔|锪孔|counterbore)', description_lower):
+                return 'counterbore'  # 沉孔优先级更高
             return 'milling'
     
-    # 检查车削相关关键词
-    for keyword in turning_keywords:
-        if keyword in description_lower:
+    for pattern in turning_patterns:
+        if re.search(pattern, description_lower):
             return 'turning'
     
-    # 检查磨削相关关键词
-    for keyword in grinding_keywords:
-        if keyword in description_lower:
+    for pattern in grinding_patterns:
+        if re.search(pattern, description_lower):
             return 'grinding'
     
     return 'general'
@@ -147,9 +171,13 @@ def _identify_tool_required(processing_type: str) -> str:
 
 def _extract_depth(description: str) -> Optional[float]:
     """提取加工深度"""
+    # 修复：优先匹配与深度相关的关键词，避免将φ22等直径误认为深度
     # 匹配 "深度5mm" 或 "5mm深" 或简单的 "深度6" 等模式 - 增强正则表达式
     patterns = [
+        r'沉孔.*?深[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',  # "沉孔深20mm" - 最高优先级
+        r'(?:锪孔|沉孔|钻孔|攻丝|螺纹)\s*深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',  # 优先匹配具体加工类型+深度
         r'深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',  # 支持"深度20mm"或"深度20"
+        r'(?:锪孔|沉孔|钻孔|攻丝|螺纹)\s*(\d+\.?\d*)\s*([mM]?[mM]?)\s*深',  # 支持"锪孔20mm深"
         r'(\d+\.?\d*)\s*([mM]?[mM]?)\s*深',  # 支持"20mm深"或"20深"
         r'depth[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',  # 英文支持
         r'深[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',  # 支持"深20mm"
@@ -159,8 +187,8 @@ def _extract_depth(description: str) -> Optional[float]:
         r'沉孔深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',   # 沉孔深度
         r'钻孔深度[：:]?\s*(\d+\.?\d*)\s*([mM]?[mM]?)',   # 钻孔深度
         r'深度\s*(\d+\.?\d*)\s*(?=，|。|;|:| |$)',  # 匹配 "深度6" 这格式
-        r'(\d+\.?\d*)\s*(?=深度|mm深|深)',  # 匹配 "6深度" 格式
         r'(\d+\.?\d*)\s*mm\s*(?=锪孔|沉孔|钻孔|攻丝|螺纹)',  # 如"20mm锪孔"
+        # 避免匹配φ22这样的直径 - 不再使用简单的数字匹配
     ]
     
     for pattern in patterns:
@@ -320,21 +348,93 @@ def _extract_hole_positions(description: str) -> List[tuple]:
     """
     从描述中提取孔位置信息
     支持格式如: "X10.0Y-16.0", "X=10, Y=-16", "位置X10 Y-16", "(80,7.5)", "(80,-7.5)", "（80,7.5）", "（80，-7.5）"等
+    支持极坐标格式: "R=50 θ=30°", "R50θ30", "极径50 极角30度"等
     """
     positions = []
     seen_positions = set()  # 用于避免重复位置
     
+    # 匹配极坐标格式 - R和角度
+    polar_patterns = [
+        r'R\s*[=:]\s*(\d+\.?\d*)\s*(?:θ|theta|角度|θ=|θ:)\s*(\d+\.?\d*)\s*(?:°|度)?',  # R=50 θ=30°
+        r'R\s*(\d+\.?\d*)\s*(?:θ|theta|角度)\s*(\d+\.?\d*)\s*(?:°|度)?',  # R50θ30
+        r'(?:极径|半径)\s*(\d+\.?\d*)\s*(?:极角|角度)\s*(\d+\.?\d*)\s*(?:°|度)?',  # 极径50 极角30度
+    ]
+    
+    for pattern in polar_patterns:
+        matches = re.findall(pattern, description, re.IGNORECASE)
+        for match in matches:
+            try:
+                radius = float(match[0])
+                angle_deg = float(match[1])
+                # 将极坐标转换为直角坐标
+                import math
+                angle_rad = math.radians(angle_deg)
+                x = radius * math.cos(angle_rad)
+                y = radius * math.sin(angle_rad)
+                
+                # 验证转换后的坐标是否在合理范围内
+                if -200 <= x <= 200 and -200 <= y <= 200:
+                    pos = (round(x, 3), round(y, 3))
+                    if pos not in seen_positions:
+                        positions.append(pos)
+                        seen_positions.add(pos)
+            except (ValueError, TypeError, AttributeError):
+                continue
+
     # 匹配 "X10.0Y-16.0" 格式
-    pattern1 = r'X\s*([+-]?\d+\.?\d*)\s*Y\s*([+-]?\d+\.?\d*)'
-    matches1 = re.findall(pattern1, description)
-    for match in matches1:
+    # 首先匹配所有X-Y格式
+    pattern1_general = r'X\s*([+-]?\d+\.?\d*)\s*Y\s*([+-]?\d+\.?\d*)'
+    all_matches = re.findall(pattern1_general, description)
+    for match in all_matches:
         try:
             x = float(match[0])
             y = float(match[1])
-            pos = (x, y)
-            if pos not in seen_positions:
-                positions.append(pos)
-                seen_positions.add(pos)
+            # 检查这个X-Y坐标是否紧跟在φ数字后面（避免误匹配孔径信息）
+            # 修复：更精确地检查X坐标是否可能是直径而不是位置
+            # 查找X坐标在原文中的位置
+            x_pattern = r'X\s*' + re.escape(match[0])
+            x_matches = list(re.finditer(x_pattern, description))
+            
+            is_valid = True
+            for x_match in x_matches:
+                # 检查X坐标前是否有"φ数字"模式（如"φ22 X10"这种情况，X坐标可能是孔径而不是位置）
+                start_search = max(0, x_match.start() - 20)  # 向前搜索20个字符
+                preceding_text = description[start_search:x_match.start()]
+                # 检查是否有φ+数字的模式
+                phi_pattern = r'φ\s*\d+\.?\d*'
+                if re.search(phi_pattern, preceding_text):
+                    is_valid = False
+                    break
+                
+                # 进一步检查：如果X值与已知的沉孔直径相似，则不将其作为位置
+                # 获取从描述中提取的已知直径
+                from .material_tool_matcher import _extract_counterbore_diameters
+                outer_dia, inner_dia = _extract_counterbore_diameters(description)
+                if outer_dia and abs(x - outer_dia) < 2:  # 允许2mm的误差
+                    is_valid = False
+                    break
+                if inner_dia and abs(x - inner_dia) < 2:
+                    is_valid = False
+                    break
+            
+            # 同样检查Y坐标前是否有φ数字模式
+            y_pattern = r'Y\s*' + re.escape(match[1])
+            y_matches = list(re.finditer(y_pattern, description))
+            
+            for y_match in y_matches:
+                start_search = max(0, y_match.start() - 20)  # 向前搜索20个字符
+                preceding_text = description[start_search:y_match.start()]
+                phi_pattern = r'φ\s*\d+\.?\d*'
+                if re.search(phi_pattern, preceding_text):
+                    is_valid = False
+                    break
+            
+            # 扩大坐标范围以容纳更大的Y值
+            if is_valid and -300 <= x <= 300 and -300 <= y <= 300:
+                pos = (x, y)
+                if pos not in seen_positions:
+                    positions.append(pos)
+                    seen_positions.add(pos)
         except (ValueError, TypeError):
             continue
 
@@ -345,52 +445,155 @@ def _extract_hole_positions(description: str) -> List[tuple]:
         try:
             x = float(match[0])
             y = float(match[1])
-            pos = (x, y)
-            if pos not in seen_positions:
-                positions.append(pos)
-                seen_positions.add(pos)
+            # 验证坐标值是否在合理范围内，避免匹配到其他数字
+            # 检查是否与已知直径冲突
+            from .material_tool_matcher import _extract_counterbore_diameters
+            outer_dia, inner_dia = _extract_counterbore_diameters(description)
+            if not ((outer_dia and abs(x - outer_dia) < 2) or (inner_dia and abs(x - inner_dia) < 2)):
+                if -300 <= x <= 300 and -300 <= y <= 300:
+                    pos = (x, y)
+                    if pos not in seen_positions:
+                        positions.append(pos)
+                        seen_positions.add(pos)
         except (ValueError, TypeError):
             continue
 
     # 匹配 "X 10.0 Y -16.0" 格式（带空格）
-    pattern3 = r'X\s+([+-]?\d+\.?\d*)\s+Y\s+([+-]?\d+\.?\d*)'
-    matches3 = re.findall(pattern3, description)
-    for match in matches3:
+    # 用同样的方法处理
+    pattern3_general = r'X\s+([+-]?\d+\.?\d*)\s+Y\s+([+-]?\d+\.?\d*)'
+    all_matches3 = re.findall(pattern3_general, description)
+    for match in all_matches3:
         try:
             x = float(match[0])
             y = float(match[1])
-            pos = (x, y)
-            if pos not in seen_positions:
-                positions.append(pos)
-                seen_positions.add(pos)
+            # 检查这个X-Y坐标是否紧跟在φ数字后面
+            x_pattern = r'X\s+' + re.escape(match[0])
+            x_matches = list(re.finditer(x_pattern, description))
+            
+            is_valid = True
+            for x_match in x_matches:
+                # 检查X坐标前是否有"φ数字"模式
+                start_search = max(0, x_match.start() - 20)  # 向前搜索20个字符
+                preceding_text = description[start_search:x_match.start()]
+                # 检查是否有φ+数字的模式
+                phi_pattern = r'φ\s*\d+\.?\d*'
+                if re.search(phi_pattern, preceding_text):
+                    is_valid = False
+                    break
+                
+                # 检查X值是否与已知直径相似
+                from .material_tool_matcher import _extract_counterbore_diameters
+                outer_dia, inner_dia = _extract_counterbore_diameters(description)
+                if outer_dia and abs(x - outer_dia) < 2:
+                    is_valid = False
+                    break
+                if inner_dia and abs(x - inner_dia) < 2:
+                    is_valid = False
+                    break
+            
+            # 同样检查Y坐标前是否有φ数字模式
+            y_pattern = r'Y\s+' + re.escape(match[1])
+            y_matches = list(re.finditer(y_pattern, description))
+            
+            for y_match in y_matches:
+                start_search = max(0, y_match.start() - 20)  # 向前搜索20个字符
+                preceding_text = description[start_search:y_match.start()]
+                phi_pattern = r'φ\s*\d+\.?\d*'
+                if re.search(phi_pattern, preceding_text):
+                    is_valid = False
+                    break
+            
+            if is_valid and -300 <= x <= 300 and -300 <= y <= 300:
+                pos = (x, y)
+                if pos not in seen_positions:
+                    positions.append(pos)
+                    seen_positions.add(pos)
         except (ValueError, TypeError):
             continue
 
     # 匹配 "(80,7.5)" 格式（英文圆括号坐标） - 只匹配不在中文括号内的
+    # 避免匹配"坐标原点（0,0）"这类描述
     pattern4 = r'\(\s*([+-]?\d+\.?\d*)\s*[,\s]\s*([+-]?\d+\.?\d*)\s*\)'
-    matches4 = re.findall(pattern4, description)
-    for match in matches4:
+    all_matches4 = re.findall(pattern4, description)
+    for match in all_matches4:
         try:
             x = float(match[0])
             y = float(match[1])
-            pos = (x, y)
-            if pos not in seen_positions:
-                positions.append(pos)
-                seen_positions.add(pos)
+            # 检查这个坐标是否是坐标原点描述
+            # 查找坐标在原文中的位置
+            coord_pattern = r'\(\s*' + re.escape(match[0]) + r'\s*[,\s]\s*' + re.escape(match[1]) + r'\s*\)'
+            coord_matches = list(re.finditer(coord_pattern, description))
+            
+            is_valid = True
+            for coord_match in coord_matches:
+                # 检查坐标前后是否有"坐标原点"、"原点"等描述
+                start_search = max(0, coord_match.start() - 20)  # 向前搜索20个字符
+                end_search = min(len(description), coord_match.end() + 20)  # 向后搜索20个字符
+                surrounding_text = description[start_search:end_search].lower()
+                # 检查是否包含原点相关的描述
+                if re.search(r'(?:坐标原点|原点|origin)', surrounding_text):
+                    is_valid = False
+                    break
+                
+                # 检查坐标值是否与直径值冲突
+                from .material_tool_matcher import _extract_counterbore_diameters
+                outer_dia, inner_dia = _extract_counterbore_diameters(description)
+                if outer_dia and abs(x - outer_dia) < 2:
+                    is_valid = False
+                    break
+                if inner_dia and abs(x - inner_dia) < 2:
+                    is_valid = False
+                    break
+            
+            # 验证坐标值是否在合理范围内，避免匹配到其他数字
+            if is_valid and -300 <= x <= 300 and -300 <= y <= 300:
+                pos = (x, y)
+                if pos not in seen_positions:
+                    positions.append(pos)
+                    seen_positions.add(pos)
         except (ValueError, TypeError):
             continue
 
     # 匹配 "（80,7.5）" 格式（中文圆括号坐标）
+    # 避免匹配"坐标原点（0,0）"这类描述
     pattern5 = r'（\s*([+-]?\d+\.?\d*)\s*[，,\s]\s*([+-]?\d+\.?\d*)\s*）'
-    matches5 = re.findall(pattern5, description)
-    for match in matches5:
+    all_matches5 = re.findall(pattern5, description)
+    for match in all_matches5:
         try:
             x = float(match[0])
             y = float(match[1])
-            pos = (x, y)
-            if pos not in seen_positions:
-                positions.append(pos)
-                seen_positions.add(pos)
+            # 检查这个坐标是否是坐标原点描述
+            # 查找坐标在原文中的位置
+            coord_pattern = r'（\s*' + re.escape(match[0]) + r'\s*[，,\s]\s*' + re.escape(match[1]) + r'\s*）'
+            coord_matches = list(re.finditer(coord_pattern, description))
+            
+            is_valid = True
+            for coord_match in coord_matches:
+                # 检查坐标前后是否有"坐标原点"、"原点"等描述
+                start_search = max(0, coord_match.start() - 20)  # 向前搜索20个字符
+                end_search = min(len(description), coord_match.end() + 20)  # 向后搜索20个字符
+                surrounding_text = description[start_search:end_search].lower()
+                # 检查是否包含原点相关的描述
+                if re.search(r'(?:坐标原点|原点|origin)', surrounding_text):
+                    is_valid = False
+                    break
+                
+                # 检查坐标值是否与直径值冲突
+                from .material_tool_matcher import _extract_counterbore_diameters
+                outer_dia, inner_dia = _extract_counterbore_diameters(description)
+                if outer_dia and abs(x - outer_dia) < 2:
+                    is_valid = False
+                    break
+                if inner_dia and abs(x - inner_dia) < 2:
+                    is_valid = False
+                    break
+            
+            # 验证坐标值是否在合理范围内，避免匹配到其他数字
+            if is_valid and -300 <= x <= 300 and -300 <= y <= 300:
+                pos = (x, y)
+                if pos not in seen_positions:
+                    positions.append(pos)
+                    seen_positions.add(pos)
         except (ValueError, TypeError):
             continue
 
@@ -401,10 +604,16 @@ def _extract_hole_positions(description: str) -> List[tuple]:
         try:
             x = float(match[0])
             y = float(match[1])
-            pos = (x, y)
-            if pos not in seen_positions:
-                positions.append(pos)
-                seen_positions.add(pos)
+            # 验证坐标值是否在合理范围内，避免匹配到其他数字
+            # 检查是否与已知直径冲突
+            from .material_tool_matcher import _extract_counterbore_diameters
+            outer_dia, inner_dia = _extract_counterbore_diameters(description)
+            if not ((outer_dia and abs(x - outer_dia) < 2) or (inner_dia and abs(x - inner_dia) < 2)):
+                if -300 <= x <= 300 and -300 <= y <= 300:
+                    pos = (x, y)
+                    if pos not in seen_positions:
+                        positions.append(pos)
+                        seen_positions.add(pos)
         except (ValueError, TypeError):
             continue
 
@@ -487,18 +696,30 @@ def _extract_counterbore_diameters(description: str) -> tuple:
     """
     description_lower = description.lower()
     
-    # 匹配"φ22深20底孔φ14.5贯通"或类似格式的沉孔描述
-    # 使用更精确的模式，确保直径数字出现在沉孔相关上下文中，避免匹配坐标和无关数字
+    # 优化的模式，能更好地匹配目标描述 "加工3个φ22深20底孔φ14.5贯通的沉孔特征"
+    # 提高匹配的准确性，避免误匹配
     patterns = [
-        r'(?:加工|沉孔|counterbore|锪孔).*?φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔|深|，|\.|;).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru|，|\.|;).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|贯通孔|钻孔)', # 加工φ22沉孔深20 φ14.5底孔/贯通
-        r'φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru|，|\.|;).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|贯通孔|钻孔)',  # φ22沉孔深20 φ14.5底孔/贯通
-        r'φ\s*(\d+(?:\.\d+)?).*?沉孔.*?深.*?φ\s*(\d+(?:\.\d+)?)\s*底孔',  # φ22沉孔深20 φ14.5底孔
-        r'沉孔.*?φ\s*(\d+(?:\.\d+)?).*?深.*?φ\s*(\d+(?:\.\d+)?)\s*底孔',  # 沉孔φ22深20 φ14.5底孔
-        r'(\d+)\s*个.*?φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?.*?底孔\s*φ\s*(\d+(?:\.\d+)?)\s*贯通',  # 3个φ22沉孔深20 底孔φ14.5贯通
-        r'φ\s*(\d+(?:\.\d+)?).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:沉孔|counterbore|锪孔).*?底孔\s*φ\s*(\d+(?:\.\d+)?)\s*贯通',  # φ22深20沉孔 底孔φ14.5贯通
-        r'φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|counterbore|锪孔).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通)',  # φ22锪孔 φ14.5底孔
-        r'沉孔.*?φ\s*(\d+(?:\.\d+)?)\s*.*?底孔.*?φ\s*(\d+(?:\.\d+)?)',  # 沉孔φ22 底孔φ14.5
-        r'锪孔.*?φ\s*(\d+(?:\.\d+)?)\s*.*?钻孔.*?φ\s*(\d+(?:\.\d+)?)',  # 锪孔φ22 钻孔φ14.5
+        # 最精确的模式：匹配"加工3个φXX深YY底孔φZZ贯通"格式
+        r'(?:加工|要求|需要)\s*(?:\d+)\s*个.*?φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|锪孔|counterbore|沉头孔).*?深\s*(?:\d+(?:\.\d+)?(?:\s*mm)?(?:\s*[，,\.])?)?.*?底孔\s*φ\s*(\d+(?:\.\d+)?)\s*(?:贯通|thru|通孔|穿透)',
+        # 匹配"φXX深YY底孔φZZ贯通"格式
+        r'φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|锪孔|counterbore|沉头孔).*?深\s*(?:\d+(?:\.\d+)?(?:\s*mm)?)?.*?底孔\s*φ\s*(\d+(?:\.\d+)?)\s*(?:贯通|thru|通孔)',
+        # 匹配"φXX锪孔深度YY φZZ底孔"格式
+        r'φ\s*(\d+(?:\.\d+)?)\s*(?:锪孔|沉孔|counterbore).*?(?:深度|深)\s*(?:\d+(?:\.\d+)?(?:\s*mm)?)?.*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|通孔|thru)',
+        # 匹配"φXX沉孔，深度YY，底孔φZZ贯通"格式
+        r'φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|锪孔|counterbore).*?(?:，|\.|;).*?(?:深度|深)\s*(?:\d+(?:\.\d+)?(?:\s*mm)?)?.*?(?:，|\.|;).*?底孔\s*φ\s*(\d+(?:\.\d+)?)\s*(?:贯通|thru|通孔)',
+        # 匹配"沉孔φXX深YY底孔φZZ"格式
+        r'(?:沉孔|锪孔|counterbore).*?φ\s*(\d+(?:\.\d+)?).*?深\s*(?:\d+(?:\.\d+)?(?:\s*mm)?)?.*?底孔\s*φ\s*(\d+(?:\.\d+)?)',
+        # 匹配"φXX锪孔 φYY底孔"格式
+        r'φ\s*(\d+(?:\.\d+)?)\s*(?:锪孔|沉孔|counterbore|沉头孔).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|通孔|thru|贯通)',
+        # 原有模式作为备选
+        r'(?:加工|沉孔|锪孔|counterbore).*?φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|锪孔|counterbore|深|，|\.|;).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru|，|\.|;).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|贯通孔|钻孔)',
+        r'φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|锪孔|counterbore).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:底孔|贯通|thru|，|\.|;).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|贯通孔|钻孔)',
+        r'φ\s*(\d+(?:\.\d+)?).*?沉孔.*?深.*?φ\s*(\d+(?:\.\d+)?)\s*底孔',
+        r'沉孔.*?φ\s*(\d+(?:\.\d+)?).*?深.*?φ\s*(\d+(?:\.\d+)?)\s*底孔',
+        r'(\d+)\s*个.*?φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|锪孔|counterbore).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?.*?底孔\s*φ\s*(\d+(?:\.\d+)?)\s*贯通',
+        r'φ\s*(\d+(?:\.\d+)?).*?深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:沉孔|锪孔|counterbore).*?底孔\s*φ\s*(\d+(?:\.\d+)?)\s*贯通',
+        # 通用模式，匹配"φXX 沉孔" 和 "φYY 底孔"形式
+        r'φ\s*(\d+(?:\.\d+)?)\s*(?:沉孔|锪孔|counterbore).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|钻孔|thru|贯通)',
     ]
     
     for pattern in patterns:
@@ -515,7 +736,7 @@ def _extract_counterbore_diameters(description: str) -> tuple:
                 else:
                     continue
                 
-                # 确保提取的直径在合理范围内，排除误匹配的数字（如φ234中的数字）
+                # 确保提取的直径在合理范围内，排除误匹配的数字
                 # 并确保外径大于内径
                 if outer_diameter > 100 or inner_diameter > 100:  # 扩大合理范围到100mm
                     continue
@@ -523,35 +744,69 @@ def _extract_counterbore_diameters(description: str) -> tuple:
                     continue
                 if outer_diameter <= 0 or inner_diameter <= 0:  # 确保直径为正数
                     continue
+                if inner_diameter >= outer_diameter * 0.9:  # 确保内外径差异合理（内径不应接近外径）
+                    continue
                 
                 return outer_diameter, inner_diameter
             except (ValueError, IndexError):
                 continue
     
-    # 如果上述模式没有匹配到，尝试提取描述末尾的直径信息
-    # 格式如: "...φ22深20，φ14.5贯通底孔"
-    end_patterns = [
-        r'φ\s*(\d+(?:\.\d+)?)\s*深\s*(?:\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:沉孔|counterbore|锪孔|，|\.|;).*?φ\s*(\d+(?:\.\d+)?)\s*(?:底孔|thru|贯通|，|\.|;)',  # φ22深20，φ14.5贯通底孔
-    ]
-    
-    for pattern in end_patterns:
-        matches = re.findall(pattern, description_lower)
-        for match in matches:
-            try:
-                if len(match) == 2:
-                    outer_diameter = float(match[0])
-                    inner_diameter = float(match[1])
-                    # 确保提取的直径在合理范围内
-                    # 并确保外径大于内径
-                    if outer_diameter > 100 or inner_diameter > 100:
-                        continue
-                    if outer_diameter <= inner_diameter:  # 外径应该大于内径
-                        continue
-                    if outer_diameter <= 0 or inner_diameter <= 0:  # 确保直径为正数
-                        continue
-                    return outer_diameter, inner_diameter
-            except (ValueError, IndexError):
-                continue
+    # 如果上面的模式都没匹配到，尝试更通用的提取方法
+    # 先提取所有直径
+    diameter_matches = re.findall(r'φ\s*(\d+(?:\.\d+)?)', description_lower)
+    if len(diameter_matches) >= 2:
+        try:
+            # 检查描述中是否包含"沉孔"或"锪孔"等关键词
+            if re.search(r'(?:沉孔|锪孔|counterbore|锪平|沉头)', description_lower):
+                # 从描述中过滤掉可能的图纸参考尺寸（通常是第一个出现的φ值，如φ234）
+                # 查找与"沉孔"、"锪孔"、"底孔"、"贯通"相关的直径
+                relevant_diameters = []
+                
+                # 查找与沉孔加工相关的直径描述
+                # 匹配 "φXX沉孔" 或 "沉孔φXX" 格式
+                counterbore_dia_matches = re.findall(r'(?:沉孔|锪孔|counterbore|锪平|沉头).*?φ\s*(\d+(?:\.\d+)?)|φ\s*(\d+(?:\.\d+)?).*?(?:沉孔|锪孔|counterbore|锪平|沉头)', description_lower)
+                for match in counterbore_dia_matches:
+                    # match 是一个元组，取非空的值
+                    dia = match[0] if match[0] else match[1]
+                    if dia:
+                        try:
+                            relevant_diameters.append(float(dia))
+                        except ValueError:
+                            continue
+                
+                # 查找与底孔相关的直径
+                bottom_hole_dia_matches = re.findall(r'(?:底孔|贯通|thru|通孔|钻孔).*?φ\s*(\d+(?:\.\d+)?)|φ\s*(\d+(?:\.\d+)?).*?(?:底孔|贯通|thru|通孔|钻孔)', description_lower)
+                for match in bottom_hole_dia_matches:
+                    # match 是一个元组，取非空的值
+                    dia = match[0] if match[0] else match[1]
+                    if dia:
+                        try:
+                            relevant_diameters.append(float(dia))
+                        except ValueError:
+                            continue
+                
+                # 如果找到了相关直径，使用它们
+                if len(relevant_diameters) >= 2:
+                    # 过滤合理范围内的直径
+                    valid_diameters = [d for d in relevant_diameters if 2 <= d <= 50]
+                    if len(valid_diameters) >= 2:
+                        # 排序，通常外径较大
+                        diameters_sorted = sorted(valid_diameters, reverse=True)
+                        # 确保内外径差异合理
+                        if diameters_sorted[0] > diameters_sorted[1] and diameters_sorted[1] < diameters_sorted[0] * 0.9:
+                            return diameters_sorted[0], diameters_sorted[1]  # 外径，内径
+                
+                # 如果上面方法没找到，尝试使用原始方法但排除明显不合理的值
+                all_diameters = [float(d) for d in diameter_matches if 2 <= float(d) <= 100]
+                # 过滤掉可能的图纸参考尺寸（如φ234），这些通常与沉孔加工无关
+                filtered_diameters = [d for d in all_diameters if d <= 50]  # 沉孔很少会是φ50以上
+                if len(filtered_diameters) >= 2:
+                    diameters_sorted = sorted(filtered_diameters, reverse=True)
+                    # 确保内外径差异合理
+                    if diameters_sorted[0] > diameters_sorted[1] and diameters_sorted[1] < diameters_sorted[0] * 0.9:
+                        return diameters_sorted[0], diameters_sorted[1]  # 外径，内径
+        except:
+            pass
     
     return None, None
 

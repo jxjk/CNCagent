@@ -1,5 +1,13 @@
 """
 Flask API服务，提供PDF到NC程序的Web接口
+
+使用方法:
+  python start_server.py        # 启动Web服务器 (默认端口5000)
+  PORT=8080 python start_server.py  # 使用环境变量指定端口
+
+统一启动器 (推荐):
+  python start_unified.py web   # 仅启动Web服务器
+  python start_unified.py       # 同时启动GUI和Web服务器
 """
 import os
 import json
@@ -258,7 +266,10 @@ def generate_nc():
             return jsonify({"error": "缺少用户描述"}), 400
         
         pdf_file = request.files['pdf']
+        # 确保用户描述正确处理中文字符
         user_description = request.form['description']
+        if isinstance(user_description, bytes):
+            user_description = user_description.decode('utf-8')
         scale = float(request.form.get('scale', 1.0))
         
         # 验证文件类型
@@ -326,6 +337,9 @@ def generate_api():
         
         pdf_content = data.get('pdf_content')
         user_description = data.get('description')
+        # 确保用户描述正确处理中文字符
+        if isinstance(user_description, bytes):
+            user_description = user_description.decode('utf-8')
         scale = data.get('scale', 1.0)
         
         if not pdf_content or not user_description:

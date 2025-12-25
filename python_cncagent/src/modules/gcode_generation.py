@@ -5,6 +5,7 @@ FANUC NC程序生成模块
 from typing import List, Dict, Optional, Union
 import math
 import datetime
+import logging
 
 # 导入配置参数
 from src.config import GCODE_GENERATION_CONFIG, THREAD_PITCH_MAP
@@ -78,8 +79,8 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
         # 坐标系统说明
         gcode.append("(COORDINATE SYSTEM SETUP)")
         gcode.append("(G90 - USE ABSOLUTE COORDINATE SYSTEM)")
-        gcode.append("(ORIGIN (0,0) LOCATED AT TOP-LEFT OF WORKPIECE (G54))")
-        gcode.append("(Y AXIS POSITIVE DIRECTION DOWNWARD, X AXIS POSITIVE RIGHTWARD)")
+        gcode.append("(USER COORDINATE SYSTEM - COORDINATES RELATIVE TO WORKPIECE DATUM)")
+        gcode.append("(X,Y COORDINATES ARE ADJUSTED BASED ON FEATURE POSITIONS)")
         gcode.append("")
         
         # 设置初始安全高度
@@ -99,10 +100,7 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
             gcode.append("(PROGRAM END)")
             gcode.append("M05 (SPINDLE STOP)")
             gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
-            gcode.append("G91 (INCREMENTAL COORDINATE SYSTEM)")
-            gcode.append("G28 Z0. (RETURN TO Z ORIGIN THROUGH REFERENCE POINT)")
-            gcode.append("G28 X0. Y0. (RETURN TO X,Y ORIGIN THROUGH REFERENCE POINT)")
-            gcode.append("G90 (ABSOLUTE COORDINATE SYSTEM)")
+            gcode.append("G00 X10.0 Y10.0 (MOVE TO SAFE POSITION - USER CAN MODIFY AS NEEDED)")
             gcode.append("M30 (PROGRAM END)")
         elif processing_type == "tapping":  # 新增攻丝工艺
             gcode.extend(_generate_tapping_code_with_full_process(features, description_analysis))
@@ -111,10 +109,7 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
             gcode.append("(PROGRAM END)")
             gcode.append("M05 (SPINDLE STOP)")
             gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
-            gcode.append("G91 (INCREMENTAL COORDINATE SYSTEM)")
-            gcode.append("G28 Z0. (RETURN TO Z ORIGIN THROUGH REFERENCE POINT)")
-            gcode.append("G28 X0. Y0. (RETURN TO X,Y ORIGIN THROUGH REFERENCE POINT)")
-            gcode.append("G90 (ABSOLUTE COORDINATE SYSTEM)")
+            gcode.append("G00 X10.0 Y10.0 (MOVE TO SAFE POSITION - USER CAN MODIFY AS NEEDED)")
             gcode.append("M30 (PROGRAM END)")
         elif processing_type == "milling":
             gcode.extend(_generate_milling_code(features, description_analysis))
@@ -123,10 +118,7 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
             gcode.append("(PROGRAM END)")
             gcode.append("M05 (SPINDLE STOP)")
             gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
-            gcode.append("G91 (INCREMENTAL COORDINATE SYSTEM)")
-            gcode.append("G28 Z0. (RETURN TO Z ORIGIN THROUGH REFERENCE POINT)")
-            gcode.append("G28 X0. Y0. (RETURN TO X,Y ORIGIN THROUGH REFERENCE POINT)")
-            gcode.append("G90 (ABSOLUTE COORDINATE SYSTEM)")
+            gcode.append("G00 X10.0 Y10.0 (MOVE TO SAFE POSITION - USER CAN MODIFY AS NEEDED)")
             gcode.append("M30 (PROGRAM END)")
         elif processing_type == "counterbore":  # 新增沉孔加工工艺
             gcode.extend(_generate_counterbore_code(features, description_analysis))
@@ -135,10 +127,7 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
             gcode.append("(PROGRAM END)")
             gcode.append("M05 (SPINDLE STOP)")
             gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
-            gcode.append("G91 (INCREMENTAL COORDINATE SYSTEM)")
-            gcode.append("G28 Z0. (RETURN TO Z ORIGIN THROUGH REFERENCE POINT)")
-            gcode.append("G28 X0. Y0. (RETURN TO X,Y ORIGIN THROUGH REFERENCE POINT)")
-            gcode.append("G90 (ABSOLUTE COORDINATE SYSTEM)")
+            gcode.append("G00 X10.0 Y10.0 (MOVE TO SAFE POSITION - USER CAN MODIFY AS NEEDED)")
             gcode.append("M30 (PROGRAM END)")
         elif processing_type == "turning":
             gcode.extend(_generate_turning_code(features, description_analysis))
@@ -147,34 +136,62 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
             gcode.append("(PROGRAM END)")
             gcode.append("M05 (SPINDLE STOP)")
             gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
-            gcode.append("G91 (INCREMENTAL COORDINATE SYSTEM)")
-            gcode.append("G28 Z0. (RETURN TO Z ORIGIN THROUGH REFERENCE POINT)")
-            gcode.append("G28 X0. Y0. (RETURN TO X,Y ORIGIN THROUGH REFERENCE POINT)")
-            gcode.append("G90 (ABSOLUTE COORDINATE SYSTEM)")
+            gcode.append("G00 X10.0 Y10.0 (MOVE TO SAFE POSITION - USER CAN MODIFY AS NEEDED)")
             gcode.append("M30 (PROGRAM END)")
         else:
-            description = description_analysis.get("description", "").lower()
-            # 检查用户描述中是否包含沉孔相关关键词
-            if "沉孔" in description or "counterbore" in description or "锪孔" in description:
+            description = description_analysis.get("description", "")
+            # 确保描述字符串正确处理中文字符
+            if isinstance(description, bytes):
+                try:
+                    description = description.decode('utf-8')
+                except UnicodeError:
+                    description = description.decode('utf-8', errors='replace')
+            elif not isinstance(description, str):
+                description = str(description)
+            description = description.lower()
+            
+            # 使用更精确的正则表达式来判断加工类型，避免冲突
+            import re
+            
+            # 检查用户描述中是否包含沉孔相关关键词 - 优先级最高
+            if re.search(r'(?:沉孔|counterbore|锪孔)', description):
                 gcode.extend(_generate_counterbore_code(features, description_analysis))
                 # 沉孔加工完成后，添加程序结束指令
                 gcode.append("")
                 gcode.append("(PROGRAM END)")
                 gcode.append("M05 (SPINDLE STOP)")
                 gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
-                gcode.append("G00 X0.0 Y0.0 (RETURN TO ORIGIN)")
-                gcode.append("G00 Z0.0 (RETURN Z-AXIS TO ORIGIN)")
+                gcode.append("G00 X10.0 Y10.0 (MOVE TO SAFE POSITION - USER CAN MODIFY AS NEEDED)")
                 gcode.append("M30 (PROGRAM END)")
-            # 检查用户描述中是否包含螺纹相关关键词
-            elif "螺纹" in description or "thread" in description or "tapping" in description:
+            # 检查用户描述中是否包含螺纹相关关键词 - 第二优先级
+            elif re.search(r'(?:螺纹|thread|tapping|攻丝)', description):
                 gcode.extend(_generate_tapping_code_with_full_process(features, description_analysis))
                 # 攻丝工艺完成后，添加程序结束指令
                 gcode.append("")
                 gcode.append("(PROGRAM END)")
                 gcode.append("M05 (SPINDLE STOP)")
                 gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
-                gcode.append("G00 X0.0 Y0.0 (RETURN TO ORIGIN)")
-                gcode.append("G00 Z0.0 (RETURN Z-AXIS TO ORIGIN)")
+                gcode.append("G00 X10.0 Y10.0 (MOVE TO SAFE POSITION - USER CAN MODIFY AS NEEDED)")
+                gcode.append("M30 (PROGRAM END)")
+            # 检查用户描述中是否包含钻孔相关关键词 - 第三优先级
+            elif re.search(r'(?:钻孔|drill|hole|钻)', description) and not re.search(r'(?:沉孔|counterbore|锪孔)', description):
+                gcode.extend(_generate_drilling_code(features, description_analysis))
+                # 添加程序结束
+                gcode.append("")
+                gcode.append("(PROGRAM END)")
+                gcode.append("M05 (SPINDLE STOP)")
+                gcode.append("G00 Z100.0 (RAISE TOOL TO SAFE HEIGHT)")
+                gcode.append("G00 X10.0 Y10.0 (MOVE TO SAFE POSITION - USER CAN MODIFY AS NEEDED)")
+                gcode.append("M30 (PROGRAM END)")
+            # 检查用户描述中是否包含铣削相关关键词 - 仅在没有沉孔、钻孔等特殊工艺时才考虑铣削
+            elif re.search(r'(?:铣|mill|cut)', description) and not any(re.search(keyword, description) for keyword in [r'沉孔', r'counterbore', r'锪孔', r'钻孔', r'drill']):
+                gcode.extend(_generate_milling_code(features, description_analysis))
+                # 添加程序结束
+                gcode.append("")
+                gcode.append("(PROGRAM END)")
+                gcode.append("M05 (SPINDLE STOP)")
+                gcode.append("G00 Z100 (RAISE TOOL TO SAFE HEIGHT)")
+                gcode.append("G00 X10.0 Y10.0 (MOVE TO SAFE POSITION - USER CAN MODIFY AS NEEDED)")
                 gcode.append("M30 (PROGRAM END)")
             else:
                 # 默认使用铣削代码
@@ -184,8 +201,7 @@ def generate_fanuc_nc(features: List[Dict], description_analysis: Dict, scale: f
                 gcode.append("(PROGRAM END)")
                 gcode.append("M05 (SPINDLE STOP)")
                 gcode.append("G00 Z100 (RAISE TOOL TO SAFE HEIGHT)")
-                gcode.append("G00 X0.0 Y0.0 (RETURN TO ORIGIN)")
-                gcode.append("G00 Z0 (RETURN Z-AXIS TO ORIGIN)")
+                gcode.append("G00 X10.0 Y10.0 (MOVE TO SAFE POSITION - USER CAN MODIFY AS NEEDED)")
                 gcode.append("M30 (PROGRAM END)")
 
         return "\n".join(gcode)
@@ -276,29 +292,81 @@ def _extract_counterbore_parameters(features: List[Dict], description_analysis: 
         print(f"DEBUG: 使用描述分析中的内径: {inner_diameter}")
     
     # 从用户描述中提取参数（第二优先级）
-    description = description_analysis.get("description", "").lower()
+    description = description_analysis.get("description", "")
     import re
     
-    # 尝试从描述中提取沉孔信息
-    if outer_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_outer_diameter']:  # 如果还是默认值，尝试从描述中提取
-        outer_matches = re.findall(r'沉孔.*?φ?(\d+\.?\d*)', description)
+    # 优化的提取逻辑，更准确地处理目标描述
+    # 先尝试使用_material_tool_matcher模块中的函数
+    from src.modules.material_tool_matcher import _extract_counterbore_diameters
+    extracted_outer, extracted_inner = _extract_counterbore_diameters(description)
+    
+    # 修复：如果提取函数返回了有效值，才更新直径
+    if extracted_outer is not None and extracted_outer > 0:
+        outer_diameter = extracted_outer
+        print(f"DEBUG: 从优化的提取函数中获取外径: {outer_diameter}")
+    if extracted_inner is not None and extracted_inner > 0:
+        inner_diameter = extracted_inner
+        print(f"DEBUG: 从优化的提取函数中获取内径: {inner_diameter}")
+    
+    # 如果通过优化函数没有提取到，再使用原来的正则表达式方法
+    if outer_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_outer_diameter']:
+        # 改进正则表达式，更精确匹配沉孔直径
+        # 避免匹配φ234这样的图纸参考尺寸
+        outer_matches = re.findall(r'(?:加工|要求|需要|进行)\s*.*?φ\s*(\d+\.?\d*).*?(?:沉孔|锪孔|counterbore|沉头孔)', description)
+        if not outer_matches:
+            # 尝试其他可能的格式，但排除图纸参考（通常在"正视图"、"俯视图"等后面）
+            # 先排除图纸参考信息
+            # 移除包含"正视图φ234的圆的圆心最高点"这类信息
+            filtered_desc = re.sub(r'[正视图俯视图侧视图].*?φ\s*\d+.*?[,，。]', '', description)
+            outer_matches = re.findall(r'φ\s*(\d+\.?\d*).*?(?:沉孔|锪孔|counterbore|沉头孔)', filtered_desc)
+        if not outer_matches:
+            # 再尝试其他格式
+            outer_matches = re.findall(r'(?:沉孔|锪孔|counterbore).*?φ\s*(\d+\.?\d*)', description)
         if outer_matches:
             try:
                 outer_diameter = float(outer_matches[0])
-                print(f"DEBUG: 从描述中提取外径: {outer_diameter}")
+                # 验证直径是否在合理范围内（避免误匹配图纸参考尺寸）
+                if 5 <= outer_diameter <= 50:  # 沉孔直径通常在5-50mm之间
+                    print(f"DEBUG: 从描述中提取外径: {outer_diameter}")
+                else:
+                    print(f"DEBUG: 忽略不合理的直径: {outer_diameter}")
             except ValueError:
                 pass
     
-    if inner_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_inner_diameter']:  # 如果还是默认值，尝试从描述中提取
-        inner_matches = re.findall(r'(?:底孔|贯通孔|钻孔).*?φ?(\d+\.?\d*)', description)
+    if inner_diameter == GCODE_GENERATION_CONFIG['counterbore']['default_inner_diameter']:
+        # 改进正则表达式，更精确匹配底孔直径
+        inner_matches = re.findall(r'(?:底孔|贯通孔|thru|通孔).*?φ\s*(\d+\.?\d*)', description)
         if not inner_matches:
-            inner_matches = re.findall(r'φ?(\d+\.?\d*).*?底孔', description)
+            inner_matches = re.findall(r'φ\s*(\d+\.?\d*).*?(?:底孔|贯通孔|thru|通孔)', description)
+        if not inner_matches:
+            # 其他可能的格式
+            inner_matches = re.findall(r'(?:钻孔|drill).*?φ\s*(\d+\.?\d*)', description)
         if inner_matches:
             try:
                 inner_diameter = float(inner_matches[0])
                 print(f"DEBUG: 从描述中提取内径: {inner_diameter}")
             except ValueError:
                 pass
+    
+    # 再次尝试从描述分析中获取直径信息（如果前面都没有获取到）
+    # 但要确保不是默认值或无效值
+    if "outer_diameter" in description_analysis and description_analysis["outer_diameter"] is not None:
+        temp_outer = description_analysis["outer_diameter"]
+        # 检查是否为有效直径（在合理范围内且不等于默认值）
+        # 并且确保它不是φ234这样的图纸参考尺寸
+        if (temp_outer != GCODE_GENERATION_CONFIG['counterbore']['default_outer_diameter'] and 
+            5 <= temp_outer <= 50 and  # 限制在外径合理范围内
+            temp_outer != 234.0):      # 排除φ234这个图纸尺寸
+            outer_diameter = temp_outer
+            print(f"DEBUG: 从描述分析中获取外径: {outer_diameter}")
+    if "inner_diameter" in description_analysis and description_analysis["inner_diameter"] is not None:
+        temp_inner = description_analysis["inner_diameter"]
+        # 检查是否为有效直径（在合理范围内且不等于默认值）
+        if (temp_inner != GCODE_GENERATION_CONFIG['counterbore']['default_inner_diameter'] and 
+            1 <= temp_inner <= 30 and  # 限制在内径合理范围内
+            temp_inner != 234.0):      # 排除φ234这个图纸尺寸
+            inner_diameter = temp_inner
+            print(f"DEBUG: 从描述分析中获取内径: {inner_diameter}")
     
     # 从沉孔特征中提取实际参数（第三优先级）
     counterbore_features = [f for f in features if f.get("shape") == "counterbore"]
@@ -352,6 +420,139 @@ def _extract_counterbore_parameters(features: List[Dict], description_analysis: 
             counterbore_positions = user_hole_positions
             print(f"DEBUG: 从描述分析中获取孔位置: {counterbore_positions}")
     
+    # 从描述中提取坐标位置（特别针对目标描述）
+    if not counterbore_positions:
+        # 修复：使用更精确的正则表达式，避免将X坐标误认为孔直径
+        # 匹配 "X94.0Y-30. X94.0Y90. X94.0Y210." 这样的格式
+        # 修复：确保不将X坐标误认为直径
+        coord_pattern = r'X\s*(\d+\.?\d*)\s*Y\s*([+-]?\d+\.?\d*)'
+        coord_matches = re.findall(coord_pattern, description)
+        if coord_matches:
+            # 确保X坐标不是直径值，避免将94.0误认为直径
+            for match in coord_matches:
+                try:
+                    x = float(match[0])
+                    y = float(match[1])
+                    # 验证X坐标是否为合理的直径值，如果是，则不将其作为坐标
+                    # 如果X坐标小于50且与已知直径相似，跳过
+                    # 只有当X坐标明显不是直径时才添加为位置
+                    if x > 50 or (x not in [outer_diameter, inner_diameter]):  # 50mm是沉孔直径的合理上限
+                        counterbore_positions.append((x, y))
+                        print(f"DEBUG: 添加坐标位置 ({x}, {y})")
+                except ValueError:
+                    continue
+            print(f"DEBUG: 从描述中提取坐标位置: {counterbore_positions}")
+        
+        # 如果上面的模式没有匹配到，尝试更通用的模式
+        if not counterbore_positions:
+            # 匹配X,Y坐标，但排除"φ数字X"这样的模式
+            # 使用后处理过滤，而不是复杂的正则表达式
+            coord_pattern = r'\s*X\s*(\d{2,}\.?\d*)\s*Y\s*([+-]?\d{1,}\.?\d*)'
+            coord_matches = re.findall(coord_pattern, description)
+            
+            # 过滤掉前面有φ数字的匹配项
+            valid_matches = []
+            for match in coord_matches:
+                x_val = match[0]
+                # 检查匹配位置前面是否是φ数字模式
+                pattern = r'\s*X\s*' + re.escape(x_val) + r'\s*Y\s*' + re.escape(match[1])
+                for match_obj in re.finditer(pattern, description):
+                    start_pos = match_obj.start()
+                    # 检查X前面是否有φ+数字
+                    preceding_text = description[:start_pos]
+                    phi_match = re.search(r'φ\s*\d+$', preceding_text)
+                    if not phi_match:  # 如果X前面没有φ数字，则保留这个匹配
+                        valid_matches.append(match)
+            
+            for match in valid_matches:
+                try:
+                    x = float(match[0])
+                    y = float(match[1])
+                    # 验证坐标值是否在合理范围内，避免匹配到其他数字
+                    # 并确保X坐标不是直径值
+                    if -300 <= x <= 300 and -300 <= y <= 300 and x != outer_diameter:
+                        counterbore_positions.append((x, y))
+                        print(f"DEBUG: 添加坐标位置 ({x}, {y})")
+                except ValueError:
+                    continue
+            print(f"DEBUG: 从描述中提取坐标位置(备用模式): {counterbore_positions}")
+        
+        # 再次尝试更精确的模式，特别针对"X94.0Y-30."这样的格式
+        if not counterbore_positions:
+            # 匹配"X数字Y数字"的连续格式
+            # 使用简单的模式并过滤结果
+            coord_pattern = r'X\s*(\d{2,}\.?\d*)\s*Y\s*([+-]?\d+\.?\d*)'
+            coord_matches = re.findall(coord_pattern, description)
+            
+            # 过滤掉前面有φ数字的匹配项
+            valid_matches = []
+            for match in coord_matches:
+                x_val = match[0]
+                # 检查匹配位置前面是否是φ数字模式
+                pattern = r'X\s*' + re.escape(x_val) + r'\s*Y\s*' + re.escape(match[1])
+                for match_obj in re.finditer(pattern, description):
+                    start_pos = match_obj.start()
+                    # 检查X前面是否有φ+数字
+                    preceding_text = description[:start_pos]
+                    phi_match = re.search(r'φ\s*\d+$', preceding_text)
+                    if not phi_match:  # 如果X前面没有φ数字，则保留这个匹配
+                        valid_matches.append(match)
+            
+            for match in valid_matches:
+                try:
+                    x = float(match[0])
+                    y = float(match[1])
+                    # 验证坐标值是否在合理范围内，避免匹配到其他数字
+                    # 并确保X坐标不是直径值
+                    if -300 <= x <= 300 and -300 <= y <= 300:
+                        # 额外验证：确保不是将直径误认为X坐标
+                        if x != outer_diameter and x != inner_diameter:
+                            counterbore_positions.append((x, y))
+                            print(f"DEBUG: 添加坐标位置 ({x}, {y})")
+                except ValueError:
+                    continue
+            print(f"DEBUG: 从描述中提取坐标位置(精确模式): {counterbore_positions}")
+    
+    # 如果仍没有找到位置，尝试从极坐标格式中提取
+    if not counterbore_positions:
+        # 支持极坐标格式如 "R=50 θ=30°" 或 "R50θ30" 等
+        import re
+        polar_patterns = [
+            r'R\s*[=:]\s*(\d+\.?\d*)\s*(?:θ|theta|角度|θ=|θ:)\s*(\d+\.?\d*)\s*(?:°|度)?',  # R=50 θ=30°
+            r'R\s*(\d+\.?\d*)\s*(?:θ|theta|角度)\s*(\d+\.?\d*)\s*(?:°|度)?',  # R50θ30
+            r'(?:极径|半径)\s*(\d+\.?\d*)\s*(?:极角|角度)\s*(\d+\.?\d*)\s*(?:°|度)?',  # 极径50 极角30度
+        ]
+        
+        for pattern in polar_patterns:
+            polar_matches = re.findall(pattern, description, re.IGNORECASE)
+            if polar_matches:
+                # 假设这些极坐标是相对于某个基准点的
+                # 使用从描述分析中获取的基准点信息
+                reference_points = description_analysis.get("reference_points", {})
+                base_x = 0.0
+                base_y = 0.0
+                # 如果有基准点信息，使用它
+                if reference_points and 'origin' in reference_points:
+                    base_x, base_y = reference_points['origin']
+                
+                for match in polar_matches:
+                    try:
+                        radius = float(match[0])
+                        angle_deg = float(match[1])
+                        # 将极坐标转换为直角坐标
+                        angle_rad = math.radians(angle_deg)
+                        x = base_x + radius * math.cos(angle_rad)
+                        y = base_y + radius * math.sin(angle_rad)
+                        
+                        # 验证转换后的坐标是否在合理范围内
+                        if -300 <= x <= 300 and -300 <= y <= 300:
+                            counterbore_positions.append((round(x, 3), round(y, 3)))
+                    except (ValueError, TypeError):
+                        continue
+                if counterbore_positions:
+                    print(f"DEBUG: 从极坐标格式提取位置: {counterbore_positions}")
+                    break
+    
     # 根据用户描述的孔数量限制实际加工的孔数量
     if len(counterbore_positions) > hole_count:
         # 如果识别到的孔数量超过用户要求的数量，只取前几个
@@ -393,18 +594,24 @@ def _generate_polar_coordinate_counterbore_code(
     if not counterbore_positions:
         return False
     
-    # 检查用户描述中是否提到极坐标
-    from src.config import OCR_CONFIG
-    description = OCR_CONFIG.get("description", "").lower()  # 需要从description_analysis获取
-    use_polar_coordinates = "极坐标" in description or "polar" in description.lower()
-    
-    if not use_polar_coordinates:
-        return False
-    
     # 计算极坐标并输出
     gcode.append("(POLAR COORDINATE OUTPUT)")
     base_x, base_y = counterbore_positions[0]  # 选择第一个孔作为参考点
     gcode.append(f"(REFERENCE HOLE: X{base_x:.3f}, Y{base_y:.3f})")
+    
+    # 输出原始坐标作为验证
+    gcode.append("(ORIGINAL CARTESIAN COORDINATES - FOR VERIFICATION)")
+    for i, (x, y) in enumerate(counterbore_positions):
+        gcode.append(f"(HOLE {i+1}: X{x:.3f}, Y{y:.3f})")
+    
+    # 添加调试输出，显示坐标转换过程
+    gcode.append("(DEBUG: COORDINATE CONVERSION FROM CARTESIAN TO POLAR)")
+    for i, (x, y) in enumerate(counterbore_positions):
+        dx = x - base_x
+        dy = y - base_y
+        radius = math.sqrt(dx*dx + dy*dy)
+        angle = math.degrees(math.atan2(dy, dx))
+        gcode.append(f"(DEBUG: HOLE {i+1} - CARTESIAN({x:.3f}, {y:.3f}) -> RELATIVE({dx:.3f}, {dy:.3f}) -> POLAR(R{radius:.3f}, A{angle:.3f}°))")
     
     # 在加工循环中使用极坐标
     # 注意：在FANUC中，G16启用极坐标模式后，X表示半径，Y表示角度
@@ -412,9 +619,10 @@ def _generate_polar_coordinate_counterbore_code(
     gcode.append("(STEP 1: PILOT DRILLING OPERATION WITH POLAR COORDINATES)")
     gcode.append("(TOOL CHANGE - T01: CENTER DRILL)")
     gcode.append("T1 M06 (TOOL CHANGE - CENTER DRILL)")
+    gcode.append("G54 (ENSURE WORK COORDINATE SYSTEM IS SELECTED)")
+    gcode.append("G43 H1 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T1)")
     gcode.append("M03 S1000 (SPINDLE FORWARD, PILOT DRILLING SPEED)")
     gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
-    gcode.append("G43 H1 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T1)")
     gcode.append("M08 (COOLANT ON)")
     
     # 设置参考点
@@ -439,19 +647,22 @@ def _generate_polar_coordinate_counterbore_code(
     gcode.append("M09 (COOLANT OFF)")
     gcode.append(f"G00 Z{GCODE_GENERATION_CONFIG['safety']['safe_height']:.1f} (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
     gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
+    gcode.append("G15 (CANCEL POLAR COORDINATES)")
     
     # 2. 钻孔工艺使用极坐标
     gcode.append("")
     gcode.append("(STEP 2: DRILLING OPERATION WITH POLAR COORDINATES)")
     gcode.append(f"(TOOL CHANGE - T02: DRILL BIT, HOLE DIAMETER {inner_diameter}mm)")
     gcode.append("T2 M06 (TOOL CHANGE - DRILL BIT)")
+    gcode.append("G54 (ENSURE WORK COORDINATE SYSTEM IS SELECTED)")
+    gcode.append("G43 H2 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T2)")
     gcode.append("M03 S800 (SPINDLE FORWARD, DRILLING SPEED)")
     gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
-    gcode.append("G43 H2 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T2)")
     gcode.append("M08 (COOLANT ON)")
     
     # 重新启用极坐标模式（因为固定循环已被取消）
-    gcode.append("G16 (RE-ENTER POLAR COORDINATE MODE)")
+    gcode.append(f"G00 X{base_x:.3f} Y{base_y:.3f} (MOVE TO POLAR COORDINATE REFERENCE POINT)")
+    gcode.append("G16 (ENTER POLAR COORDINATE MODE)")
     
     # 使用极坐标进行钻孔加工
     for i, (x, y) in enumerate(counterbore_positions):
@@ -470,19 +681,22 @@ def _generate_polar_coordinate_counterbore_code(
     gcode.append("M09 (COOLANT OFF)")
     gcode.append("G00 Z100.0 (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
     gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
+    gcode.append("G15 (CANCEL POLAR COORDINATES)")
     
     # 3. 锪孔工艺使用极坐标
     gcode.append("")
     gcode.append("(STEP 3: COUNTERBORE OPERATION WITH POLAR COORDINATES)")
     gcode.append(f"(TOOL CHANGE - T04: COUNTERBORE TOOL, φ{outer_diameter}mm)")
     gcode.append("T4 M06 (TOOL CHANGE - COUNTERBORE TOOL)")
+    gcode.append("G54 (ENSURE WORK COORDINATE SYSTEM IS SELECTED)")
+    gcode.append("G43 H4 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T4)")
     gcode.append(f"M03 S{int(counterbore_spindle_speed)} (SPINDLE FORWARD, COUNTERBORE SPEED)")
     gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
-    gcode.append("G43 H4 Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T4)")
     gcode.append("M08 (COOLANT ON)")
     
     # 重新启用极坐标模式（因为固定循环已被取消）
-    gcode.append("G16 (RE-ENTER POLAR COORDINATE MODE)")
+    gcode.append(f"G00 X{base_x:.3f} Y{base_y:.3f} (MOVE TO POLAR COORDINATE REFERENCE POINT)")
+    gcode.append("G16 (ENTER POLAR COORDINATE MODE)")
     
     # 使用极坐标进行锪孔加工
     for i, (x, y) in enumerate(counterbore_positions):
@@ -682,29 +896,56 @@ def _generate_counterbore_code(features: List[Dict], description_analysis: Dict)
     
     print(f"DEBUG: 验证通过 - 外径: {outer_diameter}, 内径: {inner_diameter}, 深度: {counterbore_depth}, 孔数: {hole_count}")
     
-    # 检查是否需要使用极坐标
+    # 检查是否需要使用极坐标 - 修复：更精确的判断逻辑
     description = description_analysis.get("description", "").lower()
-    use_polar_coordinates = "极坐标" in description or "polar" in description.lower()
-    if use_polar_coordinates:
-        gcode.append("(USING POLAR COORDINATES FOR HOLE POSITIONS)")
-        gcode.append("G15 (CANCEL POLAR COORDINATES)")
     
-    # 尝试生成极坐标代码
+    # 修复：当描述中包含"使用极坐标位置"时，应理解为使用指定的笛卡尔坐标作为极坐标参考点
+    # 例如："使用极坐标位置X94.0 Y-30., X94.0 Y90., X94.0 Y210." 表示使用这些笛卡尔坐标进行极坐标加工
+    use_polar_coordinates = False
+    
+    # 检查是否包含"使用极坐标位置"这样的明确指示
+    if ("使用极坐标位置" in description or 
+        "using polar coordinates at" in description or
+        "polar coordinate position" in description):
+        use_polar_coordinates = True
+        gcode.append("(USER REQUESTED POLAR COORDINATE POSITIONING - PROCESSING CARTESIAN COORDINATES AS POLAR REFERENCE POINTS)")
+    elif ("使用极坐标" in description or 
+          "极坐标模式" in description or 
+          "polar mode" in description or
+          "polar coordinate" in description):
+        # 如果只是提到极坐标但没有"使用极坐标位置"，仍需检查是否有笛卡尔坐标
+        import re
+        # 检查是否包含X数字Y数字格式的坐标
+        cartesian_coord_pattern = r'X\s*\d+\.?\d*\s*Y\s*[+-]?\d+\.?\d*'
+        cartesian_coords_found = re.findall(cartesian_coord_pattern, description_analysis.get("description", ""))
+        
+        # 如果找到笛卡尔坐标格式，且没有"使用极坐标位置"，则优先使用笛卡尔坐标
+        if cartesian_coords_found and len(cartesian_coords_found) > 0:
+            use_polar_coordinates = False
+            gcode.append(f"(FOUND {len(cartesian_coords_found)} CARTESIAN COORDINATES IN DESCRIPTION - USING CARTESIAN MODE)")
+            for coord in cartesian_coords_found:
+                gcode.append(f"(COORD: {coord})")
+        else:
+            use_polar_coordinates = True
+    
+    # 如果用户明确要求使用极坐标，才使用极坐标模式
     if use_polar_coordinates and len(counterbore_positions) > 0:
+        gcode.append("(USING POLAR COORDINATES FOR HOLE POSITIONS)")
         if _generate_polar_coordinate_counterbore_code(
             gcode, counterbore_positions, outer_diameter, inner_diameter, 
             counterbore_depth, centering_depth, drilling_depth, 
             drill_feed, counterbore_spindle_speed, counterbore_feed
         ):
             return gcode  # 如果生成了极坐标代码，则返回
-    
-    # 生成笛卡尔坐标代码
-    _generate_cartesian_counterbore_code(
-        gcode, counterbore_positions, outer_diameter, inner_diameter, 
-        counterbore_depth, hole_count, centering_depth, drilling_depth, 
-        drill_feed, counterbore_spindle_speed, counterbore_feed, 
-        description_analysis
-    )
+    else:
+        # 默认使用笛卡尔坐标系，这是大多数情况下的正确选择
+        # 生成笛卡尔坐标代码
+        _generate_cartesian_counterbore_code(
+            gcode, counterbore_positions, outer_diameter, inner_diameter, 
+            counterbore_depth, hole_count, centering_depth, drilling_depth, 
+            drill_feed, counterbore_spindle_speed, counterbore_feed, 
+            description_analysis
+        )
     
     return gcode
 
