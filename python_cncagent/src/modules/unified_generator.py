@@ -185,6 +185,19 @@ class UnifiedCNCGenerator:
         elif not isinstance(user_prompt, str):
             user_prompt = str(user_prompt)
         
+        # 检查当前实例是否有API密钥，如果没有则从环境变量获取
+        if not self.api_key:
+            import os
+            api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
+            model = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))
+            
+            if api_key:
+                # 创建新的AI生成器实例，使用环境变量中的API密钥
+                temp_generator = lambda user_prompt, pdf_path: generate_nc_with_ai(
+                    user_prompt, pdf_path, api_key=api_key, model=model
+                )
+                return temp_generator(user_prompt, pdf_path=None)
+        
         # 直接使用AI生成器，PDF路径为None
         return self.ai_generator(user_prompt, pdf_path=None)
 

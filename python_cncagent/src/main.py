@@ -9,6 +9,14 @@ CNC Agent: 从PDF图纸自动生成FANUC NC程序的Python实现
 5. 完整流程整合
 6. AI辅助NC编程工具（新增）
 """
+
+# 尝试加载 .env 文件
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # 如果没有安装dotenv则跳过
+
 import os
 import sys
 from pathlib import Path
@@ -189,7 +197,7 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
     # 使用重构后的AI优先生成器，直接调用大模型生成NC代码
     logging.info("使用大模型直接生成NC程序，PDF特征仅作为辅助参考...")
     nc_program = generate_cnc_with_unified_approach(
-        user_description, 
+        user_prompt=user_description, 
         pdf_path=pdf_path,
         api_key=api_key,
         model=model

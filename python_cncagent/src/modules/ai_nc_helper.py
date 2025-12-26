@@ -438,10 +438,18 @@ class AI_NC_Helper:
         Returns:
             str: 生成的NC代码
         """
-        from src.modules.unified_generator import unified_generator
+        from src.modules.unified_generator import UnifiedCNCGenerator
+        import os
+        
+        # 从环境变量获取API配置
+        api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
+        model = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))
+        
+        # 创建新的统一生成器实例，使用API密钥
+        generator = UnifiedCNCGenerator(api_key=api_key, model=model)
         
         # 使用统一生成器的仅描述模式功能
-        nc_code = unified_generator.generate_from_description_only(user_description, material)
+        nc_code = generator.generate_from_description_only(user_description, material)
         self.last_nc_code = nc_code
         
         # 由于没有实际特征，创建一个虚拟的特征报告

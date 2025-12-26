@@ -370,24 +370,31 @@ class AIDrivenCNCGenerator:
             str: 生成的NC代码
         """
         # 这里实现调用大模型的逻辑
-        # 为了演示，我将模拟调用过程
         try:
             # 如果有API密钥，使用真实的API调用
             if self.api_key:
+                self.logger.info(f"检测到API密钥，使用模型: {self.model}")
+                
                 # 检查是否是DeepSeek API
                 import os
                 deepseek_api_base = os.getenv('DEEPSEEK_API_BASE', 'https://api.deepseek.com')
                 
                 # 使用OpenAI兼容接口
                 from openai import OpenAI
-                if 'deepseek' in deepseek_api_base.lower():
+                
+                # 根据模型名称或API基础URL判断是否使用DeepSeek
+                is_deepseek = ('deepseek' in self.model.lower()) or ('deepseek' in deepseek_api_base.lower())
+                
+                if is_deepseek:
                     # 使用DeepSeek API配置
+                    self.logger.info(f"使用DeepSeek API: {deepseek_api_base}")
                     client = OpenAI(
                         api_key=self.api_key,
                         base_url=deepseek_api_base
                     )
                 else:
                     # 使用标准OpenAI API
+                    self.logger.info("使用标准OpenAI API")
                     client = OpenAI(api_key=self.api_key)
                 
                 response = client.chat.completions.create(
@@ -401,19 +408,29 @@ class AIDrivenCNCGenerator:
                 )
                 
                 generated_code = response.choices[0].message.content
+                self.logger.info(f"API调用成功，响应长度: {len(generated_code)}")
+                
                 # 提取代码块（如果有的话）
                 if "```" in generated_code:
                     import re
                     code_blocks = re.findall(r'```(?:nc|gcode|fanuc)?\n(.*?)\n```', generated_code, re.DOTALL)
                     if code_blocks:
+                        self.logger.info(f"提取到 {len(code_blocks)} 个代码块")
                         return code_blocks[0].strip()
                 
                 return generated_code.strip()
             else:
-                # 模拟API调用，返回基于需求的代码
-                # 这里应该被实际的API调用替代
-                self.logger.warning("未提供API密钥，使用模拟生成。在实际部署中请配置API密钥。")
+                # 没有API密钥，记录警告
+                self.logger.warning("未提供API密钥，使用模拟生成。请检查DEEPSEEK_API_KEY或OPENAI_API_KEY环境变量是否正确设置。")
                 return self._generate_fallback_code(prompt)
+        except Exception as e:
+            self.logger.error(f"调用大模型API时出错: {str(e)}")
+            # 详细错误信息，帮助诊断问题
+            if not self.api_key:
+                self.logger.error("错误原因: API密钥未设置，请设置DEEPSEEK_API_KEY环境变量")
+            else:
+                self.logger.error(f"错误原因: API密钥已设置但API调用失败，可能原因: 密钥无效、网络问题、模型名称错误({self.model})等")
+            return self._generate_fallback_code(prompt)
         except Exception as e:
             self.logger.error(f"调用大模型API时出错: {str(e)}")
             return self._generate_fallback_code(prompt)

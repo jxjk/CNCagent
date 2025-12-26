@@ -11,6 +11,14 @@
 """
 import sys
 import os
+
+# 尝试加载 .env 文件
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # 如果没有安装dotenv则跳过
+
 import argparse
 import threading
 import time

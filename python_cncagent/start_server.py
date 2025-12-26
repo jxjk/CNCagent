@@ -10,6 +10,14 @@ Flask API服务，提供PDF到NC程序的Web接口
   python start_unified.py       # 同时启动GUI和Web服务器
 """
 import os
+
+# 尝试加载 .env 文件
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # 如果没有安装dotenv则跳过
+
 import json
 from flask import Flask, request, jsonify, send_file, render_template_string
 from flask_cors import CORS
@@ -282,8 +290,19 @@ def generate_nc():
             temp_pdf_path = temp_pdf.name
         
         try:
+            # 从环境变量获取API配置
+            import os
+            api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
+            model = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))
+            
             # 生成NC程序
-            nc_program = generate_nc_from_pdf(temp_pdf_path, user_description, scale)
+            nc_program = generate_nc_from_pdf(
+                user_description=user_description,
+                pdf_path=temp_pdf_path,
+                scale=scale,
+                api_key=api_key,
+                model=model
+            )
             
             # 创建临时文件保存NC程序
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.nc') as temp_nc:
@@ -354,8 +373,19 @@ def generate_api():
             temp_pdf_path = temp_pdf.name
         
         try:
+            # 从环境变量获取API配置
+            import os
+            api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
+            model = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))
+            
             # 生成NC程序
-            nc_program = generate_nc_from_pdf(temp_pdf_path, user_description, scale)
+            nc_program = generate_nc_from_pdf(
+                user_description=user_description,
+                pdf_path=temp_pdf_path,
+                scale=scale,
+                api_key=api_key,
+                model=model
+            )
             
             return jsonify({
                 "status": "success",
