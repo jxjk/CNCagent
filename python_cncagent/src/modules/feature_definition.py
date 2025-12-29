@@ -13,8 +13,7 @@ import logging
 from src.config import IMAGE_PROCESSING_CONFIG, FEATURE_RECOGNITION_CONFIG, COORDINATE_CONFIG, OCR_CONFIG
 from src.exceptions import FeatureRecognitionError, handle_exception
 
-# 导入AI驱动模块和OCR模块
-from src.modules.ai_driven_generator import AIDrivenCNCGenerator
+# 导入OCR模块
 from src.modules.ocr_ai_inference import extract_features_from_pdf_with_ai
 
 

@@ -14,6 +14,7 @@ from src.exceptions import NCGenerationError, handle_exception
 # 导入优化模块
 try:
     from src.modules.fanuc_optimization import optimize_tapping_cycle, optimize_drilling_cycle, get_thread_pitch
+    from src.modules.cutting_optimization import cutting_optimizer
 except ImportError:
     # 如果无法导入优化模块，使用基础实现
     def get_thread_pitch(thread_type: str) -> float:
@@ -240,6 +241,58 @@ def _generate_drilling_code(features: List[Dict], description_analysis: Dict) ->
     """生成钻孔加工代码"""
     gcode = []
     
+    # 获取材料信息，默认为铝
+    material = "aluminum"  # 默认值
+    if description_analysis:
+        material_temp = description_analysis.get("material", "aluminum")
+        if material_temp is not None:
+            material = str(material_temp).lower()
+        else:
+            material = "aluminum"
+    else:
+        material = "aluminum"
+    
+    # 获取刀具直径信息
+    tool_diameter = 12.0  # 默认使用φ12钻头
+    if description_analysis:
+        temp_diameter = description_analysis.get("tool_diameter", 12.0)
+        if temp_diameter is not None:
+            tool_diameter = float(temp_diameter)
+        else:
+            tool_diameter = 12.0
+    
+    # 获取工件尺寸信息，用于优化切削参数
+    workpiece_dimensions = None
+    if description_analysis:
+        workpiece_dimensions = description_analysis.get("workpiece_dimensions", None)
+    
+    # 使用切削工艺优化器计算最优参数
+    try:
+        optimal_params = cutting_optimizer.calculate_optimal_cutting_parameters(
+            material=material,
+            tool_type="drill_bit",  # 钻头
+            tool_diameter=tool_diameter,
+            workpiece_dimensions=workpiece_dimensions,
+            operation_type="drilling"
+        )
+        
+        # 应用优化后的参数
+        spindle_speed = optimal_params["spindle_speed"]
+        feed_rate = optimal_params["feed_rate"]
+        
+        # 验证优化参数
+        validation_errors = cutting_optimizer.validate_cutting_parameters(
+            optimal_params, tool_diameter, workpiece_dimensions
+        )
+        if validation_errors:
+            gcode.append(f"(WARNING: OPTIMIZATION ISSUES DETECTED: {', '.join(validation_errors)})")
+            # 仍然使用优化参数，但添加警告注释
+    except Exception as e:
+        # 如果优化失败，使用默认参数
+        gcode.append(f"(WARNING: Optimization failed, using default parameters: {str(e)})")
+        spindle_speed = GCODE_GENERATION_CONFIG['drilling']['default_spindle_speed']
+        feed_rate = GCODE_GENERATION_CONFIG['drilling']['default_feed_rate']
+    
     # 设置钻孔参数 - 优先使用从用户描述中提取的参数
     depth = description_analysis.get("depth")
     if depth is None or not isinstance(depth, (int, float)):
@@ -248,18 +301,15 @@ def _generate_drilling_code(features: List[Dict], description_analysis: Dict) ->
     else:
         depth = float(depth)
     
-    feed_rate = description_analysis.get("feed_rate")
-    if feed_rate is None or not isinstance(feed_rate, (int, float)):
-        # 如果描述分析中没有提供进给率，使用配置中的默认值
-        feed_rate = GCODE_GENERATION_CONFIG['drilling']['default_feed_rate']  # 使用配置中的默认值
-    else:
-        feed_rate = float(feed_rate)
+    feed_rate_input = description_analysis.get("feed_rate")
+    if feed_rate_input is not None and isinstance(feed_rate_input, (int, float)):
+        feed_rate = float(feed_rate_input)  # 如果用户提供了具体进给，则使用它
     
     # 获取刀具编号（钻头通常是T2）
     tool_number = _get_tool_number("drill_bit")
     
     gcode.append(f"(DRILLING OPERATION)")
-    gcode.append(f"M03 S{GCODE_GENERATION_CONFIG['drilling']['default_spindle_speed']} (SPINDLE FORWARD, DRILLING SPEED)")
+    gcode.append(f"M03 S{int(spindle_speed)} (SPINDLE FORWARD, DRILLING SPEED)")
     gcode.append(f"G04 P{GCODE_GENERATION_CONFIG['safety']['delay_time']} (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
     
     # 激活刀具长度补偿
@@ -274,14 +324,15 @@ def _generate_drilling_code(features: List[Dict], description_analysis: Dict) ->
         # 首先在第一个孔执行完整循环
         first_feature = hole_features[0]
         center_x, center_y = first_feature["center"]
-        gcode.append(f"G99 G83 X{center_x:.3f} Y{center_y:.3f} Z{-depth:.3f} R2.0 F{feed_rate:.1f} (DEEP HOLE DRILLING CYCLE)")
+        # 使用优化的钻孔循环G83，考虑切削深度和排屑
+        gcode.append(f"G99 G83 X{center_x:.3f} Y{center_y:.3f} Z{-depth:.3f} R2.0 Q{min(tool_diameter/2, 3.0):.1f} F{feed_rate:.1f} (DEEP HOLE DRILLING CYCLE WITH PECKING)")
         
         # 对于后续孔，只使用X、Y坐标，简化编程
         for feature in hole_features[1:]:
             center_x, center_y = feature["center"]
             gcode.append(f"X{center_x:.3f} Y{center_y:.3f} (DRILLING OPERATION)")
     else:
-        gcode.append(f"G99 G83 Z{-depth:.3f} R2.0 F{feed_rate:.1f} (DEEP HOLE DRILLING CYCLE)")
+        gcode.append(f"G99 G83 Z{-depth:.3f} R2.0 Q{min(tool_diameter/2, 3.0):.1f} F{feed_rate:.1f} (DEEP HOLE DRILLING CYCLE WITH PECKING)")
     
     gcode.append("G80 (CANCEL FIXED CYCLE)")
     
@@ -1215,24 +1266,74 @@ def _generate_milling_code(features: List[Dict], description_analysis: Dict) -> 
     """生成铣削加工代码"""
     gcode = []
     
-    # 设置铣削参数 - 优先使用从用户描述中提取的参数
-    depth = description_analysis.get("depth")
-    if depth is None or not isinstance(depth, (int, float)):
-        depth = 5  # 默认值
+    # 获取材料信息，默认为铝
+    material = "aluminum"  # 默认值
+    if description_analysis:
+        material = description_analysis.get("material", "aluminum")
+        if material is None:
+            material = "aluminum"
+        else:
+            material = str(material).lower()
     else:
-        depth = float(depth)
+        material = "aluminum"
     
-    feed_rate = description_analysis.get("feed_rate")
-    if feed_rate is None or not isinstance(feed_rate, (int, float)):
-        feed_rate = 200  # 默认值
-    else:
-        feed_rate = float(feed_rate)
+    # 获取刀具直径，优先从描述分析中获取
+    tool_diameter = 63.0  # 默认使用φ63面铣刀
+    if description_analysis:
+        temp_diameter = description_analysis.get("tool_diameter", 63.0)
+        if temp_diameter is not None:
+            tool_diameter = float(temp_diameter)
+        else:
+            tool_diameter = 63.0
     
-    spindle_speed = description_analysis.get("spindle_speed")
-    if spindle_speed is None or not isinstance(spindle_speed, (int, float)):
-        spindle_speed = 1000  # 默认值
-    else:
-        spindle_speed = float(spindle_speed)
+    # 获取工件尺寸信息，用于优化切削参数
+    workpiece_dimensions = None
+    if description_analysis:
+        workpiece_dimensions = description_analysis.get("workpiece_dimensions", None)
+    
+    # 使用切削工艺优化器计算最优参数
+    try:
+        optimal_params = cutting_optimizer.calculate_optimal_cutting_parameters(
+            material=material,
+            tool_type="face_mill",  # 面铣刀
+            tool_diameter=tool_diameter,
+            workpiece_dimensions=workpiece_dimensions,
+            operation_type="face_milling"
+        )
+        
+        # 应用优化后的参数
+        spindle_speed = optimal_params["spindle_speed"]
+        feed_rate = optimal_params["feed_rate"]
+        depth_of_cut = optimal_params["depth_of_cut"]
+        stepover = optimal_params["stepover"]
+        
+        # 验证优化参数
+        validation_errors = cutting_optimizer.validate_cutting_parameters(
+            optimal_params, tool_diameter, workpiece_dimensions
+        )
+        if validation_errors:
+            gcode.append(f"(WARNING: OPTIMIZATION ISSUES DETECTED: {', '.join(validation_errors)})")
+            # 仍然使用优化参数，但添加警告注释
+    except Exception as e:
+        # 如果优化失败，使用默认参数
+        gcode.append(f"(WARNING: Optimization failed, using default parameters: {str(e)})")
+        depth = description_analysis.get("depth")
+        if depth is None or not isinstance(depth, (int, float)):
+            depth = 2  # 铣削上平面深度2毫米
+        else:
+            depth = float(depth)
+        
+        feed_rate = description_analysis.get("feed_rate")
+        if feed_rate is None or not isinstance(feed_rate, (int, float)):
+            feed_rate = 500  # 默认值
+        else:
+            feed_rate = float(feed_rate)
+        
+        spindle_speed = description_analysis.get("spindle_speed")
+        if spindle_speed is None or not isinstance(spindle_speed, (int, float)):
+            spindle_speed = 800  # 默认值
+        else:
+            spindle_speed = float(spindle_speed)
     
     # 获取刀具编号（铣刀通常是T4）
     tool_number = _get_tool_number("end_mill")
@@ -1252,7 +1353,73 @@ def _generate_milling_code(features: List[Dict], description_analysis: Dict) -> 
         gcode.append("")
         gcode.append(f"(MILLING OPERATION - {feature['shape'].upper()})")
         
-        if feature["shape"] == "circle":
+        if feature["shape"] == "rectangle" and len(feature["dimensions"]) >= 2:
+            # 矩形面铣削 - 考虑刀具直径和工件尺寸
+            center_x, center_y = feature["center"]
+            length, width = feature["dimensions"]
+            
+            # 使用优化器生成优化的刀具路径
+            toolpath = cutting_optimizer.optimize_toolpath(
+                feature_type="rectangle",
+                feature_dimensions=(length, width),
+                tool_diameter=tool_diameter,
+                workpiece_dimensions=workpiece_dimensions or (length, width, 10)  # 假设高度
+            )
+            
+            if toolpath:
+                # 根据优化路径生成G代码
+                for i, path_segment in enumerate(toolpath):
+                    if path_segment["type"] == "linear":
+                        start = path_segment["start"]
+                        end = path_segment["end"]
+                        
+                        # 移动到起始位置
+                        gcode.append(f"G00 X{center_x + start[0]:.3f} Y{center_y + start[1]:.3f} (MOVE TO MILLING START POINT {i+1})")
+                        
+                        # 下刀
+                        gcode.append(f"G01 Z{-depth_of_cut:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
+                        
+                        # 铣削直线段
+                        gcode.append(f"G01 X{center_x + end[0]:.3f} Y{center_y + end[1]:.3f} F{feed_rate} (MILLING PASS)")
+                        
+                        # 抬刀到安全高度
+                        gcode.append(f"G00 Z{GCODE_GENERATION_CONFIG['safety']['safe_height']:.1f} (RAISE TOOL TO SAFE HEIGHT)")
+            else:
+                # 如果没有优化路径，使用传统方法
+                # 确保铣削范围不超过工件尺寸
+                half_length = min(length / 2, 200)  # 限制在400mm长度内
+                half_width = min(width / 2, 150)   # 限制在300mm宽度内
+                
+                # 生成螺旋或往复铣削路径
+                start_x = center_x - half_length + (tool_diameter / 2)
+                start_y = center_y - half_width + (tool_diameter / 2)
+                
+                gcode.append(f"G00 X{start_x:.3f} Y{start_y:.3f} (MOVE TO MILLING START POINT)")
+                gcode.append(f"G01 Z{-depth_of_cut:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
+                
+                # 生成往复铣削路径
+                y_pos = start_y
+                direction = 1  # 1为正向，-1为反向
+                stepover = min(stepover, 5)  # 限制步距
+                
+                while y_pos <= center_y + half_width - (tool_diameter / 2):
+                    # X方向移动
+                    if direction == 1:
+                        end_x = center_x + half_length - (tool_diameter / 2)
+                    else:
+                        end_x = center_x - half_length + (tool_diameter / 2)
+                    
+                    gcode.append(f"G01 X{end_x:.3f} Y{y_pos:.3f} F{feed_rate} (MILLING PASS)")
+                    
+                    # 移动到下一个Y位置
+                    if y_pos + stepover <= center_y + half_width - (tool_diameter / 2):
+                        y_pos += stepover
+                        direction *= -1  # 反向
+                        gcode.append(f"G01 Y{y_pos:.3f} F{feed_rate/2:.1f} (STEPOVER TO NEXT PASS)")
+                    else:
+                        break
+        
+        elif feature["shape"] == "circle":
             # 圆形铣削
             center_x, center_y = feature["center"]
             radius = feature.get("radius", 10)
@@ -1260,32 +1427,12 @@ def _generate_milling_code(features: List[Dict], description_analysis: Dict) -> 
             # 快速移动到圆的起始点
             start_x = center_x - radius
             gcode.append(f"G00 X{start_x:.3f} Y{center_y:.3f} (MOVE TO CIRCULAR ARC START POINT)")
-            gcode.append(f"G01 Z{-depth/2:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
+            gcode.append(f"G01 Z{-depth_of_cut:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
             gcode.append(f"G02 X{start_x:.3f} Y{center_y:.3f} I{radius:.3f} J0 F{feed_rate} (CLOCKWISE CIRCULAR MILLING)")
             
             # 如果需要更深的加工，进行第二次切削
-            gcode.append(f"G01 Z{-depth:.3f} F{feed_rate/2:.1f} (CONTINUE CUTTING)")
+            gcode.append(f"G01 Z{-depth_of_cut*2:.3f} F{feed_rate/2:.1f} (CONTINUE CUTTING)")
             gcode.append(f"G02 X{start_x:.3f} Y{center_y:.3f} I{radius:.3f} J0 F{feed_rate} (CLOCKWISE CIRCULAR MILLING)")
-            
-        elif feature["shape"] in ["rectangle", "square"]:
-            # 矩形铣削
-            center_x, center_y = feature["center"]
-            length, width = feature["dimensions"]
-            
-            half_length = length / 2
-            half_width = width / 2
-            
-            # 移动到矩形起点
-            start_x = center_x - half_length
-            start_y = center_y - half_width
-            gcode.append(f"G00 X{start_x:.3f} Y{start_y:.3f} (MOVE TO RECTANGLE START POINT)")
-            gcode.append(f"G01 Z{-depth:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
-            
-            # 铣削矩形轮廓
-            gcode.append(f"G01 X{start_x + length:.3f} F{feed_rate} (MILL X DIRECTION EDGE)")
-            gcode.append(f"G01 Y{start_y + width:.3f} (MILL Y DIRECTION EDGE)")
-            gcode.append(f"G01 X{start_x:.3f} (MILL X DIRECTION EDGE)")
-            gcode.append(f"G01 Y{start_y:.3f} (MILL Y DIRECTION EDGE)")
             
         elif feature["shape"] == "triangle":
             # 三角形铣削
@@ -1293,7 +1440,7 @@ def _generate_milling_code(features: List[Dict], description_analysis: Dict) -> 
             if len(vertices) >= 3:
                 start_x, start_y = vertices[0]
                 gcode.append(f"G00 X{start_x:.3f} Y{start_y:.3f} (MOVE TO TRIANGLE START POINT)")
-                gcode.append(f"G01 Z{-depth:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
+                gcode.append(f"G01 Z{-depth_of_cut:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
                 
                 for i in range(1, len(vertices)):
                     x, y = vertices[i]

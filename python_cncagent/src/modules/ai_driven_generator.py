@@ -1,6 +1,6 @@
 """
 AI驱动的NC程序生成模块
-直接调用大模型根据提示词生成NC代码，PDF特征仅作为辅助参考
+重构：完全以大模型为中心，使用智能提示词构建器整合多源信息
 """
 import json
 import logging
@@ -29,6 +29,8 @@ except ImportError:
     import logging
     logging.warning("警告: 未安装OpenCV库，图像处理功能将受限")
 
+from .prompt_builder import prompt_builder
+
 @dataclass
 class ProcessingRequirements:
     """处理需求数据类"""
@@ -51,7 +53,7 @@ class ProcessingRequirements:
 class AIDrivenCNCGenerator:
     """
     AI驱动的CNC程序生成器
-    直接调用大模型根据提示词生成NC代码，PDF特征仅作为辅助参考
+    重构：完全以大模型为中心，使用智能提示词构建器整合OCR、图纸、3D模型特征
     """
     
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-3.5-turbo"):
@@ -629,34 +631,49 @@ class AIDrivenCNCGenerator:
         
         return "\n".join(validated_lines)
     
-    def generate_nc_program(self, user_prompt: str, pdf_path: Optional[str] = None) -> str:
+    def generate_nc_program(
+        self, 
+        user_prompt: str, 
+        pdf_path: Optional[str] = None,
+        image_path: Optional[str] = None,
+        model_3d_path: Optional[str] = None,
+        material: str = "Aluminum",
+        precision_requirement: str = "General",
+        process_constraints: Optional[Dict] = None
+    ) -> str:
         """
-        主要的NC程序生成方法
+        主要的NC程序生成方法（重构：完全以大模型为中心）
         
         Args:
             user_prompt: 用户需求描述
             pdf_path: 可选的PDF图纸路径
+            image_path: 可选的图像文件路径
+            model_3d_path: 可选的3D模型文件路径
+            material: 材料类型
+            precision_requirement: 精度要求
+            process_constraints: 加工约束条件
             
         Returns:
             str: 生成的NC程序代码
         """
         try:
-            # 步骤1: 解析用户需求
-            self.logger.info("解析用户需求...")
-            parsed_requirements = self.parse_user_requirements(user_prompt)
+            # 步骤1: 使用智能提示词构建器整合多源信息
+            self.logger.info("使用智能提示词构建器整合多源信息...")
+            full_prompt = prompt_builder.build_optimized_prompt(
+                user_description=user_prompt,
+                pdf_path=pdf_path,
+                image_path=image_path,
+                model_3d_path=model_3d_path,
+                material=material,
+                precision_requirement=precision_requirement,
+                process_constraints=process_constraints
+            )
             
-            # 步骤2: 从图纸中提取特征（如果提供）- 仅作为辅助参考
-            pdf_features = None
-            if pdf_path and HAS_PYMUPDF:
-                self.logger.info("从PDF中提取特征信息（作为辅助参考）...")
-                pdf_features = self.extract_features_from_pdf(pdf_path)
-                parsed_requirements = self.merge_requirements_and_features(parsed_requirements, pdf_features)
-            
-            # 步骤3: 生成NC程序 - 直接使用大模型生成
+            # 步骤2: 调用大模型生成NC程序
             self.logger.info("使用大模型生成NC程序...")
-            nc_program = self.generate_with_ai(parsed_requirements, pdf_features)
+            nc_program = self._call_large_language_model(full_prompt)
             
-            # 步骤4: 验证和优化
+            # 步骤3: 验证和优化
             self.logger.info("验证和优化NC程序...")
             validated_program = self.validate_and_optimize(nc_program)
             
@@ -675,18 +692,41 @@ class AIDrivenCNCGenerator:
 # 全局实例
 ai_generator = AIDrivenCNCGenerator()
 
-def generate_nc_with_ai(user_prompt: str, pdf_path: Optional[str] = None, api_key: Optional[str] = None, model: str = "deepseek-chat") -> str:
+def generate_nc_with_ai(
+    user_prompt: str, 
+    pdf_path: Optional[str] = None, 
+    image_path: Optional[str] = None,
+    model_3d_path: Optional[str] = None,
+    api_key: Optional[str] = None, 
+    model: str = "deepseek-chat",
+    material: str = "Aluminum",
+    precision_requirement: str = "General",
+    process_constraints: Optional[Dict] = None
+) -> str:
     """
-    AI驱动的NC程序生成函数
+    AI驱动的NC程序生成函数（重构：支持多源信息输入）
     
     Args:
         user_prompt: 用户需求描述
         pdf_path: 可选的PDF图纸路径
+        image_path: 可选的图像文件路径
+        model_3d_path: 可选的3D模型文件路径
         api_key: 大模型API密钥
         model: 使用的模型名称
+        material: 材料类型
+        precision_requirement: 精度要求
+        process_constraints: 加工约束条件
         
     Returns:
         str: 生成的NC程序代码
     """
     generator = AIDrivenCNCGenerator(api_key=api_key, model=model)
-    return generator.generate_nc_program(user_prompt, pdf_path)
+    return generator.generate_nc_program(
+        user_prompt, 
+        pdf_path, 
+        image_path, 
+        model_3d_path,
+        material,
+        precision_requirement,
+        process_constraints
+    )

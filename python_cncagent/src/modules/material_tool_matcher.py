@@ -56,6 +56,9 @@ def analyze_user_description(description: str) -> Dict:
     # 从描述中提取孔数量
     hole_count = _extract_hole_count(description)
     
+    # 提取工件尺寸信息
+    workpiece_dimensions = _extract_workpiece_dimensions(description)
+    
     result = {
         "processing_type": processing_type,
         "tool_required": tool_required,
@@ -67,6 +70,7 @@ def analyze_user_description(description: str) -> Dict:
         "hole_positions": hole_positions,  # 添加孔位置信息
         "reference_points": reference_points,  # 添加参考点信息
         "hole_count": hole_count,  # 添加孔数量信息
+        "workpiece_dimensions": workpiece_dimensions,  # 添加工件尺寸信息
         "description": description
     }
     
@@ -833,6 +837,81 @@ def _extract_counterbore_diameters(description: str) -> tuple:
             pass
     
     return None, None
+
+
+def _extract_workpiece_dimensions(description: str) -> Optional[Tuple[float, float, float]]:
+    """
+    从描述中提取工件尺寸信息
+    
+    Args:
+        description: 用户描述字符串
+        
+    Returns:
+        tuple: (长, 宽, 高) 或 None 如果没有找到
+    """
+    # 匹配格式如 "长400宽300深2毫米" 或 "400X300X2" 等
+    patterns = [
+        # 匹配 "长400宽300深2毫米" 格式
+        r'长[：:]?\s*(\d+\.?\d*)\s*(?:mm|毫米)?\s*宽[：:]?\s*(\d+\.?\d*)\s*(?:mm|毫米)?\s*(?:高|深|厚|高度|深度|厚度)[：:]?\s*(\d+\.?\d*)\s*(?:mm|毫米)?',
+        # 匹配 "长400宽300厚度2" 格式
+        r'长[：:]?\s*(\d+\.?\d*)\s*(?:mm|毫米)?\s*宽[：:]?\s*(\d+\.?\d*)\s*(?:mm|毫米)?\s*(?:高|深|厚|高度|深度|厚度)[：:]?\s*(\d+\.?\d*)\s*(?:mm|毫米)?',
+        # 匹配 "400X300X2" 格式
+        r'(\d+\.?\d*)\s*[xX*]\s*(\d+\.?\d*)\s*[xX*]\s*(\d+\.?\d*)',
+        # 匹配 "400*300*2" 格式
+        r'(\d+\.?\d*)\s*\*\s*(\d+\.?\d*)\s*\*\s*(\d+\.?\d*)',
+        # 匹配 "400×300×2" 格式
+        r'(\d+\.?\d*)\s*×\s*(\d+\.?\d*)\s*×\s*(\d+\.?\d*)',
+        # 匹配 "尺寸400X300X2" 格式
+        r'(?:尺寸|大小|规格)[：:]?\s*(\d+\.?\d*)\s*[xX*×]\s*(\d+\.?\d*)\s*[xX*×]\s*(\d+\.?\d*)',
+        # 匹配 "长宽高400X300X2" 格式
+        r'(?:长宽高|长×宽×高|L×W×H|长宽厚度)[：:]?\s*(\d+\.?\d*)\s*[xX*×]\s*(\d+\.?\d*)\s*[xX*×]\s*(\d+\.?\d*)',
+        # 匹配 "上平面尺寸长400宽300深2毫米" 格式
+        r'(?:上平面尺寸|平面尺寸|表面尺寸)[：:]?.*?长[：:]?\s*(\d+\.?\d*)\s*(?:mm|毫米)?\s*宽[：:]?\s*(\d+\.?\d*)\s*(?:mm|毫米)?\s*(?:深|厚度)[：:]?\s*(\d+\.?\d*)\s*(?:mm|毫米)?',
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, description, re.IGNORECASE)
+        for match in matches:
+            if len(match) == 3:
+                try:
+                    length = float(match[0])
+                    width = float(match[1])
+                    height = float(match[2])
+                    
+                    # 验证尺寸是否在合理范围内（避免误匹配其他数字）
+                    if 1 <= length <= 2000 and 1 <= width <= 2000 and 0.1 <= height <= 1000:
+                        return (length, width, height)
+                except (ValueError, TypeError):
+                    continue
+    
+    # 尝试匹配只有长度和宽度的情况（厚度可能未指定）
+    patterns_2d = [
+        # 匹配 "长400宽300" 格式
+        r'长[：:]?\s*(\d+\.?\d*)\s*(?:mm|毫米)?\s*宽[：:]?\s*(\d+\.?\d*)\s*(?:mm|毫米)?',
+        # 匹配 "400X300" 格式
+        r'(\d+\.?\d*)\s*[xX*]\s*(\d+\.?\d*)',
+        # 匹配 "400*300" 格式
+        r'(\d+\.?\d*)\s*\*\s*(\d+\.?\d*)',
+        # 匹配 "400×300" 格式
+        r'(\d+\.?\d*)\s*×\s*(\d+\.?\d*)',
+    ]
+    
+    for pattern in patterns_2d:
+        matches = re.findall(pattern, description, re.IGNORECASE)
+        for match in matches:
+            if len(match) == 2:
+                try:
+                    length = float(match[0])
+                    width = float(match[1])
+                    
+                    # 验证尺寸是否在合理范围内
+                    if 1 <= length <= 2000 and 1 <= width <= 2000:
+                        # 对于2D尺寸，高度设为默认值（例如10mm）
+                        return (length, width, 10.0)
+                except (ValueError, TypeError):
+                    continue
+    
+    return None
 
 
 def _extract_hole_count(description: str) -> int:

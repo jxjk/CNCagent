@@ -1,6 +1,6 @@
 """
 统一CNC程序生成入口
-重构：直接调用大模型生成NC代码，PDF特征仅作为辅助参考
+重构：完全以大模型为中心，利用智能提示词构建器整合多源信息
 """
 import logging
 from typing import Dict, Optional, List, Any
@@ -9,9 +9,9 @@ from pathlib import Path
 from src.exceptions import CNCError, InputValidationError, handle_exception
 from .ai_driven_generator import generate_nc_with_ai
 from .ocr_ai_inference import extract_features_from_pdf_with_ai
-from .gcode_generation import generate_fanuc_nc  # 保留作为备用
+from .gcode_generation import generate_fanuc_nc  # 保留作为备用验证
 from .material_tool_matcher import analyze_user_description
-from .feature_definition import identify_features  # 保留作为备用
+from .feature_definition import identify_features  # 保留作为备用验证
 from .feature_completeness_evaluator import evaluate_feature_completeness, query_system, CompletenessLevel
 from .model_3d_processor import process_3d_model, Model3DProcessor
 
@@ -350,28 +350,42 @@ def generate_cnc_with_unified_approach(
     user_priority_weight: float = 1.0,
     api_key: Optional[str] = None,
     model: str = "deepseek-chat",
-    enable_completeness_check: bool = True
+    enable_completeness_check: bool = True,
+    material: str = "Aluminum",
+    precision_requirement: str = "General",
+    process_constraints: Optional[Dict] = None
 ) -> str:
     """
-    使用统一方法生成CNC程序
+    使用统一方法生成CNC程序（重构：完全以大模型为中心）
     
     Args:
         user_prompt: 用户需求描述
         pdf_path: PDF图纸路径
         image_path: 图像文件路径
         model_3d_path: 3D模型文件路径
-        use_ai_primary: 是否优先使用AI驱动方法
+        use_ai_primary: 是否优先使用AI驱动方法（重构：始终使用AI方法）
         user_priority_weight: 用户描述优先级权重 (0.0-1.0)，1.0表示最高优先级
         api_key: 大模型API密钥
         model: 使用的模型名称
         enable_completeness_check: 是否启用特征完整性检查
+        material: 材料类型
+        precision_requirement: 精度要求
+        process_constraints: 加工约束条件
         
     Returns:
         str: 生成的NC程序代码
     """
-    generator = UnifiedCNCGenerator(api_key=api_key, model=model)
-    return generator.generate_cnc_program(
-        user_prompt, pdf_path, image_path, model_3d_path, use_ai_primary, user_priority_weight, enable_completeness_check
+    # 调用AI驱动生成器，现在完全以大模型为中心
+    return generate_nc_with_ai(
+        user_prompt=user_prompt,
+        pdf_path=pdf_path,
+        image_path=image_path,
+        model_3d_path=model_3d_path,
+        api_key=api_key,
+        model=model,
+        material=material,
+        precision_requirement=precision_requirement,
+        process_constraints=process_constraints
     )
 
 def generate_cnc_with_hybrid_approach(
