@@ -470,3 +470,103 @@
 2025-12-26 08:35:55,488 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
 2025-12-26 08:35:55,488 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
 2025-12-26 08:35:55,489 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-26 08:35:58,574 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-26 08:36:27,650 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 1716
+2025-12-26 08:36:27,651 - src.modules.ai_driven_generator - INFO - 提取到 1 个代码块
+2025-12-26 08:36:27,651 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-26 08:36:27,651 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-26 08:36:27,652 - root - INFO - 正在生成模拟报告...
+2025-12-26 08:36:27,681 - root - INFO - 模拟报告已生成: simulation_report.txt
+2025-12-26 08:36:27,685 - werkzeug - INFO - 127.0.0.1 - - [26/Dec/2025 08:36:27] "POST /generate_nc HTTP/1.1" 200 -
+2025-12-26 09:52:37,124 - root - WARNING - 警告: 未安装open3d库，3D模型处理功能将受限
+2025-12-26 09:52:39,038 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-26 09:52:39,038 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-26 09:52:39,039 - __main__ - INFO - 预加载核心模块成功
+2025-12-26 09:52:39,041 - __main__ - INFO - 启动模式: GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-26 09:52:39,043 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-26 09:52:39,076 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-26 09:52:39,077 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-26 09:52:41,044 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-26 09:52:41,063 - root - WARNING - 警告: 未安装open3d库，3D模型处理功能将受限
+2025-12-26 09:52:41,071 - __main__ - INFO - 启动GUI界面...
+2025-12-26 09:53:17,738 - werkzeug - INFO - 127.0.0.1 - - [26/Dec/2025 09:53:17] "GET / HTTP/1.1" 200 -
+2025-12-26 09:53:53,740 - root - INFO - 开始处理输入文件...
+2025-12-26 09:53:53,741 - root - INFO - 使用大模型直接生成NC程序，PDF/3D模型特征仅作为辅助参考...
+2025-12-26 09:53:54,331 - src.modules.feature_completeness_evaluator - INFO - 特征完整性评估完成，等级: incomplete, 置信度: 0.38
+2025-12-26 09:53:54,331 - src.modules.unified_generator - INFO - 特征完整性评估: incomplete, 置信度: 0.38
+2025-12-26 09:53:54,331 - src.modules.unified_generator - WARNING - 检测到信息不完整: ['feature_positions', 'feature_sizes', '缺少材料信息', '缺少主轴转速信息', '缺少进给速度信息']
+2025-12-26 09:53:54,332 - src.modules.ai_driven_generator - INFO - 解析用户需求...
+2025-12-26 09:53:54,338 - src.modules.ai_driven_generator - INFO - 从PDF中提取特征信息（作为辅助参考）...
+2025-12-26 09:53:54,345 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-26 09:53:54,346 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-26 09:53:54,346 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-26 09:53:57,698 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-26 09:54:31,116 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 2120
+2025-12-26 09:54:31,116 - src.modules.ai_driven_generator - INFO - 提取到 1 个代码块
+2025-12-26 09:54:31,117 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-26 09:54:31,117 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-26 09:54:31,117 - root - INFO - 正在生成模拟报告...
+2025-12-26 09:54:31,119 - root - INFO - 模拟报告已生成: simulation_report.txt
+2025-12-26 09:54:31,123 - werkzeug - INFO - 127.0.0.1 - - [26/Dec/2025 09:54:31] "POST /generate_nc HTTP/1.1" 200 -
+2025-12-26 10:01:58,543 - root - INFO - 开始处理输入文件...
+2025-12-26 10:01:58,544 - root - INFO - 使用大模型直接生成NC程序，PDF/3D模型特征仅作为辅助参考...
+2025-12-26 10:01:58,969 - src.modules.feature_completeness_evaluator - INFO - 特征完整性评估完成，等级: incomplete, 置信度: 0.38
+2025-12-26 10:01:58,970 - src.modules.unified_generator - INFO - 特征完整性评估: incomplete, 置信度: 0.38
+2025-12-26 10:01:58,970 - src.modules.unified_generator - WARNING - 检测到信息不完整: ['feature_positions', 'feature_sizes', '缺少孔位置坐标信息', '缺少材料信息', '缺少主轴转速信息', '缺少进给速度信息']
+2025-12-26 10:01:58,970 - src.modules.ai_driven_generator - INFO - 解析用户需求...
+2025-12-26 10:01:58,971 - src.modules.ai_driven_generator - INFO - 从PDF中提取特征信息（作为辅助参考）...
+2025-12-26 10:01:58,975 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-26 10:01:58,975 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-26 10:01:58,976 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-26 10:02:01,308 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-26 10:02:22,434 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 1050
+2025-12-26 10:02:22,434 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-26 10:02:22,435 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-26 10:02:22,435 - root - INFO - 正在生成模拟报告...
+2025-12-26 10:02:22,437 - root - INFO - 模拟报告已生成: simulation_report.txt
+2025-12-26 10:02:22,440 - werkzeug - INFO - 127.0.0.1 - - [26/Dec/2025 10:02:22] "POST /generate_nc HTTP/1.1" 200 -
+2025-12-29 12:27:40,880 - root - WARNING - 警告: 未安装open3d库，3D模型处理功能将受限
+2025-12-29 12:27:50,422 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-29 12:27:50,422 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-29 12:27:50,423 - __main__ - INFO - 预加载核心模块成功
+2025-12-29 12:27:50,427 - __main__ - INFO - 启动模式: 仅Web服务器 (地址: 0.0.0.0:5000)
+2025-12-29 12:27:50,428 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-29 12:27:50,519 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-29 12:27:50,520 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-29 12:28:36,513 - root - INFO - 开始处理输入文件...
+2025-12-29 12:28:36,514 - root - INFO - 使用大模型直接生成NC程序，PDF/3D模型特征仅作为辅助参考...
+2025-12-29 12:28:36,974 - src.modules.feature_completeness_evaluator - INFO - 特征完整性评估完成，等级: incomplete, 置信度: 0.38
+2025-12-29 12:28:36,975 - src.modules.unified_generator - INFO - 特征完整性评估: incomplete, 置信度: 0.38
+2025-12-29 12:28:36,975 - src.modules.unified_generator - WARNING - 检测到信息不完整: ['feature_positions', 'feature_sizes', '缺少孔位置坐标信息', '缺少材料信息', '缺少主轴转速信息', '缺少进给速度信息']
+2025-12-29 12:28:36,975 - src.modules.ai_driven_generator - INFO - 解析用户需求...
+2025-12-29 12:28:36,979 - src.modules.ai_driven_generator - INFO - 从PDF中提取特征信息（作为辅助参考）...
+2025-12-29 12:28:36,983 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-29 12:28:36,984 - src.modules.ai_driven_generator - WARNING - 未提供API密钥，使用模拟生成。请检查DEEPSEEK_API_KEY或OPENAI_API_KEY环境变量是否正确设置。
+2025-12-29 12:28:36,984 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-29 12:28:36,985 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-29 12:28:36,985 - root - INFO - 正在生成模拟报告...
+2025-12-29 12:28:36,987 - root - INFO - 模拟报告已生成: simulation_report.txt
+2025-12-29 12:28:36,995 - werkzeug - INFO - 127.0.0.1 - - [29/Dec/2025 12:28:36] "POST /generate_nc HTTP/1.1" 200 -
+2025-12-29 12:29:17,321 - __main__ - INFO - 收到信号 2，正在关闭...
+2025-12-29 12:30:11,878 - root - WARNING - 警告: 未安装open3d库，3D模型处理功能将受限
+2025-12-29 12:30:13,636 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-29 12:30:13,637 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-29 12:30:13,637 - __main__ - INFO - 预加载核心模块成功
+2025-12-29 12:30:13,640 - __main__ - INFO - 启动模式: GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-29 12:30:13,641 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-29 12:30:13,671 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-29 12:30:13,671 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-29 12:30:15,641 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-29 12:30:15,686 - root - WARNING - 警告: 未安装open3d库，3D模型处理功能将受限
+2025-12-29 12:30:15,699 - __main__ - INFO - 启动GUI界面...
+2025-12-29 12:30:24,067 - root - INFO - 开始处理输入文件...
+2025-12-29 12:30:24,068 - root - INFO - 使用大模型直接生成NC程序，PDF/3D模型特征仅作为辅助参考...

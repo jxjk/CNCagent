@@ -174,10 +174,11 @@ def _select_and_adjust_coordinate_system(features: List[Dict], drawing_info: Any
 
 def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.0,
                         coordinate_strategy: str = "highest_y", custom_origin: Optional[Tuple[float, float]] = None,
-                        api_key: Optional[str] = None, model: str = "gpt-3.5-turbo") -> str:
+                        api_key: Optional[str] = None, model: str = "gpt-3.5-turbo",
+                        model_3d_path: Optional[str] = None) -> str:
     """
-    完整流程：从PDF图纸和用户描述生成NC程序（重构版）
-    直接使用大模型生成，PDF特征仅作为辅助参考
+    完整流程：从PDF图纸、3D模型和用户描述生成NC程序（重构版）
+    直接使用大模型生成，PDF/图像/3D模型特征仅作为辅助参考
     
     Args:
         pdf_path (str): PDF图纸路径
@@ -187,18 +188,20 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
         custom_origin (Tuple[float, float]): 自定义原点坐标
         api_key (str): 大模型API密钥
         model (str): 使用的模型名称
+        model_3d_path (str): 3D模型文件路径（可选）
     
     Returns:
         str: 生成的NC程序代码
     """
     import logging
-    logging.info("开始处理PDF图纸...")
+    logging.info("开始处理输入文件...")
     
     # 使用重构后的AI优先生成器，直接调用大模型生成NC代码
-    logging.info("使用大模型直接生成NC程序，PDF特征仅作为辅助参考...")
+    logging.info("使用大模型直接生成NC程序，PDF/3D模型特征仅作为辅助参考...")
     nc_program = generate_cnc_with_unified_approach(
         user_prompt=user_description, 
         pdf_path=pdf_path,
+        model_3d_path=model_3d_path,  # 新增3D模型路径参数
         api_key=api_key,
         model=model
     )
@@ -283,9 +286,10 @@ if __name__ == "__main__":
         print("  help         显示帮助信息")
         print("")
         print("处理PDF参数:")
-        print("  python main.py process <pdf_path> <user_description> [scale] [coordinate_strategy] [custom_origin_x] [custom_origin_y]")
-        print('  示例: python main.py process part_design.pdf "请加工一个100mm x 50mm的矩形，使用铣削加工" 1.0 highest_y')
+        print("  python main.py process <pdf_path> [model_3d_path] <user_description> [scale] [coordinate_strategy] [custom_origin_x] [custom_origin_y]")
+        print('  示例: python main.py process part_design.pdf part_model.stl "请加工一个100mm x 50mm的矩形，使用铣削加工" 1.0 highest_y')
         print("  坐标策略选项: highest_y, lowest_y, leftmost_x, rightmost_x, center, custom, geometric_center")
+        print("  注意: 可同时提供PDF和3D模型文件，系统将结合两者信息生成更准确的NC代码")
         print("")
         print("环境变量设置:")
         print("  DEEPSEEK_API_KEY    设置DeepSeek API密钥（优先使用）")
@@ -315,19 +319,42 @@ if __name__ == "__main__":
     elif command == "process":
         if len(sys.argv) < 3:
             print("错误: 需要提供PDF路径和用户描述")
-            print("用法: python main.py process <pdf_path> <user_description> [scale] [coordinate_strategy] [custom_origin_x] [custom_origin_y]")
+            print("用法: python main.py process <pdf_path> [model_3d_path] <user_description> [scale] [coordinate_strategy] [custom_origin_x] [custom_origin_y]")
             sys.exit(1)
         
-        pdf_path = sys.argv[2]
-        user_description = sys.argv[3] if len(sys.argv) > 3 else ""
-        scale = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0
-        coordinate_strategy = sys.argv[5] if len(sys.argv) > 5 else "highest_y"
+        # 解析命令行参数
+        # 参数顺序: command pdf_path [model_3d_path] user_description [scale] [coordinate_strategy] [custom_origin_x] [custom_origin_y]
+        arg_idx = 2  # 从sys.argv[2]开始
+        
+        # 获取PDF路径
+        pdf_path = sys.argv[arg_idx]
+        arg_idx += 1
+        
+        # 检查下一个参数是否为3D模型文件
+        model_3d_path = None
+        if arg_idx < len(sys.argv):
+            potential_3d_path = sys.argv[arg_idx]
+            potential_path = Path(potential_3d_path)
+            if potential_path.exists() and potential_path.suffix.lower() in ['.stl', '.step', '.stp', '.igs', '.iges', '.obj', '.ply', '.off', '.gltf', '.glb']:
+                model_3d_path = potential_3d_path
+                arg_idx += 1
+        
+        # 获取用户描述
+        user_description = sys.argv[arg_idx] if arg_idx < len(sys.argv) else ""
+        arg_idx += 1
+        
+        # 获取其他可选参数
+        scale = float(sys.argv[arg_idx]) if arg_idx < len(sys.argv) else 1.0
+        arg_idx += 1
+        
+        coordinate_strategy = sys.argv[arg_idx] if arg_idx < len(sys.argv) else "highest_y"
+        arg_idx += 1
         
         custom_origin = None
-        if len(sys.argv) > 7:
+        if arg_idx + 1 < len(sys.argv):  # 需要两个参数：x和y坐标
             try:
-                custom_origin_x = float(sys.argv[6])
-                custom_origin_y = float(sys.argv[7])
+                custom_origin_x = float(sys.argv[arg_idx])
+                custom_origin_y = float(sys.argv[arg_idx + 1])
                 custom_origin = (custom_origin_x, custom_origin_y)
             except ValueError:
                 print("自定义原点坐标必须是数字")
@@ -349,7 +376,26 @@ if __name__ == "__main__":
             print(f"错误: 文件路径 {pdf_path} 超出允许范围")
             sys.exit(1)
         
+        # 验证3D模型路径（如果提供）
+        if model_3d_path:
+            model_3d_path = os.path.abspath(model_3d_path)
+            model_file = Path(model_3d_path)
+            if not model_file.exists():
+                print(f"错误: 3D模型文件 {model_3d_path} 不存在")
+                sys.exit(1)
+            if model_file.suffix.lower() not in ['.stl', '.step', '.stp', '.igs', '.iges', '.obj', '.ply', '.off', '.gltf', '.glb']:
+                print(f"错误: 文件 {model_3d_path} 不是支持的3D模型格式")
+                print(f"支持的格式: .stl, .step, .stp, .igs, .iges, .obj, .ply, .off, .gltf, .glb")
+                sys.exit(1)
+            # 防止路径遍历攻击
+            resolved_path = model_file.resolve()
+            if not resolved_path.is_relative_to(base_path):
+                print(f"错误: 文件路径 {model_3d_path} 超出允许范围")
+                sys.exit(1)
+        
         print(f"正在处理PDF文件: {pdf_path}")
+        if model_3d_path:
+            print(f"同时处理3D模型: {model_3d_path}")
         print(f"用户描述: {user_description}")
         print(f"比例: {scale}")
         print(f"坐标策略: {coordinate_strategy}")
@@ -369,7 +415,8 @@ if __name__ == "__main__":
                 coordinate_strategy, 
                 custom_origin,
                 api_key=api_key,
-                model=model
+                model=model,
+                model_3d_path=model_3d_path  # 传递3D模型路径
             )
             print("\n生成的NC程序:")
             print(nc_program)

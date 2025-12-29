@@ -1,15 +1,15 @@
 ============================================================
 CNC 加工模拟报告
 ============================================================
-生成时间: 2025-12-26 08:36:27
+生成时间: 2025-12-29 12:30:58
 
 识别出的几何特征:
 ------------------------------
 用户描述分析:
 ------------------------------
-加工类型: counterbore
-所需刀具: counterbore_tool
-加工深度: 22.0 mm
+加工类型: drilling
+所需刀具: drill_bit
+加工深度: 300.0 mm
 进给速度: None mm/min
 主轴转速: None RPM
 材料: None
@@ -17,34 +17,34 @@ CNC 加工模拟报告
 
 NC程序统计:
 ------------------------------
-总行数: 83
-G代码行数: 35
-M代码行数: 10
-换刀次数: 3
+总行数: 49
+G代码行数: 25
+M代码行数: 4
+换刀次数: 4
 
 NC程序预览 (前20行):
 ------------------------------
-  O1001 (COUNTERBORE WITH POLAR COORDINATES)
-  (TOOL LIST: T01 - CENTER DRILL, T02 - DRILL, T03 - COUNTERBORE)
-  (MATERIAL: NOT SPECIFIED)
-  (PROGRAMMER: FANUC EXPERT)
-  (DATE: 2024)
+  O1000 (MAIN PROGRAM - FACE MILLING AND DRILLING)
+  (400X300X2, CENTER DRILLED HOLE)
+  (TOOL LIST: T01 - FACE MILL D63, T02 - FINISH FACE MILL D125, T03 - CENTER DRILL, T04 - DRILL D12)
   
-  (INITIALIZATION)
-  G21 (MILLIMETER MODE)
-  G90 (ABSOLUTE PROGRAMMING)
-  G94 (FEED PER MINUTE)
-  G17 (XY PLANE SELECTION)
-  G40 (CANCEL CUTTER COMP)
-  G49 (CANCEL TOOL LENGTH OFFSET)
-  G80 (CANCEL CANNED CYCLE)
-  G69 (CANCEL COORDINATE ROTATION)
-  G15 (CANCEL POLAR COORDINATES)
-  
-  (SAFETY SETTINGS)
+  G21 G17 G40 G49 G80 G90 G94 (INITIALIZATION)
   G91 G28 Z0 (RETURN TO Z HOME)
-  G90 (ABSOLUTE MODE)
-  ... 还有 63 行
+  G90 G54 G00 X0 Y0 (WORKPIECE CENTER, TOP)
+  
+  (=== FACE MILLING - ROUGHING ===)
+  T01 M06 (FACE MILL D63 - ROUGH)
+  G00 G90 G54 X-250. Y0 S800 M03 (POSITION, START SPINDLE)
+  G43 H01 Z50. M08 (TOOL LENGTH COMP, SAFE HEIGHT, COOLANT ON)
+  Z5.
+  G01 Z-2. F200. (PLUNGE TO DEPTH)
+  X250. F500. (FACE MILL PASS)
+  G00 Z50. M09
+  G91 G28 Z0 M05
+  M01 (OPTIONAL STOP)
+  
+  (=== FACE MILLING - FINISHING ===)
+  ... 还有 29 行
 
 ============================================================
 报告结束

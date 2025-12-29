@@ -17,6 +17,9 @@ CNC Agent 是一个 AI 辅助的从 PDF 图纸自动生成 FANUC NC 程序的 Py
 9. **统一代码生成入口** - 整合AI驱动、OCR推理和传统图像处理功能
 10. **Web API 接口** - 提供 RESTful API 服务，支持远程调用
 11. **统一启动器** - 支持同时或单独启动GUI界面和Web服务器
+12. **3D模型处理** - 支持STL、STEP等格式的3D模型，提取几何特征用于CNC加工
+13. **特征完整性评估** - 评估图纸和描述信息的完整性，识别缺失信息并提供补充建议
+14. **智能信息补充** - 当信息不完整时，生成针对性问题引导用户提供必要信息
 12. **AI优先生成** - 直接使用大模型生成NC代码，PDF特征仅作辅助参考
 
 ### 支持的加工工艺
@@ -141,11 +144,15 @@ python start_server.py
 ### 直接运行主程序
 
 ```bash
-# 基本用法
+# 基本用法（仅PDF）
 python src/main.py process <pdf_path> <user_description> [scale] [coordinate_strategy]
+
+# 使用3D模型（推荐）
+python src/main.py process <pdf_path> [model_3d_path] <user_description> [scale] [coordinate_strategy]
 
 # 示例
 python src/main.py process part_design.pdf "请加工一个100mm x 50mm的矩形，使用铣削加工" 1.0 highest_y
+python src/main.py process part_design.pdf model.stl "请加工一个100mm x 50mm的矩形，使用铣削加工" 1.0 highest_y
 
 # 坐标策略选项: highest_y, lowest_y, leftmost_x, rightmost_x, center, custom, geometric_center
 ```
@@ -385,6 +392,31 @@ pytest -m "not slow"  # 跳过慢速测试
 - 灵活的配置选项，支持自定义端口和主机地址
 - 统一的日志记录和错误处理
 - 优雅的进程管理，支持信号处理
+
+### 新特性：3D模型支持与特征完整性评估
+
+#### 3D模型处理能力
+CNC Agent现在支持多种3D模型格式，能够：
+- 加载STL、STEP、IGES、OBJ等常见3D格式
+- 提取几何特征（顶点、面、体积、表面积等）
+- 检测几何基元（平面、圆柱面等）
+- 将3D信息与2D图纸信息融合，生成更精确的NC代码
+
+#### 特征完整性评估
+系统现在具备智能评估能力：
+- 自动检测图纸和描述中的信息缺失
+- 识别关键信息（坐标、深度、直径、加工类型等）
+- 生成改进建议和补充提示
+- 提供交互式查询，引导用户提供必要信息
+
+#### 混合输入模式
+支持多种输入组合：
+- 仅PDF图纸
+- PDF + 3D模型（推荐，精度最高）
+- 仅3D模型 + 用户描述
+- PDF + 图像 + 3D模型（最高精度）
+
+这些新功能显著提高了系统的鲁棒性和易用性，即使在图纸信息不完整的情况下也能生成高质量的NC代码。
 
 ### 新特性：AI优先生成
 
