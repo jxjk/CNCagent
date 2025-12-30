@@ -137,7 +137,8 @@ def generate_nc():
                 coordinate_strategy=coordinate_strategy,  # 添加坐标策略
                 model_3d_path=model_3d_path,  # 可能为None
                 api_key=api_key,
-                model=model
+                model=model,
+                material=request.form.get('material', 'Aluminum')  # 添加材料参数
             )
             
             logging.info("NC程序生成完成")
@@ -254,7 +255,8 @@ def generate_api():
                 pdf_path=temp_pdf_path,
                 scale=scale,
                 api_key=api_key,
-                model=model
+                model=model,
+                material=data.get('material', 'Aluminum')  # 添加材料参数
             )
             
             return jsonify({

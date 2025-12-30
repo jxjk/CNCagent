@@ -175,7 +175,7 @@ def _select_and_adjust_coordinate_system(features: List[Dict], drawing_info: Any
 def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.0,
                         coordinate_strategy: str = "highest_y", custom_origin: Optional[Tuple[float, float]] = None,
                         api_key: Optional[str] = None, model: str = "gpt-3.5-turbo",
-                        model_3d_path: Optional[str] = None) -> str:
+                        model_3d_path: Optional[str] = None, material: str = "Aluminum") -> str:
     """
     完整流程：从PDF图纸、3D模型和用户描述生成NC程序（重构版）
     直接使用大模型生成，PDF/图像/3D模型特征仅作为辅助参考
@@ -203,7 +203,8 @@ def generate_nc_from_pdf(pdf_path: str, user_description: str, scale: float = 1.
         pdf_path=pdf_path,
         model_3d_path=model_3d_path,  # 新增3D模型路径参数
         api_key=api_key,
-        model=model
+        model=model,
+        material=material  # 添加材料参数
     )
     
     # 生成模拟报告和可视化
@@ -244,34 +245,104 @@ def run_ai_helper_gui():
 
 
 def generate_nc_with_ai_helper(pdf_path: str, user_description: str, material: str = "Aluminum", scale: float = 1.0) -> str:
+
+
     """
+
+
     使用AI辅助工具从PDF生成NC代码
 
+
+
+
+
     Args:
+
+
         pdf_path (str): PDF图纸路径
+
+
         user_description (str): 用户描述
+
+
         material (str): 材料类型
+
+
         scale (float): 比例尺因子
 
+
+
+
+
     Returns:
+
+
         str: 生成的NC程序代码
+
+
     """
+
+
     print("使用AI辅助工具生成NC程序...")
+
+
     
-    # 初始化AI辅助工具
-    nc_helper = AI_NC_Helper()
+
+
+    # 为了保持与GUI和WEB端的一致性，使用统一生成器
+
+
+    from .modules.unified_generator import generate_cnc_with_unified_approach
+
+
+    import os
+
+
     
-    # 提取文本信息
-    from .modules.pdf_parsing_process import extract_text_from_pdf
-    all_text = extract_text_from_pdf(pdf_path)
+
+
+    # 从环境变量获取API配置
+
+
+    api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
+
+
+    model = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))
+
+
     
-    # 使用AI辅助工具的PDF处理功能
-    nc_code = nc_helper.process_pdf(
-        pdf_path,
-        all_text,
-        material,
-        user_description
+
+
+    # 使用统一生成器，确保与GUI和WEB端一致
+
+
+    nc_code = generate_cnc_with_unified_approach(
+
+
+        user_prompt=user_description,
+
+
+        pdf_path=pdf_path,
+
+
+        model_3d_path=None,  # 命令行模式不支持3D模型
+
+
+        api_key=api_key,
+
+
+        model=model,
+
+
+        material=material
+
+
     )
+
+
+    
+
+
     return nc_code
 
 

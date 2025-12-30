@@ -526,7 +526,7 @@ class AIDrivenCNCGenerator:
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.1,  # 低温度以获得更一致的结果
-                    max_tokens=2000
+                    max_tokens=4000  # 增加输出长度限制，以支持更复杂的NC程序
                 )
                 
                 generated_code = response.choices[0].message.content
@@ -535,10 +535,42 @@ class AIDrivenCNCGenerator:
                 # 提取代码块（如果有的话）
                 if "```" in generated_code:
                     import re
-                    code_blocks = re.findall(r'```(?:nc|gcode|fanuc)?\n(.*?)\n```', generated_code, re.DOTALL)
-                    if code_blocks:
-                        self.logger.info(f"提取到 {len(code_blocks)} 个代码块")
-                        return code_blocks[0].strip()
+                    # 尝试多种代码块提取模式
+                    code_patterns = [
+                        r'```(?:nc|gcode|fanuc)?\n(.*?)\n```',  # 标准代码块
+                        r'```(?:nc|gcode|fanuc)?\n(.*?)(?=```|$)',  # 开放式代码块（不强制闭合）
+                        r'```\n(.*?)\n```',  # 通用代码块
+                        r'```\n(.*?)(?=```|$)'  # 开放式通用代码块
+                    ]
+                    
+                    for pattern in code_patterns:
+                        code_blocks = re.findall(pattern, generated_code, re.DOTALL)
+                        if code_blocks:
+                            self.logger.info(f"使用模式 '{pattern}' 提取到 {len(code_blocks)} 个代码块")
+                            # 返回最大的代码块（通常是最完整的）
+                            largest_block = max(code_blocks, key=len)
+                            return largest_block.strip()
+                
+                # 如果没有找到代码块，检查是否以G代码开头或包含G/M代码
+                import re
+                if re.search(r'(?:^|\n)\s*G\d+|M\d+', generated_code):
+                    # 从第一个G/M代码开始提取
+                    start_match = re.search(r'(?:^|\n)\s*(?:G|M)\d+', generated_code)
+                    if start_match:
+                        start_pos = start_match.start()
+                        # 找到最后一个G代码或M代码
+                        end_matches = list(re.finditer(r'(?:^|\n)\s*M30', generated_code))  # 程序结束
+                        if end_matches:
+                            end_pos = end_matches[-1].end()
+                            return generated_code[start_pos:end_pos].strip()
+                        else:
+                            # 找到其他结束指令
+                            end_matches = list(re.finditer(r'(?:^|\n)\s*M0[25]|%', generated_code))
+                            if end_matches:
+                                end_pos = end_matches[-1].end()
+                                return generated_code[start_pos:end_pos].strip()
+                            else:
+                                return generated_code[start_pos:].strip()
                 
                 return generated_code.strip()
             else:
