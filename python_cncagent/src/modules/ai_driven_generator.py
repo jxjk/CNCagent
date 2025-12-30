@@ -11,24 +11,16 @@ from pathlib import Path
 import requests
 import openai
 
-# 尝试导入可能需要的库，如果不存在则使用替代方案
+# 仅保留必要的库导入，减少对传统CV库的依赖
 try:
-    import fitz  # PyMuPDF
+    import fitz  # PyMuPDF - 用于PDF文本提取
     HAS_PYMUPDF = True
 except ImportError:
     HAS_PYMUPDF = False
     import logging
     logging.warning("警告: 未安装PyMuPDF库，PDF功能将受限")
 
-try:
-    import cv2
-    import numpy as np
-    HAS_OPENCV = True
-except ImportError:
-    HAS_OPENCV = False
-    import logging
-    logging.warning("警告: 未安装OpenCV库，图像处理功能将受限")
-
+# 不再导入OpenCV和numpy，因为我们现在使用大模型进行特征识别
 from .prompt_builder import prompt_builder
 
 @dataclass
@@ -222,44 +214,56 @@ class AIDrivenCNCGenerator:
     
     def extract_features_from_pdf(self, pdf_path: str) -> Dict:
         """
-        从PDF图纸中提取特征信息（仅作为辅助参考）
+        从PDF图纸中提取文本和视觉信息供大模型理解（仅作为辅助参考）
+        现在主要依赖大模型来理解和解释PDF内容
         
         Args:
             pdf_path: PDF文件路径
             
         Returns:
-            Dict: 提取的特征信息
+            Dict: 提取的信息，主要用于构建提示词
         """
         if not HAS_PYMUPDF:
             return {"error": "PyMuPDF未安装，无法处理PDF文件"}
         
         try:
             doc = fitz.open(pdf_path)
-            features = {
+            result = {
                 "text_content": "",
-                "dimensions": [],
-                "annotations": [],
-                "image_features": []
+                "page_count": len(doc),
+                "has_images": False,
+                "potential_dimensions": [],
+                "annotations": []
             }
             
+            # 仅提取文本内容，让大模型来解释几何特征
             for page_num in range(len(doc)):
                 page = doc[page_num]
                 
-                # 提取文本内容
+                # 提取所有文本内容
                 text = page.get_text()
-                features["text_content"] += text + "\n"
+                result["text_content"] += f"\n--- PAGE {page_num + 1} ---\n{text}\n"
                 
-                # 提取尺寸标注（简化版本）
-                # 在实际应用中，这里需要更复杂的图像和文本分析
-                blocks = page.get_text_blocks()
-                for block in blocks:
-                    if len(block[4]) > 2:  # 简单的文本块判断
-                        # 检查是否包含尺寸信息
-                        if any(char.isdigit() for char in block[4]) and any(unit in block[4] for unit in ['mm', 'cm', 'φ', 'R']):
-                            features["dimensions"].append(block[4])
+                # 检查是否有图像
+                image_list = page.get_images()
+                if image_list:
+                    result["has_images"] = True
+                
+                # 提取可能的尺寸信息（仅做简单识别，复杂几何特征由大模型处理）
+                import re
+                # 匹配可能的尺寸标注，如 100mm, φ20, R15 等
+                dimension_pattern = r'(?:φ|Φ|D|d|R|r|SΦ|Sφ|SR|sr)?\s*(\d+(?:\.\d+)?)\s*(?:x|\*|X)?\s*(\d+(?:\.\d+)?)?(?:\s*mm|cm|in)?'
+                potential_dims = re.findall(dimension_pattern, text)
+                for dim in potential_dims:
+                    result["potential_dimensions"].append(f"尺寸: {' x '.join(filter(None, dim))}mm")
+                
+                # 提取标注信息
+                annotation_pattern = r'(?:标注|说明|注释|NOTE|note|Remark|remark)[:：]\s*([^\n\r]+)'
+                annotations = re.findall(annotation_pattern, text)
+                result["annotations"].extend(annotations)
             
             doc.close()
-            return features
+            return result
         except Exception as e:
             self.logger.error(f"处理PDF文件时出错: {str(e)}")
             return {"error": f"处理PDF文件时出错: {str(e)}"}
@@ -305,59 +309,51 @@ class AIDrivenCNCGenerator:
         
         return requirements
     
-    def _build_generation_prompt(self, requirements: ProcessingRequirements, pdf_features: Dict = None) -> str:
+    def _build_generation_prompt(self, requirements: ProcessingRequirements, pdf_features: Dict = None, image_path: Optional[str] = None, model_3d_path: Optional[str] = None) -> str:
         """
-        构建大模型生成NC代码的提示词
+        构建大模型生成NC代码的智能提示词
         
         Args:
             requirements: 解析后的需求
-            pdf_features: PDF提取的特征信息（辅助参考）
+            pdf_features: PDF提取的信息（辅助参考）
+            image_path: 图像文件路径
+            model_3d_path: 3D模型文件路径
             
         Returns:
             str: 构建的提示词
         """
-        prompt = f"""
-你是一个专业的FANUC数控机床编程专家。请根据以下用户需求生成符合FANUC标准的NC程序代码。
-
-用户需求:
-{requirements.user_prompt}
-
-加工类型: {requirements.processing_type}
-材料: {requirements.material or '未指定'}
-深度: {requirements.depth or '未指定'} mm
-孔位置: {requirements.hole_positions or '未指定'}
-工具直径: {requirements.tool_diameters or '未指定'}
-特殊要求: {requirements.special_requirements or '无'}
-
-"""
+        # 使用智能提示词构建器
+        from .prompt_builder import prompt_builder
         
-        if pdf_features and "text_content" in pdf_features:
-            prompt += f"""
-            
-图纸参考信息（仅在与用户需求一致时使用）：
-图纸文本内容: {pdf_features['text_content'][:500]}...
-图纸标注尺寸: {', '.join(pdf_features.get('dimensions', [])[:5])}
-            
-重要提醒：如果图纸信息与用户需求冲突，必须严格以用户需求为准。
-"""
+        # 准备约束条件
+        process_constraints = {
+            "processing_type": requirements.processing_type,
+            "material": requirements.material,
+            "depth": requirements.depth,
+            "tool_diameters": requirements.tool_diameters
+        }
         
+        # 构建优化的提示词
+        prompt = prompt_builder.build_optimized_prompt(
+            user_description=requirements.user_prompt,
+            pdf_path=None,  # PDF信息已通过pdf_features提供
+            image_path=image_path,
+            model_3d_path=model_3d_path,
+            material=requirements.material or "Aluminum",
+            precision_requirement="General",
+            process_constraints=process_constraints
+        )
+        
+        # 添加大模型指令
         prompt += f"""
-            
-请生成以下内容:
-1. 完整的NC程序代码，符合FANUC标准
-2. 包含必要的初始化指令（G21, G90, G54等）
-3. 包含安全指令（刀具补偿、冷却液控制、安全高度等）
-4. 使用适当的加工循环（G81, G82, G83, G84等）
-5. 合理的进给速度和主轴转速
-6. 程序结束指令（M30）
-
-程序格式要求：
-- 使用O编号标识程序（如O1234）
-- 包含注释说明加工内容
-- 使用适当的固定循环
-- 确保Z轴安全高度设置正确
-
-请直接输出NC代码，不要添加额外的解释。
+        
+# 最终输出指令
+请严格按照以上要求生成完整的NC程序代码。
+输出格式：
+- 直接输出FANUC G代码
+- 不要包含任何解释性文字
+- 确保代码完整可执行
+- 遵循所有工艺要点和安全要求
 """
         return prompt
     
@@ -544,19 +540,21 @@ class AIDrivenCNCGenerator:
         
         return "\n".join(fallback_code)
     
-    def generate_with_ai(self, requirements: ProcessingRequirements, pdf_features: Dict = None) -> str:
+    def generate_with_ai(self, requirements: ProcessingRequirements, pdf_features: Dict = None, image_path: Optional[str] = None, model_3d_path: Optional[str] = None) -> str:
         """
         使用AI生成NC程序
         
         Args:
             requirements: 处理需求
             pdf_features: 从PDF提取的特征信息（作为辅助参考）
+            image_path: 图像文件路径
+            model_3d_path: 3D模型文件路径
             
         Returns:
             str: 生成的NC程序代码
         """
         # 构建AI提示词
-        prompt = self._build_generation_prompt(requirements, pdf_features)
+        prompt = self._build_generation_prompt(requirements, pdf_features, image_path, model_3d_path)
         
         # 实际调用大语言模型生成NC代码
         ai_generated_code = self._call_large_language_model(prompt)

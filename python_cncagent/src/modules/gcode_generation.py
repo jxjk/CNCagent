@@ -1263,197 +1263,204 @@ def _generate_tapping_code_with_full_process(features: List[Dict], description_a
 
 
 def _generate_milling_code(features: List[Dict], description_analysis: Dict) -> List[str]:
-    """生成铣削加工代码"""
+    """Generate milling code with optimized roughing and finishing strategy"""
     gcode = []
     
-    # 获取材料信息，默认为铝
-    material = "aluminum"  # 默认值
-    if description_analysis:
-        material = description_analysis.get("material", "aluminum")
-        if material is None:
-            material = "aluminum"
-        else:
-            material = str(material).lower()
-    else:
-        material = "aluminum"
+    # Import the milling strategy optimizer
+    from .milling_strategy_optimizer import milling_optimizer
     
-    # 获取刀具直径，优先从描述分析中获取
-    tool_diameter = 63.0  # 默认使用φ63面铣刀
+    # Extract parameters with defaults
+    depth = 2.0  # Default depth for face milling: 2mm
     if description_analysis:
-        temp_diameter = description_analysis.get("tool_diameter", 63.0)
-        if temp_diameter is not None:
-            tool_diameter = float(temp_diameter)
-        else:
-            tool_diameter = 63.0
+        temp_depth = description_analysis.get("depth")
+        if temp_depth is not None and isinstance(temp_depth, (int, float)):
+            depth = float(temp_depth)
     
-    # 获取工件尺寸信息，用于优化切削参数
+    feed_rate = None  # Will be set by strategy optimizer
+    spindle_speed = None  # Will be set by strategy optimizer
+    material = "aluminum"  # Default material
+    tool_diameter = 63.0  # Default tool diameter for face milling
+    
+    if description_analysis:
+        temp_material = description_analysis.get("material")
+        if temp_material is not None:
+            material = str(temp_material).lower()
+        
+        temp_tool_dia = description_analysis.get("tool_diameter")
+        if temp_tool_dia is not None and isinstance(temp_tool_dia, (int, float)):
+            tool_diameter = float(temp_tool_dia)
+    
+    # Get workpiece dimensions if available
     workpiece_dimensions = None
     if description_analysis:
-        workpiece_dimensions = description_analysis.get("workpiece_dimensions", None)
+        workpiece_dimensions = description_analysis.get("workpiece_dimensions")
     
-    # 使用切削工艺优化器计算最优参数
-    try:
-        optimal_params = cutting_optimizer.calculate_optimal_cutting_parameters(
-            material=material,
-            tool_type="face_mill",  # 面铣刀
+    # Calculate optimized milling strategy if workpiece dimensions are available
+    if workpiece_dimensions and isinstance(workpiece_dimensions, (tuple, list)) and len(workpiece_dimensions) >= 3:
+        strategy = milling_optimizer.calculate_milling_strategy(
+            workpiece_size=workpiece_dimensions,
             tool_diameter=tool_diameter,
-            workpiece_dimensions=workpiece_dimensions,
-            operation_type="face_milling"
+            material=material,
+            total_depth=depth
         )
-        
-        # 应用优化后的参数
-        spindle_speed = optimal_params["spindle_speed"]
-        feed_rate = optimal_params["feed_rate"]
-        depth_of_cut = optimal_params["depth_of_cut"]
-        stepover = optimal_params["stepover"]
-        
-        # 验证优化参数
-        validation_errors = cutting_optimizer.validate_cutting_parameters(
-            optimal_params, tool_diameter, workpiece_dimensions
+    else:
+        # Use default strategy
+        strategy = milling_optimizer.calculate_milling_strategy(
+            workpiece_size=(400, 300, 10),  # Default workpiece: 400x300 for face milling
+            tool_diameter=tool_diameter,
+            material=material,
+            total_depth=depth
         )
-        if validation_errors:
-            gcode.append(f"(WARNING: OPTIMIZATION ISSUES DETECTED: {', '.join(validation_errors)})")
-            # 仍然使用优化参数，但添加警告注释
-    except Exception as e:
-        # 如果优化失败，使用默认参数
-        gcode.append(f"(WARNING: Optimization failed, using default parameters: {str(e)})")
-        depth = description_analysis.get("depth")
-        if depth is None or not isinstance(depth, (int, float)):
-            depth = 2  # 铣削上平面深度2毫米
-        else:
-            depth = float(depth)
-        
-        feed_rate = description_analysis.get("feed_rate")
-        if feed_rate is None or not isinstance(feed_rate, (int, float)):
-            feed_rate = 500  # 默认值
-        else:
-            feed_rate = float(feed_rate)
-        
-        spindle_speed = description_analysis.get("spindle_speed")
-        if spindle_speed is None or not isinstance(spindle_speed, (int, float)):
-            spindle_speed = 800  # 默认值
-        else:
-            spindle_speed = float(spindle_speed)
     
-    # 获取刀具编号（铣刀通常是T4）
+    # Apply optimized parameters from milling strategy
+    spindle_speed = strategy['roughing_speed']
+    feed_rate = strategy['roughing_feed']
+    
+    # Get tool number for end mill
     tool_number = _get_tool_number("end_mill")
     
-    # 主轴启动
-    gcode.append(f"M03 S{int(spindle_speed)} (SPINDLE FORWARD, MILLING SPEED)")
+    # Spindle start with optimized parameters
+    gcode.append(f"M03 S{int(spindle_speed)} (SPINDLE FORWARD, ROUGHING SPEED)")
     gcode.append("G04 P1000 (DELAY 1 SECOND, WAIT FOR SPINDLE TO REACH SET SPEED)")
     
-    # 激活刀具长度补偿
+    # Activate tool length compensation
     gcode.append(f"G43 H{tool_number} Z100. (ACTIVATE TOOL LENGTH COMPENSATION FOR T{tool_number:02})")
     
-    # 开启切削液
+    # Coolant on
     gcode.append("M08 (COOLANT ON)")
     
-    # 为每个特征生成铣削代码
+    # Generate milling code for each feature
     for feature in features:
         gcode.append("")
         gcode.append(f"(MILLING OPERATION - {feature['shape'].upper()})")
         
         if feature["shape"] == "rectangle" and len(feature["dimensions"]) >= 2:
-            # 矩形面铣削 - 考虑刀具直径和工件尺寸
+            # Rectangular face milling - consider tool diameter and workpiece size
             center_x, center_y = feature["center"]
             length, width = feature["dimensions"]
             
-            # 使用优化器生成优化的刀具路径
-            toolpath = cutting_optimizer.optimize_toolpath(
-                feature_type="rectangle",
-                feature_dimensions=(length, width),
-                tool_diameter=tool_diameter,
-                workpiece_dimensions=workpiece_dimensions or (length, width, 10)  # 假设高度
-            )
+            # Roughing pass if needed
+            if strategy['has_roughing']:
+                gcode.append(f"(ROUGHING PASS - DEPTH: {strategy['roughing_depth_per_pass']:.3f}mm, STEP: {strategy['stepover']:.3f}mm)")
+                
+                current_depth = 0
+                for pass_idx in range(int(strategy['roughing_passes'])):
+                    current_depth -= strategy['roughing_depth_per_pass']
+                    # Create zig-zag pattern for roughing
+                    y_pos = center_y - width/2 + strategy['stepover']/2
+                    direction = 1  # 1 for right, -1 for left
+                    
+                    while y_pos <= center_y + width/2 - strategy['stepover']/2:
+                        # Move to start of pass
+                        if direction == 1:
+                            start_x = center_x - length/2 + strategy['stepover']/2
+                            end_x = center_x + length/2 - strategy['stepover']/2
+                        else:
+                            start_x = center_x + length/2 - strategy['stepover']/2
+                            end_x = center_x - length/2 + strategy['stepover']/2
+                        
+                        gcode.append(f"G00 X{start_x:.3f} Y{y_pos:.3f} (MOVE TO START OF ROUGHING PASS {pass_idx+1})")
+                        gcode.append(f"G01 Z{current_depth:.3f} F{strategy['roughing_feed']/2:.1f} (ENGAGE MATERIAL)")
+                        gcode.append(f"G01 X{end_x:.3f} F{strategy['roughing_feed']} (ROUGHING PASS)")
+                        
+                        # Move to next Y position if available
+                        next_y = y_pos + strategy['stepover']
+                        if next_y <= center_y + width/2 - strategy['stepover']/2:
+                            gcode.append(f"G01 Y{next_y:.3f} F{strategy['roughing_feed']/2:.1f} (MOVE TO NEXT PASS)")
+                            y_pos = next_y
+                            direction *= -1  # Change direction
+                        else:
+                            break
             
-            if toolpath:
-                # 根据优化路径生成G代码
-                for i, path_segment in enumerate(toolpath):
-                    if path_segment["type"] == "linear":
-                        start = path_segment["start"]
-                        end = path_segment["end"]
-                        
-                        # 移动到起始位置
-                        gcode.append(f"G00 X{center_x + start[0]:.3f} Y{center_y + start[1]:.3f} (MOVE TO MILLING START POINT {i+1})")
-                        
-                        # 下刀
-                        gcode.append(f"G01 Z{-depth_of_cut:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
-                        
-                        # 铣削直线段
-                        gcode.append(f"G01 X{center_x + end[0]:.3f} Y{center_y + end[1]:.3f} F{feed_rate} (MILLING PASS)")
-                        
-                        # 抬刀到安全高度
-                        gcode.append(f"G00 Z{GCODE_GENERATION_CONFIG['safety']['safe_height']:.1f} (RAISE TOOL TO SAFE HEIGHT)")
-            else:
-                # 如果没有优化路径，使用传统方法
-                # 确保铣削范围不超过工件尺寸
-                half_length = min(length / 2, 200)  # 限制在400mm长度内
-                half_width = min(width / 2, 150)   # 限制在300mm宽度内
+            # Finishing pass around perimeter with proper allowance (0.15-0.25mm as required)
+            if strategy['roughing_allowance'] > 0:
+                gcode.append(f"(FINISHING PASS - ALLOWANCE: {strategy['roughing_allowance']:.3f}mm)")
+                final_depth = -depth
+                start_x = center_x - length/2 + 2  # Start 2mm from edge to ensure full coverage
+                start_y = center_y - width/2 + 2
                 
-                # 生成螺旋或往复铣削路径
-                start_x = center_x - half_length + (tool_diameter / 2)
-                start_y = center_y - half_width + (tool_diameter / 2)
+                gcode.append(f"G00 X{start_x:.3f} Y{start_y:.3f} (MOVE TO FINISHING START POINT)")
+                gcode.append(f"G01 Z{final_depth:.3f} F{strategy['finishing_feed']/2:.1f} (ENGAGE MATERIAL FOR FINISHING)")
                 
-                gcode.append(f"G00 X{start_x:.3f} Y{start_y:.3f} (MOVE TO MILLING START POINT)")
-                gcode.append(f"G01 Z{-depth_of_cut:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
+                # Perimeter finishing pass with inward spiral or zig-zag
+                # First pass: along X edges
+                gcode.append(f"G01 X{center_x + length/2 - 2:.3f} F{strategy['finishing_feed']} (MILL X POSITIVE EDGE)")
+                gcode.append(f"G01 Y{center_y + width/2 - 2:.3f} F{strategy['finishing_feed']} (MILL Y POSITIVE EDGE)")
+                gcode.append(f"G01 X{center_x - length/2 + 2:.3f} F{strategy['finishing_feed']} (MILL X NEGATIVE EDGE)")
+                gcode.append(f"G01 Y{center_y - width/2 + 2:.3f} F{strategy['finishing_feed']} (MILL Y NEGATIVE EDGE)")
                 
-                # 生成往复铣削路径
-                y_pos = start_y
-                direction = 1  # 1为正向，-1为反向
-                stepover = min(stepover, 5)  # 限制步距
-                
-                while y_pos <= center_y + half_width - (tool_diameter / 2):
-                    # X方向移动
-                    if direction == 1:
-                        end_x = center_x + half_length - (tool_diameter / 2)
-                    else:
-                        end_x = center_x - half_length + (tool_diameter / 2)
-                    
-                    gcode.append(f"G01 X{end_x:.3f} Y{y_pos:.3f} F{feed_rate} (MILLING PASS)")
-                    
-                    # 移动到下一个Y位置
-                    if y_pos + stepover <= center_y + half_width - (tool_diameter / 2):
-                        y_pos += stepover
-                        direction *= -1  # 反向
-                        gcode.append(f"G01 Y{y_pos:.3f} F{feed_rate/2:.1f} (STEPOVER TO NEXT PASS)")
-                    else:
-                        break
-        
         elif feature["shape"] == "circle":
-            # 圆形铣削
+            # Circular milling with optimized roughing and finishing
             center_x, center_y = feature["center"]
             radius = feature.get("radius", 10)
             
-            # 快速移动到圆的起始点
-            start_x = center_x - radius
-            gcode.append(f"G00 X{start_x:.3f} Y{center_y:.3f} (MOVE TO CIRCULAR ARC START POINT)")
-            gcode.append(f"G01 Z{-depth_of_cut:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
-            gcode.append(f"G02 X{start_x:.3f} Y{center_y:.3f} I{radius:.3f} J0 F{feed_rate} (CLOCKWISE CIRCULAR MILLING)")
+            # Roughing pass if needed
+            if strategy['has_roughing']:
+                gcode.append(f"(ROUGHING PASS - DEPTH: {strategy['roughing_depth_per_pass']:.3f}mm)")
+                # Peck milling for circle with stepover
+                current_depth = 0
+                for pass_idx in range(int(strategy['roughing_passes'])):
+                    current_depth -= strategy['roughing_depth_per_pass']
+                    # Spiral roughing from outside to inside
+                    current_radius = radius
+                    while current_radius > strategy['stepover']:
+                        start_x = center_x - current_radius
+                        gcode.append(f"G00 X{start_x:.3f} Y{center_y:.3f} (MOVE TO CIRCULAR ROUGHING START POINT)")
+                        gcode.append(f"G01 Z{current_depth:.3f} F{strategy['roughing_feed']/2:.1f} (ENGAGE MATERIAL)")
+                        gcode.append(f"G02 X{start_x:.3f} Y{center_y:.3f} I{current_radius:.3f} J0 F{strategy['roughing_feed']} (CLOCKWISE CIRCULAR MILLING)")
+                        current_radius -= strategy['stepover']
             
-            # 如果需要更深的加工，进行第二次切削
-            gcode.append(f"G01 Z{-depth_of_cut*2:.3f} F{feed_rate/2:.1f} (CONTINUE CUTTING)")
-            gcode.append(f"G02 X{start_x:.3f} Y{center_y:.3f} I{radius:.3f} J0 F{feed_rate} (CLOCKWISE CIRCULAR MILLING)")
-            
+            # Finishing pass with proper allowance
+            if strategy['roughing_allowance'] > 0:
+                gcode.append(f"(FINISHING PASS - ALLOWANCE: {strategy['roughing_allowance']:.3f}mm)")
+                final_depth = -depth
+                start_x = center_x - radius
+                gcode.append(f"G00 X{start_x:.3f} Y{center_y:.3f} (MOVE TO CIRCULAR FINISHING START POINT)")
+                gcode.append(f"G01 Z{final_depth:.3f} F{strategy['finishing_feed']/2:.1f} (ENGAGE MATERIAL FOR FINISHING)")
+                gcode.append(f"G02 X{start_x:.3f} Y{center_y:.3f} I{radius:.3f} J0 F{strategy['finishing_feed']} (CLOCKWISE FINISH CIRCULAR MILLING)")
+                
         elif feature["shape"] == "triangle":
-            # 三角形铣削
+            # Triangular milling with optimized strategy
             vertices = feature.get("vertices", [])
             if len(vertices) >= 3:
                 start_x, start_y = vertices[0]
-                gcode.append(f"G00 X{start_x:.3f} Y{start_y:.3f} (MOVE TO TRIANGLE START POINT)")
-                gcode.append(f"G01 Z{-depth_of_cut:.3f} F{feed_rate/2:.1f} (INITIAL CUTTING)")
                 
-                for i in range(1, len(vertices)):
-                    x, y = vertices[i]
-                    gcode.append(f"G01 X{x:.3f} Y{y:.3f} F{feed_rate} (MILL TRIANGLE EDGE)")
+                # Roughing pass if needed
+                if strategy['has_roughing']:
+                    gcode.append(f"(ROUGHING PASS - DEPTH: {strategy['roughing_depth_per_pass']:.3f}mm)")
+                    gcode.append(f"G00 X{start_x:.3f} Y{start_y:.3f} (MOVE TO TRIANGLE START POINT)")
+                    
+                    current_depth = 0
+                    for pass_idx in range(int(strategy['roughing_passes'])):
+                        current_depth -= strategy['roughing_depth_per_pass']
+                        gcode.append(f"G01 Z{current_depth:.3f} F{strategy['roughing_feed']/2:.1f} (ROUGHING CUTTING PASS {pass_idx+1})")
+                        
+                        for i in range(1, len(vertices)):
+                            x, y = vertices[i]
+                            gcode.append(f"G01 X{x:.3f} Y{y:.3f} F{strategy['roughing_feed']} (MILL TRIANGLE EDGE)")
+                        
+                        # Close triangle
+                        x, y = vertices[0]
+                        gcode.append(f"G01 X{x:.3f} Y{y:.3f} F{strategy['roughing_feed']} (CLOSE TRIANGLE)")
                 
-                # 闭合三角形
-                x, y = vertices[0]
-                gcode.append(f"G01 X{x:.3f} Y{y:.3f} (CLOSE TRIANGLE)")
+                # Finishing pass with proper allowance
+                if strategy['roughing_allowance'] > 0:
+                    gcode.append(f"(FINISHING PASS - ALLOWANCE: {strategy['roughing_allowance']:.3f}mm)")
+                    final_depth = -depth
+                    gcode.append(f"G01 Z{final_depth:.3f} F{strategy['finishing_feed']/2:.1f} (FINISHING CUTTING)")
+                    
+                    for i in range(1, len(vertices)):
+                        x, y = vertices[i]
+                        gcode.append(f"G01 X{x:.3f} Y{y:.3f} F{strategy['finishing_feed']} (MILL TRIANGLE EDGE)")
+                    
+                    # Close triangle
+                    x, y = vertices[0]
+                    gcode.append(f"G01 X{x:.3f} Y{y:.3f} F{strategy['finishing_feed']} (CLOSE TRIANGLE)")
     
-    # 关闭切削液
+    # Coolant off
     gcode.append("M09 (COOLANT OFF)")
     
-    # 移动到统一的安全高度，然后取消刀具长度补偿
+    # Move to safe height and cancel tool length compensation
     gcode.append("G00 Z100.0 (RAPID MOVE TO UNIFIED SAFE HEIGHT)")
     gcode.append("G49 (CANCEL TOOL LENGTH COMPENSATION)")
     
