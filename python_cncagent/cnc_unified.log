@@ -795,3 +795,17 @@
 2025-12-30 12:02:02,227 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
 2025-12-30 12:02:02,247 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
 2025-12-30 12:02:02,271 - __main__ - INFO - 启动GUI界面...
+2025-12-30 12:26:20,760 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 12:26:22,591 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 12:26:22,592 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-30 12:26:22,592 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 12:26:22,596 - __main__ - INFO - 启动模式: GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 12:26:22,598 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 12:26:22,645 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 12:26:22,646 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 12:26:24,598 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 12:26:24,613 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 12:26:24,632 - __main__ - INFO - 启动GUI界面...

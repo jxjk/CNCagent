@@ -24,10 +24,11 @@ def main():
         print("AI辅助NC编程工具")
         print("=" * 60)
         print("使用方法:")
-        print("  python start_ai_nc_helper.py gui          # 启动图形界面")
-        print("  python start_ai_nc_helper.py process      # 处理PDF生成NC代码")
-        print("  python start_ai_nc_helper.py demo         # 运行演示")
-        print("  python start_ai_nc_helper.py help         # 显示帮助")
+        print("  python start_ai_nc_helper.py gui                    # 启动图形界面")
+        print("  python start_ai_nc_helper.py gui optimized          # 启动优化版图形界面（AI优先）")
+        print("  python start_ai_nc_helper.py process                # 处理PDF生成NC代码")
+        print("  python start_ai_nc_helper.py demo                   # 运行演示")
+        print("  python start_ai_nc_helper.py help                   # 显示帮助")
         print("")
         print("新功能: 统一启动器")
         print("  python start_unified.py                   # 同时启动GUI和Web服务器")
@@ -51,9 +52,17 @@ def main():
             if str(src_path) not in sys.path:
                 sys.path.insert(0, str(src_path))
             
-            from modules.simple_nc_gui import run_gui
-            print("启动AI辅助NC编程工具界面...")
-            run_gui()
+            # 检查命令行参数，看是否指定使用优化版GUI
+            use_optimized = len(sys.argv) > 2 and sys.argv[2] == "optimized"
+            
+            if use_optimized:
+                from modules.optimized_cnc_gui import run_optimized_gui
+                print("启动优化版AI辅助NC编程工具界面（AI优先模式）...")
+                run_optimized_gui()
+            else:
+                from modules.simple_nc_gui import run_gui
+                print("启动AI辅助NC编程工具界面...")
+                run_gui()
         except ImportError as e:
             print(f"无法启动图形界面: {e}")
             print("请确保已安装所有依赖项: pip install -r requirements.txt")
@@ -122,6 +131,7 @@ def main():
         print("=" * 60)
         print("命令说明:")
         print("  gui      - 启动图形界面，提供可视化操作")
+        print("  gui optimized  - 启动优化版图形界面（AI优先模式）")
         print("  process  - 命令行模式处理PDF文件")
         print("  demo     - 运行功能演示")
         print("  help     - 显示此帮助信息")
@@ -133,6 +143,15 @@ def main():
         print("  - 工艺模板拖拽：将预定义工艺直接拖到特征上")
         print("  - 点击特征直接调整相关参数")
         print("  - 支持导出到CamBam、Mastercam、Fusion 360等格式")
+        print("")
+        print("优化版GUI功能 (AI优先模式):")
+        print("  - 以大语言模型为核心处理引擎")
+        print("  - 支持2D图纸、3D模型、加工描述的综合处理")
+        print("  - AI驱动的智能特征识别和工艺规划")
+        print("  - 实时AI分析报告和处理建议")
+        print("  - AI优先的NC代码生成")
+        print("  - 更直观的参数配置界面")
+        print("  - 增强的3D模型可视化支持")
         print("")
         print("新功能: 统一启动器")
         print("统一启动器支持同时运行GUI和Web服务器:")
