@@ -750,3 +750,17 @@
 2025-12-30 10:34:45,731 - __main__ - INFO - 预加载 start_server 模块成功
 2025-12-30 10:34:45,731 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
 2025-12-30 10:34:45,731 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 10:50:30,147 - root - WARNING - 警告: 未安装open3d库，3D模型处理功能将受限
+2025-12-30 10:50:32,305 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 10:50:32,306 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-30 10:50:32,307 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 10:50:32,311 - __main__ - INFO - 启动模式: GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 10:50:32,312 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 10:50:32,401 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 10:50:32,401 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 10:50:34,313 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 10:50:34,322 - root - WARNING - 警告: 未安装open3d库，3D模型处理功能将受限
+2025-12-30 10:50:34,337 - __main__ - INFO - 启动GUI界面...

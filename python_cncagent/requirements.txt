@@ -8,3 +8,4 @@ torch==2.1.0
 transformers==4.34.0
 flask==2.3.3
 flask-cors==4.0.0
+trimesh>=3.23.0

@@ -8,21 +8,20 @@ from typing import Dict, List, Optional, Tuple, Any
 from pathlib import Path
 
 # 尝试导入可能需要的库
+# 针对Python 3.14不支持open3d的情况，优先使用trimesh作为主要3D处理库
 try:
     import numpy as np
     import open3d as o3d
     HAS_OPEN3D = True
 except ImportError:
     HAS_OPEN3D = False
-    import logging
-    logging.warning("警告: 未安装open3d库，3D模型处理功能将受限")
+    logging.warning("警告: 未安装open3d库，将使用trimesh作为主要3D处理库")
 
 try:
     import trimesh
     HAS_TRIMESH = True
 except ImportError:
     HAS_TRIMESH = False
-    import logging
     logging.warning("警告: 未安装trimesh库，3D模型处理功能将受限")
 
 from src.exceptions import CNCError, InputValidationError
@@ -62,29 +61,29 @@ class Model3DProcessor:
             raise InputValidationError(f"不支持的3D模型格式: {file_ext}. 支持的格式: {', '.join(self.SUPPORTED_FORMATS)}")
         
         try:
-            if HAS_OPEN3D:
-                # 使用Open3D加载模型
+            # 优先使用trimesh，因为它对Python 3.14有更好的支持
+            if HAS_TRIMESH:
+                # 使用trimesh加载模型（支持更多格式）
+                mesh = trimesh.load(str(path))
+                return mesh
+            elif HAS_OPEN3D:
+                # 仅在没有trimesh时使用Open3D
                 if file_ext in ['.stl', '.ply', '.obj']:
                     mesh = o3d.io.read_triangle_mesh(str(path))
                     if mesh.is_empty():
                         raise CNCError(f"无法加载模型: {model_path}")
                     return mesh
                 elif file_ext in ['.step', '.stp', '.igs', '.iges']:
-                    # 对于STEP/IGES格式，需要转换为中间格式或使用专门的CAD库
-                    # 这里我们先使用trimesh尝试加载
-                    if HAS_TRIMESH:
-                        mesh = trimesh.load(str(path))
-                        return mesh
-                    else:
-                        raise CNCError(f"需要安装trimesh库来处理{file_ext}格式文件")
-            elif HAS_TRIMESH:
-                # 使用trimesh作为备选
-                mesh = trimesh.load(str(path))
-                return mesh
+                    # 对于STEP/IGES格式，由于Open3D支持有限，提示用户安装trimesh
+                    raise CNCError(f"Open3D对{file_ext}格式支持有限，建议安装trimesh库来处理此类格式")
             else:
-                raise CNCError("需要安装open3d或trimesh库来处理3D模型")
+                raise CNCError("需要安装trimesh库来处理3D模型（推荐）或open3d库")
         except Exception as e:
-            raise CNCError(f"加载3D模型失败: {str(e)}")
+            # 如果主要方法失败，尝试其他方法
+            if file_ext in ['.step', '.stp', '.igs', '.iges'] and not HAS_TRIMESH:
+                raise CNCError(f"需要安装trimesh库来处理{file_ext}格式文件")
+            else:
+                raise CNCError(f"加载3D模型失败: {str(e)}")
     
     def extract_geometric_features(self, model: Any) -> Dict[str, Any]:
         """
@@ -111,8 +110,44 @@ class Model3DProcessor:
             'dimensions': {}
         }
         
-        if HAS_OPEN3D and isinstance(model, o3d.geometry.TriangleMesh):
-            # 使用Open3D处理三角网格
+        # 优先使用trimesh进行处理，因为它对Python 3.14有更好的支持
+        if HAS_TRIMESH and hasattr(model, 'vertices'):
+            # 使用trimesh处理
+            features['vertices_count'] = len(model.vertices)
+            features['faces_count'] = len(model.faces)
+            
+            # 计算边界框
+            bounds = model.bounds
+            if bounds is not None and bounds.shape == (2, 3):
+                features['bounding_box'] = {
+                    'min': bounds[0].tolist(),
+                    'max': bounds[1].tolist(),
+                    'size': (bounds[1] - bounds[0]).tolist()
+                }
+            
+            # 计算表面积和体积
+            features['surface_area'] = model.area
+            if hasattr(model, 'volume') and model.is_volume:
+                try:
+                    features['volume'] = model.volume
+                except:
+                    # 某些模型可能无法计算体积
+                    features['volume'] = 0.0
+            
+            # 检测几何基元
+            geometric_primitives = self._detect_geometric_primitives_trimesh(model)
+            features['geometric_primitives'] = geometric_primitives
+            
+            # 检测孔、槽等特征
+            features['holes'] = self._detect_holes_trimesh(model)
+            features['slots'] = self._detect_slots_trimesh(model)
+            
+            # 检测更多高级特征
+            features['cylindrical_surfaces'] = self._detect_cylindrical_surfaces_trimesh(model)
+            features['planar_surfaces'] = self._detect_planar_surfaces_trimesh(model)
+            
+        elif HAS_OPEN3D and isinstance(model, o3d.geometry.TriangleMesh):
+            # 如果没有trimesh但有Open3D，则使用Open3D
             vertices = np.asarray(model.vertices)
             triangles = np.asarray(model.triangles)
             
@@ -130,40 +165,20 @@ class Model3DProcessor:
                 }
             
             # 计算表面积和体积（仅对封闭网格）
-            if model.is_watertight():
-                features['surface_area'] = model.get_surface_area()
-                features['volume'] = model.get_volume()
+            if hasattr(model, 'is_watertight') and model.is_watertight():
+                try:
+                    features['surface_area'] = model.get_surface_area()
+                except:
+                    # 如果无法计算，使用替代方法
+                    features['surface_area'] = 0.0
+                try:
+                    features['volume'] = model.get_volume()
+                except:
+                    features['volume'] = 0.0
             
             # 检测几何基元（如圆柱、球体等）
             geometric_primitives = self._detect_geometric_primitives_o3d(model)
             features['geometric_primitives'] = geometric_primitives
-            
-        elif HAS_TRIMESH and hasattr(model, 'vertices'):
-            # 使用trimesh处理
-            features['vertices_count'] = len(model.vertices)
-            features['faces_count'] = len(model.faces)
-            
-            # 计算边界框
-            bounds = model.bounds
-            if bounds is not None:
-                features['bounding_box'] = {
-                    'min': bounds[0].tolist(),
-                    'max': bounds[1].tolist(),
-                    'size': (bounds[1] - bounds[0]).tolist()
-                }
-            
-            # 计算表面积和体积
-            features['surface_area'] = model.area
-            if hasattr(model, 'volume'):
-                features['volume'] = model.volume
-            
-            # 检测几何基元
-            geometric_primitives = self._detect_geometric_primitives_trimesh(model)
-            features['geometric_primitives'] = geometric_primitives
-            
-            # 检测孔、槽等特征
-            features['holes'] = self._detect_holes_trimesh(model)
-            features['slots'] = self._detect_slots_trimesh(model)
             
         return features
     
@@ -190,6 +205,69 @@ class Model3DProcessor:
         
         return primitives
     
+    def _detect_cylindrical_surfaces_trimesh(self, mesh) -> List[Dict[str, Any]]:
+        """使用trimesh检测圆柱面"""
+        if not HAS_TRIMESH:
+            return []
+        
+        cylindrical_surfaces = []
+        
+        try:
+            # trimesh没有直接的圆柱检测功能，但我们可以通过分析网格的几何特性
+            # 来近似检测圆柱面
+            if hasattr(mesh, 'principal_inertia_vectors') and hasattr(mesh, 'volume'):
+                # 使用惯性张量来检测可能的圆柱形状
+                if mesh.volume > 0:
+                    # 通过分析边界框和体积比来检测圆柱
+                    extents = mesh.extents
+                    if extents is not None and len(extents) >= 3:
+                        # 检查是否两个维度近似相等（圆形截面），而第三个维度不同（长度）
+                        sorted_extents = sorted(extents)
+                        if (abs(sorted_extents[0] - sorted_extents[1]) < 0.1 * max(sorted_extents[0], 0.001) 
+                            and sorted_extents[2] > 1.5 * sorted_extents[1]):
+                            # 可能是圆柱：两个维度近似相等，第三个维度更大
+                            cylindrical_surfaces.append({
+                                'type': 'cylinder_approximation',
+                                'diameter': sorted_extents[0],
+                                'length': sorted_extents[2],
+                                'orientation': 'vertical' if sorted_extents[2] == extents[2] else 'horizontal'
+                            })
+        except:
+            pass
+        
+        return cylindrical_surfaces
+    
+    def _detect_planar_surfaces_trimesh(self, mesh) -> List[Dict[str, Any]]:
+        """使用trimesh检测平面面"""
+        if not HAS_TRIMESH:
+            return []
+        
+        planar_surfaces = []
+        
+        try:
+            # 通过检查网格是否近似为平面状来检测平面
+            extents = mesh.extents
+            if extents is not None and len(extents) >= 3:
+                # 如果一个维度相对于其他维度非常小，则可能是平面
+                min_extent = min(extents) if extents is not None else 0
+                max_extent = max(extents) if extents is not None else 1
+                
+                if min_extent > 0 and max_extent > 0 and max_extent / min_extent > 50:
+                    # 一个维度远小于其他维度，可能是薄板
+                    thickness_idx = extents.tolist().index(min_extent)
+                    planar_surfaces.append({
+                        'type': 'planar_surface',
+                        'thickness': min_extent,
+                        'area': (extents[0] * extents[1] if thickness_idx == 2 
+                                else extents[0] * extents[2] if thickness_idx == 1 
+                                else extents[1] * extents[2]),
+                        'orientation': ['x', 'y', 'z'][thickness_idx]
+                    })
+        except:
+            pass
+        
+        return planar_surfaces
+    
     def _detect_geometric_primitives_trimesh(self, mesh) -> List[Dict[str, Any]]:
         """使用trimesh检测几何基元"""
         if not HAS_TRIMESH:
@@ -197,19 +275,36 @@ class Model3DProcessor:
         
         primitives = []
         
-        # trimesh提供了一些内置的几何检测功能
-        if hasattr(mesh, 'bounding_box'):
-            # 检测是否近似为立方体
+        # 检测球体近似
+        try:
             extents = mesh.extents
-            if extents is not None:
-                # 检查各维度比例，判断是否为近似立方体
-                ratios = sorted(extents / min(extents)) if min(extents) > 0 else [1, 1, 1]
-                if all(0.8 < r < 1.2 for r in ratios):
+            if extents is not None and len(extents) >= 3:
+                # 检查各维度是否近似相等
+                ratios = sorted(extents / min(extents + [0.0001]))  # 避免除零
+                if len(ratios) >= 3 and all(0.8 < r < 1.2 for r in ratios[:3]):
+                    primitives.append({
+                        'type': 'sphere_approximation',
+                        'diameter': max(extents),
+                        'extents': extents.tolist() if hasattr(extents, 'tolist') else extents.tolist() if isinstance(extents, np.ndarray) else extents,
+                        'center_mass': mesh.center_mass.tolist() if hasattr(mesh.center_mass, 'tolist') else mesh.center_mass.tolist() if isinstance(mesh.center_mass, np.ndarray) else mesh.center_mass
+                    })
+        except:
+            pass
+        
+        # 检测立方体近似
+        try:
+            extents = mesh.extents
+            if extents is not None and len(extents) >= 3:
+                # 检查是否近似为立方体
+                ratios = sorted(extents / min(extents + [0.0001]))  # 避免除零
+                if all(0.8 < r < 1.5 for r in ratios):
                     primitives.append({
                         'type': 'cube_approximation',
-                        'extents': extents.tolist() if hasattr(extents, 'tolist') else extents,
-                        'center_mass': mesh.center_mass.tolist() if hasattr(mesh.center_mass, 'tolist') else mesh.center_mass
+                        'extents': extents.tolist() if hasattr(extents, 'tolist') else extents.tolist() if isinstance(extents, np.ndarray) else extents,
+                        'center_mass': mesh.center_mass.tolist() if hasattr(mesh.center_mass, 'tolist') else mesh.center_mass.tolist() if isinstance(mesh.center_mass, np.ndarray) else mesh.center_mass
                     })
+        except:
+            pass
         
         return primitives
     
@@ -223,12 +318,13 @@ class Model3DProcessor:
         try:
             # 检查是否是开放网格（有孔）
             if not mesh.is_watertight:
-                # 获取边界边
-                boundaries = mesh.face_adjacency_edges[mesh.face_adjacency_angles > np.pi - 1e-6]
-                if len(boundaries) > 0:
+                # 获取边界的详细信息
+                boundary_entities = mesh.face_adjacency_edges[mesh.face_adjacency_angles > np.pi - 1e-6]
+                if len(boundary_entities) > 0:
                     holes.append({
-                        'boundary_edges_count': len(boundaries),
-                        'is_open_mesh': not mesh.is_watertight
+                        'boundary_edges_count': len(boundary_entities),
+                        'is_open_mesh': not mesh.is_watertight,
+                        'boundary_loops': len(mesh.face_adjacency_angles[mesh.face_adjacency_angles > np.pi - 1e-6])
                     })
         except:
             pass
@@ -242,19 +338,33 @@ class Model3DProcessor:
         
         slots = []
         
-        # 槽检测是复杂的，这里只做简单检测
-        # 通过分析网格的几何特征来推断槽的存在
-        extents = mesh.extents if hasattr(mesh, 'extents') else None
-        if extents is not None:
-            # 如果某一个维度相对于其他维度很小，则可能是槽
-            min_extent = min(extents) if extents is not None else 0
-            max_extent = max(extents) if extents is not None else 1
-            if min_extent > 0 and max_extent > 0 and max_extent / min_extent > 10:
-                slots.append({
-                    'type': 'slot_approximation',
-                    'extents': extents.tolist() if hasattr(extents, 'tolist') else extents,
-                    'aspect_ratio': max_extent / min_extent
-                })
+        # 槽检测：通过分析网格的几何特征来推断槽的存在
+        try:
+            extents = mesh.extents if hasattr(mesh, 'extents') else None
+            if extents is not None and len(extents) >= 3:
+                # 如果某一个维度相对于其他维度很小，则可能是槽
+                min_extent = min(extents) if extents is not None else 0.001
+                max_extent = max(extents) if extents is not None else 1
+                
+                # 检查是否有一个维度明显小于其他维度（可能表示槽或孔）
+                if min_extent > 0 and max_extent > 0 and max_extent / min_extent > 10:
+                    # 计算各轴方向的尺寸比例
+                    x_ratio = extents[0] / min_extent if min_extent > 0 else 0
+                    y_ratio = extents[1] / min_extent if min_extent > 0 else 0
+                    z_ratio = extents[2] / min_extent if min_extent > 0 else 0
+                    
+                    # 确定最小维度的方向
+                    min_axis = ['x', 'y', 'z'][np.argmin(extents)]
+                    
+                    slots.append({
+                        'type': 'slot_approximation',
+                        'extents': extents.tolist() if hasattr(extents, 'tolist') else extents.tolist() if isinstance(extents, np.ndarray) else extents,
+                        'aspect_ratio': max_extent / min_extent,
+                        'orientation': min_axis,
+                        'description': f'Slot oriented along {min_axis} axis with high aspect ratio ({max_extent / min_extent:.2f})'
+                    })
+        except:
+            pass
         
         return slots
     
