@@ -48,6 +48,7 @@ def health_check():
 def generate_nc():
     """根据上传的2D/3D文件和用户描述生成NC程序"""
     import logging
+    import os  # 在函数开始处导入os模块
     logging.info("收到生成NC程序请求")
     
     try:

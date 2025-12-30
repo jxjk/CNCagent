@@ -610,7 +610,6 @@ HTML_TEMPLATE = '''
             
             const formData = new FormData(this);
             const submitBtn = document.getElementById('submitBtn');
-            const submitText = document.getElementById('submitText');
             const submitSpinner = document.getElementById('submitSpinner');
             const resultDiv = document.getElementById('result');
             
@@ -623,8 +622,7 @@ HTML_TEMPLATE = '''
             
             // 显示加载状态
             submitBtn.disabled = true;
-            submitText.textContent = '⏳ 正在生成NC程序...';
-            submitSpinner.style.display = 'inline-block';
+            submitBtn.innerHTML = '⏳ 正在生成NC程序... <span id="submitSpinner" class="spinner" style="display: inline-block;"></span>';
             resultDiv.innerHTML = `
                 <div class="loading">
                     <span class="spinner"></span>
@@ -675,8 +673,7 @@ HTML_TEMPLATE = '''
                 }
             } finally {
                 submitBtn.disabled = false;
-                submitText.textContent = '🚀 生成NC程序';
-                submitSpinner.style.display = 'none';
+                submitBtn.innerHTML = '🚀 生成NC程序 <span id="submitSpinner" class="spinner" style="display: none;"></span>';
             }
         });
         
