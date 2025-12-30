@@ -27,6 +27,9 @@ class SimpleNC_GUI:
         self.current_nc_code = ""
         self.material = tk.StringVar(value="Aluminum")
         self.processing_type = tk.StringVar(value="general")
+        # 将描述改为普通字符串变量，因为我们会用单独的文本区域
+        self.description_text = tk.StringVar(value="")
+        # 保持原来的小输入框作为快捷输入
         self.description = tk.StringVar(value="")
         self.only_description_mode = tk.BooleanVar(value=False)  # 新增：仅描述模式
         self.file_types = [
@@ -74,7 +77,7 @@ class SimpleNC_GUI:
         
         # 用户描述输入
         ttk.Label(control_frame, text="描述:").pack(side=tk.LEFT, padx=(0, 5))
-        desc_entry = ttk.Entry(control_frame, textvariable=self.description, width=30)
+        desc_entry = ttk.Entry(control_frame, textvariable=self.description, width=50)  # 增加宽度
         desc_entry.pack(side=tk.LEFT, padx=(0, 10))
         
         # 预览窗口标签
@@ -107,23 +110,33 @@ class SimpleNC_GUI:
         self.feature_listbox.bind("<<ListboxSelect>>", self.on_feature_select)
         preview_frame.rowconfigure(3, weight=1)
         
+        # 右侧用户描述输入区域
+        desc_frame = ttk.Frame(main_frame)
+        desc_frame.grid(row=2, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        desc_frame.rowconfigure(0, weight=1)
+        desc_frame.columnconfigure(0, weight=1)
+        
+        ttk.Label(desc_frame, text="加工描述:").grid(row=0, column=0, sticky=tk.W)
+        self.desc_text = scrolledtext.ScrolledText(desc_frame, wrap=tk.WORD, width=60, height=8)
+        self.desc_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(5, 5))
+        
         # 右侧NC代码预览区域
         nc_frame = ttk.Frame(main_frame)
-        nc_frame.grid(row=2, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
+        nc_frame.grid(row=3, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
         nc_frame.rowconfigure(0, weight=1)
         nc_frame.columnconfigure(0, weight=1)
         
-        self.nc_text = scrolledtext.ScrolledText(nc_frame, wrap=tk.NONE, width=60, height=15)
+        self.nc_text = scrolledtext.ScrolledText(nc_frame, wrap=tk.NONE, width=60, height=12)
         self.nc_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 分析报告区域
         report_frame = ttk.Frame(main_frame)
-        report_frame.grid(row=3, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0))
+        report_frame.grid(row=4, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0))
         report_frame.rowconfigure(0, weight=1)
         report_frame.columnconfigure(0, weight=1)
         
         ttk.Label(report_frame, text="分析报告:").grid(row=0, column=0, sticky=tk.W)
-        self.report_text = scrolledtext.ScrolledText(report_frame, wrap=tk.WORD, width=60, height=8)
+        self.report_text = scrolledtext.ScrolledText(report_frame, wrap=tk.WORD, width=60, height=6)
         self.report_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 状态栏
