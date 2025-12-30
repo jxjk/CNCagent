@@ -384,10 +384,11 @@ class CNC_GUI:
                     from src.modules.unified_generator import generate_cnc_with_unified_approach
                     import os
                     
-                    # 从环境变量获取API配置
+                    # 从环境变量获取API配置 - 与WEB端保持一致
                     api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
                     model_name = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))
                     
+                    # 与WEB端使用完全相同的调用方式和参数
                     nc_code = generate_cnc_with_unified_approach(
                         user_prompt=description_text,
                         pdf_path=self.current_image_path,  # 可能为None

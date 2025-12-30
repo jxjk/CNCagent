@@ -393,16 +393,18 @@ class SimpleNC_GUI:
                         from src.modules.unified_generator import generate_cnc_with_unified_approach
                         import os
                         
-                        # 从环境变量获取API配置
+                        # 从环境变量获取API配置 - 与WEB端保持一致
                         api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
                         model_name = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))
                         
+                        # 与WEB端使用完全相同的调用方式和参数
                         nc_code = generate_cnc_with_unified_approach(
                             user_prompt=user_description,
                             pdf_path=pdf_path,  # 可能为None
                             model_3d_path=model_3d_path,  # 可能为None
                             api_key=api_key,
-                            model=model_name
+                            model=model_name,
+                            material=material  # 添加材料参数以保持一致性
                         )
                         
                         self.current_nc_code = nc_code
