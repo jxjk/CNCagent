@@ -234,7 +234,7 @@ def identify_shape_advanced(contour: np.ndarray, area: float, circle_area: float
             if solidity > 0.9:
                 # 检查是否接近矩形
                 rect_approx = cv2.boxPoints(cv2.minAreaRect(contour))
-                rect_approx = np.int0(rect_approx)
+                rect_approx = rect_approx.astype(np.int_)
                 rect_area = cv2.contourArea(rect_approx)
                 area_ratio = area / rect_area if rect_area > 0 else 0
                 
@@ -1179,7 +1179,7 @@ def estimate_corner_radius(contour: np.ndarray) -> float:
         # 通过计算轮廓的最小外接矩形和实际轮廓的差异来估算圆角
         rect = cv2.minAreaRect(contour)
         rect_box = cv2.boxPoints(rect)
-        rect_area = cv2.contourArea(np.int0(rect_box))
+        rect_area = cv2.contourArea(rect_box.astype(np.int_))
         
         # 如果实际轮廓面积小于最小外接矩形面积，说明有圆角
         if contour_area < rect_area:

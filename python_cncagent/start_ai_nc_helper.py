@@ -24,8 +24,9 @@ def main():
         print("AI辅助NC编程工具")
         print("=" * 60)
         print("使用方法:")
-        print("  python start_ai_nc_helper.py gui                    # 启动图形界面")
+        print("  python start_ai_nc_helper.py gui                    # 启动标准图形界面")
         print("  python start_ai_nc_helper.py gui optimized          # 启动优化版图形界面（AI优先）")
+        print("  python start_ai_nc_helper.py gui beautified         # 启动美化版图形界面（简洁设计）")
         print("  python start_ai_nc_helper.py process                # 处理PDF生成NC代码")
         print("  python start_ai_nc_helper.py demo                   # 运行演示")
         print("  python start_ai_nc_helper.py help                   # 显示帮助")
@@ -52,14 +53,23 @@ def main():
             if str(src_path) not in sys.path:
                 sys.path.insert(0, str(src_path))
             
-            # 检查命令行参数，看是否指定使用优化版GUI
-            use_optimized = len(sys.argv) > 2 and sys.argv[2] == "optimized"
-            
-            if use_optimized:
-                from modules.optimized_cnc_gui import run_optimized_gui
-                print("启动优化版AI辅助NC编程工具界面（AI优先模式）...")
-                run_optimized_gui()
+            # 检查命令行参数，看是否指定使用特定版GUI
+            if len(sys.argv) > 2:
+                gui_type = sys.argv[2]
+                if gui_type == "optimized":
+                    from modules.optimized_cnc_gui import run_optimized_gui
+                    print("启动优化版AI辅助NC编程工具界面（AI优先模式）...")
+                    run_optimized_gui()
+                elif gui_type == "beautified":
+                    from modules.beautified_cnc_gui import run_gui
+                    print("启动美化版AI驱动CNC编程工具界面（简洁设计）...")
+                    run_gui()
+                else:
+                    from modules.simple_nc_gui import run_gui
+                    print("启动标准AI辅助NC编程工具界面...")
+                    run_gui()
             else:
+                # 默认启动标准界面
                 from modules.simple_nc_gui import run_gui
                 print("启动AI辅助NC编程工具界面...")
                 run_gui()
@@ -130,13 +140,14 @@ def main():
         print("AI辅助NC编程工具 - 帮助信息")
         print("=" * 60)
         print("命令说明:")
-        print("  gui      - 启动图形界面，提供可视化操作")
-        print("  gui optimized  - 启动优化版图形界面（AI优先模式）")
-        print("  process  - 命令行模式处理PDF文件")
-        print("  demo     - 运行功能演示")
-        print("  help     - 显示此帮助信息")
+        print("  gui                    - 启动标准图形界面，提供可视化操作")
+        print("  gui optimized          - 启动优化版图形界面（AI优先模式）")
+        print("  gui beautified         - 启动美化版图形界面（简洁设计）")
+        print("  process                - 命令行模式处理PDF文件")
+        print("  demo                   - 运行功能演示")
+        print("  help                   - 显示此帮助信息")
         print("")
-        print("图形界面功能:")
+        print("标准图形界面功能:")
         print("  - 拖拽导入PDF、DXF、DWG等格式文件")
         print("  - 一键识别主要加工特征")
         print("  - 简单确认界面，减少用户操作")
@@ -152,6 +163,14 @@ def main():
         print("  - AI优先的NC代码生成")
         print("  - 更直观的参数配置界面")
         print("  - 增强的3D模型可视化支持")
+        print("")
+        print("美化版GUI功能 (简洁设计):")
+        print("  - 以大模型为技术框架，专注核心功能")
+        print("  - 简洁界面设计，移除多余元素")
+        print("  - 专注于2D图纸、3D模型和描述词输入")
+        print("  - 直观的NC程序输出")
+        print("  - 现代化的用户界面体验")
+        print("  - 优化的布局和交互设计")
         print("")
         print("新功能: 统一启动器")
         print("统一启动器支持同时运行GUI和Web服务器:")

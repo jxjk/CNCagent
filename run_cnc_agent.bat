@@ -6,6 +6,6 @@ SET DEEPSEEK_API_BASE=https://api.deepseek.com
 
 
 cd python_cncagent
-python start_unified.py 
+python start_unified.py both-beautified
 
 pause

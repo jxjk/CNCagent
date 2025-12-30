@@ -102,26 +102,33 @@ class PromptBuilder:
         if pdf_path:
             try:
                 text_content = extract_text_from_pdf(pdf_path)
-                drawing_info['pdf_text'] = text_content
+                if text_content is not None:
+                    drawing_info['pdf_text'] = text_content
+                else:
+                    text_content = ""  # 设置为空字符串而不是None
                 
                 # 使用OCR处理PDF图像
                 images = pdf_to_images(pdf_path)
-                ocr_results = []
-                for img in images:
-                    ocr_result = ocr_image(img)
-                    ocr_results.append(ocr_result)
-                drawing_info['ocr_text'] = " ".join(ocr_results)
-                
-                # 识别图像特征
-                features = []
-                for img in images:
-                    # 将PIL图像转换为numpy数组
-                    import numpy as np
-                    img_array = np.array(img.convert('L'))
-                    img_features = identify_features(img_array, drawing_text=text_content)
-                    features.extend(img_features)
-                
-                drawing_info['geometric_features'] = features
+                if images is not None:
+                    ocr_results = []
+                    for img in images:
+                        ocr_result = ocr_image(img)
+                        ocr_results.append(ocr_result)
+                    drawing_info['ocr_text'] = " ".join(ocr_results)
+                    
+                    # 识别图像特征
+                    features = []
+                    for img in images:
+                        # 将PIL图像转换为numpy数组
+                        import numpy as np
+                        img_array = np.array(img.convert('L'))
+                        img_features = identify_features(img_array, drawing_text=text_content)
+                        if img_features:  # 确保img_features不为None
+                            features.extend(img_features)
+                    
+                    drawing_info['geometric_features'] = features
+                else:
+                    self.logger.warning(f"无法从PDF提取图像: {pdf_path}")
             except Exception as e:
                 self.logger.warning(f"处理PDF图纸时出错: {str(e)}")
         
@@ -315,11 +322,14 @@ class PromptBuilder:
             analysis_summary.append(f"加工类型: {description_analysis['processing_type']}")
         if 'material' in description_analysis:
             analysis_summary.append(f"材料: {description_analysis['material']}")
-        if 'depth' in description_analysis:
+        if 'depth' in description_analysis and description_analysis['depth'] is not None:
             analysis_summary.append(f"加工深度: {description_analysis['depth']}mm")
-        if 'workpiece_dimensions' in description_analysis:
+        if 'workpiece_dimensions' in description_analysis and description_analysis['workpiece_dimensions'] is not None:
             dims = description_analysis['workpiece_dimensions']
-            analysis_summary.append(f"工件尺寸: {dims[0]}x{dims[1]}x{dims[2]}mm")
+            if len(dims) >= 3:  # 确保有足够的维度
+                analysis_summary.append(f"工件尺寸: {dims[0]}x{dims[1]}x{dims[2]}mm")
+            else:
+                analysis_summary.append(f"工件尺寸: {dims}mm")
         
         if analysis_summary:
             sections.append(f"## 需求分析:\n" + "\n".join(f"- {item}" for item in analysis_summary))

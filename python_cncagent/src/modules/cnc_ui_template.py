@@ -632,11 +632,22 @@ HTML_TEMPLATE = '''
                 </div>
             `;
             
+            // 创建带超时的fetch请求
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟超时
+            
             try {
                 const response = await fetch('/generate_nc', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId); // 清除超时
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP错误! 状态: ${response.status}`);
+                }
                 
                 const data = await response.json();
                 
@@ -655,7 +666,13 @@ HTML_TEMPLATE = '''
                     resultDiv.innerHTML = `<div class="error">❌ 错误: ${data.error || '未知错误'}</div>`;
                 }
             } catch (error) {
-                resultDiv.innerHTML = `<div class="error">❌ 请求失败: ${error.message}</div>`;
+                clearTimeout(timeoutId); // 清除超时
+                
+                if (error.name === 'AbortError') {
+                    resultDiv.innerHTML = '<div class="error">❌ 请求超时: AI处理时间过长，请稍后重试或检查API密钥配置</div>';
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ 请求失败: ${error.message}</div>`;
+                }
             } finally {
                 submitBtn.disabled = false;
                 submitText.textContent = '🚀 生成NC程序';

@@ -809,3 +809,265 @@
 2025-12-30 12:26:24,598 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
 2025-12-30 12:26:24,613 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
 2025-12-30 12:26:24,632 - __main__ - INFO - 启动GUI界面...
+2025-12-30 12:37:47,478 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 12:37:49,985 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 12:37:49,985 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-30 12:37:49,986 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 12:37:49,989 - __main__ - INFO - 启动模式: GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 12:37:49,991 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 12:37:50,037 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 12:37:50,037 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 12:37:51,992 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 12:37:52,010 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 12:37:52,034 - __main__ - INFO - 启动GUI界面...
+2025-12-30 12:47:49,147 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 12:47:51,856 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 12:47:51,883 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-30 12:47:51,883 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 12:48:55,013 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 12:48:57,179 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 12:48:57,179 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-30 12:48:57,180 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 12:48:57,183 - __main__ - INFO - 启动模式: 优化版GUI界面（AI优先）+ Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 12:48:57,184 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 12:48:57,221 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 12:48:57,221 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 12:48:59,185 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 12:48:59,203 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 12:48:59,254 - __main__ - INFO - 启动优化版GUI界面（AI优先模式）...
+2025-12-30 12:52:09,578 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 12:52:09,579 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 12:52:17,033 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 12:52:17,037 - src.modules.ai_driven_generator - ERROR - 生成NC程序时出错: 'NoneType' object is not subscriptable
+2025-12-30 12:55:37,045 - __main__ - INFO - 收到信号 2，正在关闭...
+2025-12-30 12:55:37,045 - __main__ - INFO - 等待Web服务器线程结束...
+2025-12-30 12:55:52,779 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 12:55:54,255 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 12:55:54,255 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-30 12:55:54,255 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 12:55:54,259 - __main__ - INFO - 启动模式: 优化版GUI界面（AI优先）+ Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 12:55:54,261 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 12:55:54,300 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 12:55:54,300 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 12:55:56,261 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 12:55:56,280 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 12:55:56,303 - __main__ - INFO - 启动优化版GUI界面（AI优先模式）...
+2025-12-30 13:07:35,250 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 13:07:37,971 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 13:07:37,971 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-30 13:07:37,972 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 13:07:37,976 - __main__ - INFO - 启动模式: 优化版GUI界面（AI优先）+ Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 13:07:37,978 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 13:07:38,020 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 13:07:38,022 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 13:07:39,978 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 13:07:39,993 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 13:07:40,013 - __main__ - INFO - 启动优化版GUI界面（AI优先模式）...
+2025-12-30 13:10:43,807 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 13:10:45,868 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 13:10:45,869 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-30 13:10:45,869 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 13:10:45,874 - __main__ - INFO - 启动模式: 优化版GUI界面（AI优先）+ Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 13:10:45,876 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 13:10:45,927 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 13:10:45,927 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 13:10:47,877 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 13:10:47,897 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 13:10:47,925 - __main__ - INFO - 启动优化版GUI界面（AI优先模式）...
+2025-12-30 13:13:23,615 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 13:13:23,616 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 13:13:27,300 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 13:13:27,303 - src.modules.ai_driven_generator - ERROR - 生成NC程序时出错: 'NoneType' object is not subscriptable
+2025-12-30 13:13:57,867 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 13:13:57,868 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 13:13:57,869 - src.modules.ai_driven_generator - ERROR - 生成NC程序时出错: 'NoneType' object is not subscriptable
+2025-12-30 13:14:25,037 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 13:14:25,037 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 13:14:25,038 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-30 13:14:25,038 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-30 13:14:25,038 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-30 13:14:29,198 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-30 13:15:34,503 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 4848
+2025-12-30 13:15:34,504 - src.modules.ai_driven_generator - INFO - 提取到 1 个代码块
+2025-12-30 13:15:34,505 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-30 13:15:34,505 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-30 13:15:52,552 - werkzeug - INFO - 127.0.0.1 - - [30/Dec/2025 13:15:52] "GET / HTTP/1.1" 200 -
+2025-12-30 13:22:22,673 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 13:22:22,674 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 13:22:26,294 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 13:22:26,299 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-30 13:22:26,299 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-30 13:22:26,300 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-30 13:22:29,293 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-30 13:23:33,784 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 4402
+2025-12-30 13:23:33,786 - src.modules.ai_driven_generator - INFO - 提取到 1 个代码块
+2025-12-30 13:23:33,786 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-30 13:23:33,787 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-30 13:26:48,545 - werkzeug - INFO - 127.0.0.1 - - [30/Dec/2025 13:26:48] "GET / HTTP/1.1" 200 -
+2025-12-30 13:26:50,437 - werkzeug - INFO - 127.0.0.1 - - [30/Dec/2025 13:26:50] "GET / HTTP/1.1" 200 -
+2025-12-30 13:26:51,876 - werkzeug - INFO - 127.0.0.1 - - [30/Dec/2025 13:26:51] "GET / HTTP/1.1" 200 -
+2025-12-30 13:27:03,852 - werkzeug - INFO - 127.0.0.1 - - [30/Dec/2025 13:27:03] "GET / HTTP/1.1" 200 -
+2025-12-30 13:28:39,764 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 13:28:39,773 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 13:28:46,056 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 13:28:46,061 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-30 13:28:46,061 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-30 13:28:46,062 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-30 13:28:50,806 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-30 13:29:55,818 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 4431
+2025-12-30 13:29:55,819 - src.modules.ai_driven_generator - INFO - 提取到 1 个代码块
+2025-12-30 13:29:55,820 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-30 13:29:55,820 - src.modules.ai_driven_generator - WARNING - 检测到缺少关键指令: ['G21']
+2025-12-30 13:29:55,821 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-30 13:33:05,208 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 13:33:05,208 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 13:33:10,313 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 13:33:10,320 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-30 13:33:10,320 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-30 13:33:10,321 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-30 13:33:14,790 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-30 13:33:49,307 - werkzeug - INFO - 127.0.0.1 - - [30/Dec/2025 13:33:49] "GET / HTTP/1.1" 200 -
+2025-12-30 13:33:50,511 - werkzeug - INFO - 127.0.0.1 - - [30/Dec/2025 13:33:50] "GET / HTTP/1.1" 200 -
+2025-12-30 13:33:51,880 - werkzeug - INFO - 127.0.0.1 - - [30/Dec/2025 13:33:51] "GET / HTTP/1.1" 200 -
+2025-12-30 13:34:20,600 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 4374
+2025-12-30 13:34:20,601 - src.modules.ai_driven_generator - INFO - 提取到 1 个代码块
+2025-12-30 13:34:20,601 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-30 13:34:20,602 - src.modules.ai_driven_generator - WARNING - 检测到缺少关键指令: ['G21']
+2025-12-30 13:34:20,603 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-30 13:36:31,787 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 13:36:31,788 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 13:36:35,223 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 13:36:35,226 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-30 13:36:35,226 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-30 13:36:35,227 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-30 13:36:37,668 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-30 13:37:41,558 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 3789
+2025-12-30 13:37:41,558 - src.modules.ai_driven_generator - INFO - 提取到 1 个代码块
+2025-12-30 13:37:41,559 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-30 13:37:41,559 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-30 13:43:26,370 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 13:43:30,079 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 13:43:30,098 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 13:43:30,160 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-30 13:43:30,161 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 13:43:30,168 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 13:43:30,170 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 13:43:30,225 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 13:43:30,226 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 13:43:32,170 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 13:43:32,171 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-30 13:49:57,356 - werkzeug - INFO - 127.0.0.1 - - [30/Dec/2025 13:49:57] "GET / HTTP/1.1" 200 -
+2025-12-30 14:01:11,072 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 14:01:12,873 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 14:01:12,882 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 14:01:12,896 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-30 14:01:12,896 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 14:01:12,899 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 14:01:12,900 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 14:01:12,995 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 14:01:12,995 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 14:01:14,900 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 14:01:14,901 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-30 14:12:44,688 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 14:12:46,600 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 14:12:46,620 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 14:12:46,683 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-30 14:12:46,684 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 14:12:46,689 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 14:12:46,691 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 14:12:46,731 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 14:12:46,732 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 14:12:48,691 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 14:12:48,692 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-30 14:13:15,774 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 14:13:15,774 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 14:13:20,865 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 14:13:20,867 - src.modules.ai_driven_generator - ERROR - 生成NC程序时出错: 'NoneType' object is not subscriptable
+2025-12-30 14:13:59,052 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 14:13:59,053 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 14:14:01,872 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 14:14:01,875 - src.modules.ai_driven_generator - ERROR - 生成NC程序时出错: 'NoneType' object is not subscriptable
+2025-12-30 14:14:17,946 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 14:14:17,946 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 14:14:20,370 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 14:14:20,373 - src.modules.ai_driven_generator - ERROR - 生成NC程序时出错: 'NoneType' object is not subscriptable
+2025-12-30 14:14:26,601 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 14:14:26,602 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 14:14:29,027 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 14:14:29,030 - src.modules.ai_driven_generator - ERROR - 生成NC程序时出错: 'NoneType' object is not subscriptable
+2025-12-30 14:14:56,345 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 14:14:56,345 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 14:14:59,444 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 14:14:59,447 - src.modules.ai_driven_generator - ERROR - 生成NC程序时出错: 'NoneType' object is not subscriptable
+2025-12-30 14:15:03,466 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 14:15:03,467 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 14:15:06,261 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: module 'numpy' has no attribute 'int0'
+2025-12-30 14:15:06,265 - src.modules.ai_driven_generator - ERROR - 生成NC程序时出错: 'NoneType' object is not subscriptable
+2025-12-30 14:18:48,714 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 14:18:52,235 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 14:18:52,260 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 14:18:52,301 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-30 14:18:52,302 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 14:18:52,308 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 14:18:52,313 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 14:18:52,389 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 14:18:52,390 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 14:18:54,313 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 14:18:54,314 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-30 14:19:19,197 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 14:19:19,198 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 14:19:25,709 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: 'NoneType' object is not iterable
+2025-12-30 14:19:25,721 - src.modules.ai_driven_generator - ERROR - 生成NC程序时出错: 'NoneType' object is not subscriptable
+2025-12-30 14:24:26,409 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 14:24:28,425 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 14:24:28,440 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-30 14:24:28,460 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-30 14:24:28,461 - __main__ - INFO - 预加载核心模块成功
+2025-12-30 14:24:28,466 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 14:24:28,467 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-30 14:24:28,517 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-30 14:24:28,518 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-30 14:24:30,468 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 14:24:30,469 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-30 14:24:53,972 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-30 14:24:53,972 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-30 14:24:58,548 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: 'NoneType' object is not iterable
+2025-12-30 14:24:58,555 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-30 14:24:58,557 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-30 14:24:58,559 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-30 14:25:04,805 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-30 14:26:12,477 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 4484
+2025-12-30 14:26:12,478 - src.modules.ai_driven_generator - INFO - 提取到 1 个代码块
+2025-12-30 14:26:12,479 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-30 14:26:12,480 - src.modules.ai_driven_generator - WARNING - 检测到缺少关键指令: ['G21']
+2025-12-30 14:26:12,480 - src.modules.ai_driven_generator - INFO - NC程序生成完成

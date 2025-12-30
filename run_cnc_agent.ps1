@@ -9,4 +9,4 @@ Write-Host "正在启动CNC Agent..."
 
 # 运行CNC Agent
 Set-Location python_cncagent
-python src/main.py @args
+python start_unified.py both-optimized @args

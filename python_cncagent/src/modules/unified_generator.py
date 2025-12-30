@@ -26,7 +26,7 @@ class UnifiedCNCGenerator:
         self.model = model
         # 仅使用AI方法，移除传统方法依赖
         self.ai_generator = lambda user_prompt, pdf_path, image_path=None, model_3d_path=None: generate_nc_with_ai(
-            user_prompt, pdf_path, image_path=image_path, model_3d_path=model_3d_path, api_key=self.api_key, model=self.model
+            user_prompt, pdf_path, image_path=image_path, model_3d_path=model_3d_path, api_key=self.api_key, model=self.model, material="Aluminum"
         )
         self.description_analyzer = analyze_user_description
         # 移除对传统特征识别的依赖
@@ -39,7 +39,8 @@ class UnifiedCNCGenerator:
         model_3d_path: Optional[str] = None,
         use_ai_primary: bool = True,
         user_priority_weight: float = 1.0,
-        enable_completeness_check: bool = False  # 默认关闭完整性检查，依赖大模型
+        enable_completeness_check: bool = False,  # 默认关闭完整性检查，依赖大模型
+        material: str = "Aluminum"  # 添加材料参数
     ) -> str:
         """
         生成CNC程序的统一接口 - 完全由大模型驱动
@@ -52,6 +53,7 @@ class UnifiedCNCGenerator:
             use_ai_primary: 此参数已废弃，始终使用AI方法
             user_priority_weight: 用户描述优先级权重 (0.0-1.0)，1.0表示最高优先级
             enable_completeness_check: 是否启用特征完整性检查（现在默认关闭）
+            material: 材料类型
             
         Returns:
             str: 生成的NC程序代码
@@ -79,7 +81,16 @@ class UnifiedCNCGenerator:
         try:
             # 简化流程：直接使用AI生成，移除传统验证步骤
             # 信任大模型的智能处理能力
-            return self.ai_generator(user_prompt, pdf_path, image_path, model_3d_path)
+            from .ai_driven_generator import generate_nc_with_ai
+            return generate_nc_with_ai(
+                user_prompt=user_prompt,
+                pdf_path=pdf_path,
+                image_path=image_path,
+                model_3d_path=model_3d_path,
+                api_key=self.api_key,
+                model=self.model,
+                material=material
+            )
             
         except CNCError:
             # 如果已经是CNCError，直接重新抛出
@@ -139,6 +150,70 @@ class UnifiedCNCGenerator:
         # 直接使用AI生成
         return self.ai_generator(user_prompt, pdf_path, image_path, model_3d_path)
     
+    def generate_cnc_program_with_material(
+        self, 
+        user_prompt: str, 
+        pdf_path: Optional[str] = None,
+        image_path: Optional[str] = None,
+        model_3d_path: Optional[str] = None,
+        use_ai_primary: bool = True,
+        user_priority_weight: float = 1.0,
+        enable_completeness_check: bool = False,
+        material: str = "Aluminum"
+    ) -> str:
+        """
+        生成CNC程序的统一接口 - 支持材料参数
+        
+        Args:
+            user_prompt: 用户需求描述
+            pdf_path: PDF图纸路径
+            image_path: 图像文件路径
+            model_3d_path: 3D模型文件路径
+            use_ai_primary: 此参数已废弃，始终使用AI方法
+            user_priority_weight: 用户描述优先级权重 (0.0-1.0)，1.0表示最高优先级
+            enable_completeness_check: 是否启用特征完整性检查（现在默认关闭）
+            material: 材料类型
+            
+        Returns:
+            str: 生成的NC程序代码
+        """
+        # 输入验证
+        if not user_prompt or not user_prompt.strip():
+            raise InputValidationError("用户需求描述不能为空")
+        
+        if pdf_path and not Path(pdf_path).exists():
+            raise InputValidationError(f"PDF文件不存在: {pdf_path}")
+        
+        if image_path and not Path(image_path).exists():
+            raise InputValidationError(f"图像文件不存在: {image_path}")
+            
+        if model_3d_path and not Path(model_3d_path).exists():
+            raise InputValidationError(f"3D模型文件不存在: {model_3d_path}")
+        
+        if not 0.0 <= user_priority_weight <= 1.0:
+            raise InputValidationError("用户优先级权重必须在0.0到1.0之间")
+        
+        try:
+            # 使用AI生成器，传入材料参数
+            # 从ai_driven_generator导入generate_nc_with_ai函数
+            from .ai_driven_generator import generate_nc_with_ai
+            return generate_nc_with_ai(
+                user_prompt=user_prompt,
+                pdf_path=pdf_path,
+                image_path=image_path,
+                model_3d_path=model_3d_path,
+                api_key=self.api_key,
+                model=self.model,
+                material=material
+            )
+            
+        except CNCError:
+            # 如果已经是CNCError，直接重新抛出
+            raise
+        except Exception as e:
+            error = handle_exception(e, self.logger, "生成CNC程序时出错")
+            raise CNCError(f"生成CNC程序失败: {str(error)}", original_exception=e) from e
+
     def generate_from_description_only(self, user_prompt: str, material: str = "Aluminum") -> str:
         """
         仅根据用户描述生成NC程序
@@ -188,7 +263,8 @@ def generate_cnc_with_unified_approach(
     user_priority_weight: float = 1.0,
     api_key: Optional[str] = None,
     model: str = "deepseek-chat",
-    enable_completeness_check: bool = False  # 默认关闭完整性检查
+    enable_completeness_check: bool = False,  # 默认关闭完整性检查
+    material: str = "Aluminum"  # 添加材料参数
 ) -> str:
     """
     使用统一方法生成CNC程序 - 完全由大模型驱动
@@ -203,11 +279,12 @@ def generate_cnc_with_unified_approach(
         api_key: 大模型API密钥
         model: 使用的模型名称
         enable_completeness_check: 是否启用特征完整性检查（默认关闭）
+        material: 材料类型
         
     Returns:
         str: 生成的NC程序代码
     """
     generator = UnifiedCNCGenerator(api_key=api_key, model=model)
-    return generator.generate_cnc_program(
-        user_prompt, pdf_path, image_path, model_3d_path, use_ai_primary, user_priority_weight, enable_completeness_check
+    return generator.generate_cnc_program_with_material(
+        user_prompt, pdf_path, image_path, model_3d_path, use_ai_primary, user_priority_weight, enable_completeness_check, material
     )

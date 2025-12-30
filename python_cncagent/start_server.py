@@ -47,9 +47,13 @@ def health_check():
 @app.route('/generate_nc', methods=['POST'])
 def generate_nc():
     """根据上传的2D/3D文件和用户描述生成NC程序"""
+    import logging
+    logging.info("收到生成NC程序请求")
+    
     try:
         # 检查是否提供了用户描述（这是必须的）
         if 'description' not in request.form:
+            logging.error("缺少用户描述")
             return jsonify({"error": "缺少用户描述"}), 400
         
         # 获取用户描述并确保正确处理中文字符
@@ -57,8 +61,11 @@ def generate_nc():
         if isinstance(user_description, bytes):
             user_description = user_description.decode('utf-8')
         
+        logging.info(f"收到用户描述: {user_description[:100]}...")  # 只记录前100个字符
+        
         # 获取比例尺
         scale = float(request.form.get('scale', 1.0))
+        coordinate_strategy = request.form.get('coordinate_strategy', 'highest_y')
         
         # 初始化文件路径
         pdf_path = None
@@ -72,12 +79,14 @@ def generate_nc():
                 allowed_extensions = {'.pdf', '.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
                 file_ext = os.path.splitext(pdf_file.filename.lower())[1]
                 if file_ext not in allowed_extensions:
+                    logging.error(f"不支持的2D文件格式: {file_ext}")
                     return jsonify({"error": f"不支持的2D文件格式: {file_ext}。支持的格式: {', '.join(allowed_extensions)}"}), 400
                 
                 # 创建临时文件保存上传的2D文件
                 with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
                     pdf_file.save(temp_file.name)
                     pdf_path = temp_file.name
+                    logging.info(f"已保存2D文件到临时路径: {pdf_path}")
         
         # 处理3D模型文件
         if 'model_3d' in request.files:
@@ -87,58 +96,85 @@ def generate_nc():
                 allowed_extensions = {'.stl', '.step', '.stp', '.igs', '.iges', '.obj', '.ply', '.off', '.gltf', '.glb'}
                 file_ext = os.path.splitext(model_3d_file.filename.lower())[1]
                 if file_ext not in allowed_extensions:
+                    logging.error(f"不支持的3D模型格式: {file_ext}")
                     return jsonify({"error": f"不支持的3D模型格式: {file_ext}。支持的格式: {', '.join(allowed_extensions)}"}), 400
                 
                 # 创建临时文件保存上传的3D模型
                 with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
                     model_3d_file.save(temp_file.name)
                     model_3d_path = temp_file.name
+                    logging.info(f"已保存3D模型到临时路径: {model_3d_path}")
         
         # 检查是否至少提供了2D文件、3D文件或用户描述中的信息
         if not pdf_path and not model_3d_path:
             # 如果没有提供任何图纸文件，只用用户描述
             if not user_description.strip():
+                logging.error("没有提供文件且描述为空")
                 return jsonify({"error": "必须提供2D图纸、3D模型或加工描述之一"}), 400
         
+        # 从环境变量获取API配置
+        import os
+        api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
+        model = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))
+        
+        logging.info(f"使用模型: {model}, API密钥设置: {'已设置' if api_key else '未设置'}")
+        
+        if not api_key:
+            logging.warning("未检测到API密钥，生成可能失败")
+            return jsonify({"error": "未配置API密钥，请设置DEEPSEEK_API_KEY或OPENAI_API_KEY环境变量"}), 500
+        
         try:
-            # 从环境变量获取API配置
-            import os
-            api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
-            model = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))
-            
             # 生成NC程序 - 使用main模块中的函数
             from src.main import generate_nc_from_pdf
+            
+            logging.info("开始调用generate_nc_from_pdf函数")
             
             nc_program = generate_nc_from_pdf(
                 pdf_path=pdf_path,  # 可能为None
                 user_description=user_description,
                 scale=scale,
+                coordinate_strategy=coordinate_strategy,  # 添加坐标策略
                 model_3d_path=model_3d_path,  # 可能为None
                 api_key=api_key,
                 model=model
             )
             
+            logging.info("NC程序生成完成")
+            
             # 创建临时文件保存NC程序
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.nc') as temp_nc:
                 temp_nc.write(nc_program)
                 temp_nc_path = temp_nc.name
+                logging.info(f"NC程序已保存到临时文件: {temp_nc_path}")
             
             # 返回NC程序内容和下载链接
-            return jsonify({
+            response_data = {
                 "status": "success",
                 "nc_program": nc_program,
                 "nc_file_path": temp_nc_path,
                 "message": "NC程序生成成功"
-            })
+            }
+            
+            logging.info("成功返回响应")
+            return jsonify(response_data)
             
         finally:
             # 删除临时文件
             if pdf_path and os.path.exists(pdf_path):
-                os.unlink(pdf_path)
+                try:
+                    os.unlink(pdf_path)
+                    logging.info(f"已删除临时2D文件: {pdf_path}")
+                except Exception as e:
+                    logging.error(f"删除临时2D文件失败 {pdf_path}: {str(e)}")
             if model_3d_path and os.path.exists(model_3d_path):
-                os.unlink(model_3d_path)
+                try:
+                    os.unlink(model_3d_path)
+                    logging.info(f"已删除临时3D文件: {model_3d_path}")
+                except Exception as e:
+                    logging.error(f"删除临时3D文件失败 {model_3d_path}: {str(e)}")
     
     except Exception as e:
+        logging.error(f"生成NC程序时发生异常: {str(e)}", exc_info=True)
         # 确保临时文件被清理 - 检查变量是否存在
         temp_pdf_path = locals().get('pdf_path')
         temp_model_3d_path = locals().get('model_3d_path')
@@ -146,11 +182,13 @@ def generate_nc():
         if temp_pdf_path and os.path.exists(temp_pdf_path):
             try:
                 os.unlink(temp_pdf_path)
+                logging.info(f"异常清理: 已删除临时2D文件: {temp_pdf_path}")
             except:
                 pass
         if temp_model_3d_path and os.path.exists(temp_model_3d_path):
             try:
                 os.unlink(temp_model_3d_path)
+                logging.info(f"异常清理: 已删除临时3D文件: {temp_model_3d_path}")
             except:
                 pass
         return jsonify({"error": f"生成NC程序时发生错误: {str(e)}"}), 500
