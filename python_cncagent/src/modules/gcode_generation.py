@@ -1708,3 +1708,19 @@ def _validate_feature(feature: Dict) -> List[str]:
                     break
     
     return errors
+
+
+def generate_gcode(features: List[Dict], description_analysis: Dict, scale: float = 1.0) -> str:
+    """
+    生成G代码的主函数 - generate_fanuc_nc的别名
+    
+    Args:
+        features (list): 识别出的几何特征列表
+        description_analysis (dict): 用户描述分析结果
+        scale (float): 比例尺因子
+    
+    Returns:
+        str: 生成的NC程序代码
+    """
+    # 调用主要的FANUC NC生成函数
+    return generate_fanuc_nc(features, description_analysis, scale)

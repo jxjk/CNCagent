@@ -737,3 +737,16 @@
 2025-12-30 08:58:06,019 - root - INFO - 正在生成模拟报告...
 2025-12-30 08:58:06,021 - root - INFO - 模拟报告已生成: simulation_report.txt
 2025-12-30 08:58:06,024 - werkzeug - INFO - 127.0.0.1 - - [30/Dec/2025 08:58:06] "POST /generate_nc HTTP/1.1" 200 -
+2025-12-30 10:28:41,924 - root - WARNING - 警告: 未安装open3d库，3D模型处理功能将受限
+2025-12-30 10:28:44,714 - __main__ - WARNING - 预加载 start_server 模块失败: cannot import name 'generate_gcode' from 'src.modules.gcode_generation' (D:\Users\00596\Desktop\CNCagent\python_cncagent\src\modules\gcode_generation.py)
+2025-12-30 10:28:44,716 - __main__ - WARNING - 预加载 simple_nc_gui 模块失败: cannot import name 'generate_gcode' from 'src.modules.gcode_generation' (D:\Users\00596\Desktop\CNCagent\python_cncagent\src\modules\gcode_generation.py)
+2025-12-30 10:28:44,719 - __main__ - WARNING - 预加载核心模块失败: cannot import name 'generate_gcode' from 'src.modules.gcode_generation' (D:\Users\00596\Desktop\CNCagent\python_cncagent\src\modules\gcode_generation.py)
+2025-12-30 10:28:44,725 - __main__ - INFO - 启动模式: GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-30 10:28:44,739 - __main__ - ERROR - 无法导入Web服务器模块: cannot import name 'generate_gcode' from 'src.modules.gcode_generation' (D:\Users\00596\Desktop\CNCagent\python_cncagent\src\modules\gcode_generation.py)
+2025-12-30 10:28:46,732 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-30 10:28:46,772 - root - WARNING - 警告: 未安装open3d库，3D模型处理功能将受限
+2025-12-30 10:28:46,798 - __main__ - ERROR - 无法导入GUI模块: cannot import name 'generate_gcode' from 'modules.gcode_generation' (D:\Users\00596\Desktop\CNCagent\python_cncagent\src\modules\gcode_generation.py)
+2025-12-30 10:34:43,593 - root - WARNING - 警告: 未安装open3d库，3D模型处理功能将受限
+2025-12-30 10:34:45,731 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-30 10:34:45,731 - __main__ - INFO - 预加载 simple_nc_gui 模块成功
+2025-12-30 10:34:45,731 - __main__ - INFO - 预加载核心模块成功
