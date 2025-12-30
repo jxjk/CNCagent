@@ -36,7 +36,7 @@ HTML_TEMPLATE = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CNC Agent - PDF到NC程序转换器</title>
+    <title>CNC Agent - 2D/3D图纸到NC程序转换器</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -47,7 +47,7 @@ HTML_TEMPLATE = '''
             color: #333;
         }
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
             background: white;
             padding: 30px;
@@ -96,6 +96,16 @@ HTML_TEMPLATE = '''
         button:disabled {
             background: #bdc3c7;
             cursor: not-allowed;
+        }
+        .file-input-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .file-input-container {
+            flex: 1;
+            min-width: 200px;
         }
         .result {
             margin-top: 30px;
@@ -164,36 +174,62 @@ HTML_TEMPLATE = '''
         .instructions ul {
             margin-bottom: 0;
         }
+        .optional-field {
+            opacity: 0.7;
+            font-size: 0.9em;
+        }
+        .flex-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .flex-item {
+            flex: 1;
+            min-width: 300px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>CNC Agent - PDF到NC程序转换器</h1>
+        <h1>CNC Agent - 2D/3D图纸到NC程序转换器</h1>
         
         <div class="instructions">
             <h3>使用说明</h3>
             <ul>
-                <li>上传包含几何图纸的PDF文件</li>
+                <li>同时支持上传2D图纸（PDF、图片）和3D模型（STL、STEP等）</li>
                 <li>在描述框中输入加工要求（如：请加工一个直径10mm的孔，深度5mm）</li>
-                <li>设置图纸比例尺（默认为1.0）</li>
+                <li>2D图纸和3D模型均为可选，但至少需要提供加工描述</li>
                 <li>点击"生成NC程序"按钮</li>
             </ul>
         </div>
         
         <form id="cncForm" enctype="multipart/form-data">
-            <div class="form-group">
-                <label for="pdfFile">PDF图纸文件:</label>
-                <input type="file" id="pdfFile" name="pdf" accept=".pdf" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="description">加工描述:</label>
-                <textarea id="description" name="description" placeholder="例如：请加工一个直径10mm的孔，深度5mm，使用铣削加工" required></textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="scale">图纸比例尺 (可选):</label>
-                <input type="number" id="scale" name="scale" value="1.0" min="0.001" max="100" step="0.1">
+            <div class="flex-container">
+                <div class="flex-item">
+                    <div class="form-group">
+                        <label for="pdfFile">2D图纸文件 (可选):</label>
+                        <div class="optional-field">支持PDF、JPG、PNG等格式</div>
+                        <input type="file" id="pdfFile" name="pdf" accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="model3DFile">3D模型文件 (可选):</label>
+                        <div class="optional-field">支持STL、STEP、IGES、OBJ等格式</div>
+                        <input type="file" id="model3DFile" name="model_3d" accept=".stl,.step,.stp,.igs,.iges,.obj,.ply">
+                    </div>
+                </div>
+                
+                <div class="flex-item">
+                    <div class="form-group">
+                        <label for="description">加工描述 (必填):</label>
+                        <textarea id="description" name="description" placeholder="例如：请加工一个直径10mm的孔，深度5mm，使用铣削加工" required></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="scale">图纸比例尺 (可选):</label>
+                        <input type="number" id="scale" name="scale" value="1.0" min="0.001" max="100" step="0.1">
+                    </div>
+                </div>
             </div>
             
             <button type="submit" id="submitBtn">生成NC程序</button>
@@ -209,6 +245,13 @@ HTML_TEMPLATE = '''
             const formData = new FormData(this);
             const submitBtn = document.getElementById('submitBtn');
             const resultDiv = document.getElementById('result');
+            
+            // 检查是否至少提供了描述
+            const description = formData.get('description');
+            if (!description || !description.trim()) {
+                resultDiv.innerHTML = '<div class="error">错误: 加工描述是必填项</div>';
+                return;
+            }
             
             // 显示加载状态
             submitBtn.disabled = true;
@@ -264,30 +307,59 @@ def health_check():
 
 @app.route('/generate_nc', methods=['POST'])
 def generate_nc():
-    """根据上传的PDF和用户描述生成NC程序"""
+    """根据上传的2D/3D文件和用户描述生成NC程序"""
     try:
-        # 检查请求是否包含文件和描述
-        if 'pdf' not in request.files:
-            return jsonify({"error": "缺少PDF文件"}), 400
-        
+        # 检查是否提供了用户描述（这是必须的）
         if 'description' not in request.form:
             return jsonify({"error": "缺少用户描述"}), 400
         
-        pdf_file = request.files['pdf']
-        # 确保用户描述正确处理中文字符
+        # 获取用户描述并确保正确处理中文字符
         user_description = request.form['description']
         if isinstance(user_description, bytes):
             user_description = user_description.decode('utf-8')
+        
+        # 获取比例尺
         scale = float(request.form.get('scale', 1.0))
         
-        # 验证文件类型
-        if not pdf_file.filename.lower().endswith('.pdf'):
-            return jsonify({"error": "文件必须是PDF格式"}), 400
+        # 初始化文件路径
+        pdf_path = None
+        model_3d_path = None
         
-        # 创建临时文件保存上传的PDF
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_pdf:
-            pdf_file.save(temp_pdf.name)
-            temp_pdf_path = temp_pdf.name
+        # 处理2D文件（PDF或图像）
+        if 'pdf' in request.files:
+            pdf_file = request.files['pdf']
+            if pdf_file.filename != '':  # 如果文件名不为空
+                # 验证文件类型
+                allowed_extensions = {'.pdf', '.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
+                file_ext = os.path.splitext(pdf_file.filename.lower())[1]
+                if file_ext not in allowed_extensions:
+                    return jsonify({"error": f"不支持的2D文件格式: {file_ext}。支持的格式: {', '.join(allowed_extensions)}"}), 400
+                
+                # 创建临时文件保存上传的2D文件
+                with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+                    pdf_file.save(temp_file.name)
+                    pdf_path = temp_file.name
+        
+        # 处理3D模型文件
+        if 'model_3d' in request.files:
+            model_3d_file = request.files['model_3d']
+            if model_3d_file.filename != '':  # 如果文件名不为空
+                # 验证3D模型文件类型
+                allowed_extensions = {'.stl', '.step', '.stp', '.igs', '.iges', '.obj', '.ply', '.off', '.gltf', '.glb'}
+                file_ext = os.path.splitext(model_3d_file.filename.lower())[1]
+                if file_ext not in allowed_extensions:
+                    return jsonify({"error": f"不支持的3D模型格式: {file_ext}。支持的格式: {', '.join(allowed_extensions)}"}), 400
+                
+                # 创建临时文件保存上传的3D模型
+                with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+                    model_3d_file.save(temp_file.name)
+                    model_3d_path = temp_file.name
+        
+        # 检查是否至少提供了2D文件、3D文件或用户描述中的信息
+        if not pdf_path and not model_3d_path:
+            # 如果没有提供任何图纸文件，只用用户描述
+            if not user_description.strip():
+                return jsonify({"error": "必须提供2D图纸、3D模型或加工描述之一"}), 400
         
         try:
             # 从环境变量获取API配置
@@ -295,11 +367,14 @@ def generate_nc():
             api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
             model = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))
             
-            # 生成NC程序
+            # 生成NC程序 - 使用main模块中的函数
+            from src.main import generate_nc_from_pdf
+            
             nc_program = generate_nc_from_pdf(
+                pdf_path=pdf_path,  # 可能为None
                 user_description=user_description,
-                pdf_path=temp_pdf_path,
                 scale=scale,
+                model_3d_path=model_3d_path,  # 可能为None
                 api_key=api_key,
                 model=model
             )
@@ -318,10 +393,24 @@ def generate_nc():
             })
             
         finally:
-            # 删除临时PDF文件
-            os.unlink(temp_pdf_path)
+            # 删除临时文件
+            if pdf_path and os.path.exists(pdf_path):
+                os.unlink(pdf_path)
+            if model_3d_path and os.path.exists(model_3d_path):
+                os.unlink(model_3d_path)
     
     except Exception as e:
+        # 确保临时文件被清理
+        if 'pdf_path' in locals() and pdf_path and os.path.exists(pdf_path):
+            try:
+                os.unlink(pdf_path)
+            except:
+                pass
+        if 'model_3d_path' in locals() and model_3d_path and os.path.exists(model_3d_path):
+            try:
+                os.unlink(model_3d_path)
+            except:
+                pass
         return jsonify({"error": f"生成NC程序时发生错误: {str(e)}"}), 500
 
 

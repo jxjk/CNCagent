@@ -32,6 +32,7 @@ class SimpleNC_GUI:
         self.file_types = [
             ("图像文件", "*.png *.jpg *.jpeg *.bmp *.tiff"),
             ("PDF文件", "*.pdf"),
+            ("3D模型文件", "*.stl *.step *.stp *.igs *.iges *.obj *.ply"),
             ("所有文件", "*.*")
         ]
         
@@ -144,6 +145,64 @@ class SimpleNC_GUI:
             self.current_image = None
             self.show_welcome_message()
     
+    def create_virtual_image_from_3d(self, model_data):
+        """根据3D模型数据创建虚拟2D图像"""
+        # 创建一个空白的虚拟图像
+        width, height = 800, 600
+        virtual_image = np.zeros((height, width, 3), dtype=np.uint8)
+        
+        # 获取3D模型信息
+        geometric_features = model_data.get('geometric_features', {})
+        bounding_box = geometric_features.get('bounding_box', {})
+        
+        if bounding_box:
+            # 根据3D模型的边界框信息创建2D投影
+            min_coords = bounding_box.get('min', [0, 0, 0])
+            max_coords = bounding_box.get('max', [10, 10, 10])
+            
+            # 计算中心点和尺寸
+            center_x = (min_coords[0] + max_coords[0]) / 2
+            center_y = (min_coords[1] + max_coords[1]) / 2
+            size_x = max_coords[0] - min_coords[0]
+            size_y = max_coords[1] - min_coords[1]
+            
+            # 将3D坐标映射到2D图像空间
+            img_center_x = width // 2
+            img_center_y = height // 2
+            
+            # 计算缩放比例，确保模型适合图像
+            scale_x = width * 0.6 / (size_x if size_x > 0 else 10)
+            scale_y = height * 0.6 / (size_y if size_y > 0 else 10)
+            scale = min(scale_x, scale_y)
+            
+            # 绘制边界框
+            half_size_x = int((size_x * scale) / 2)
+            half_size_y = int((size_y * scale) / 2)
+            
+            top_left = (img_center_x - half_size_x, img_center_y - half_size_y)
+            bottom_right = (img_center_x + half_size_x, img_center_y + half_size_y)
+            
+            cv2.rectangle(virtual_image, top_left, bottom_right, (255, 255, 255), 2)
+        
+        # 添加3D模型信息文本
+        vertices_count = geometric_features.get('vertices_count', 0)
+        faces_count = geometric_features.get('faces_count', 0)
+        volume = geometric_features.get('volume', 0)
+        
+        cv2.putText(virtual_image, f"3D模型预览 - 顶点: {vertices_count}, 面: {faces_count}", 
+                   (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.putText(virtual_image, f"体积: {volume:.2f}", 
+                   (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        
+        # 如果检测到几何基元，也显示出来
+        geometric_primitives = geometric_features.get('geometric_primitives', [])
+        if geometric_primitives:
+            cv2.putText(virtual_image, f"基元: {len(geometric_primitives)}个", 
+                       (20, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        
+        self.current_image = virtual_image
+        self.current_image_path = None  # 表示这是虚拟图像
+    
     def create_virtual_image(self):
         """创建虚拟图像用于仅描述模式"""
         # 创建一个空白的虚拟图像
@@ -175,7 +234,23 @@ class SimpleNC_GUI:
             try:
                 # 检查文件扩展名
                 _, ext = os.path.splitext(file_path.lower())
-                if ext in ['.pdf']:
+                
+                if ext in ['.stl', '.step', '.stp', '.igs', '.iges', '.obj', '.ply', '.off', '.gltf', '.glb']:
+                    # 处理3D模型文件
+                    from src.modules.model_3d_processor import process_3d_model
+                    try:
+                        model_data = process_3d_model(file_path)
+                        self.current_3d_model_path = file_path
+                        self.current_3d_model_data = model_data
+                        
+                        # 创建虚拟2D图像用于显示
+                        self.create_virtual_image_from_3d(model_data)
+                        self.display_cv_image()
+                        self.status_var.set(f"已加载3D模型: {os.path.basename(file_path)} - {model_data['geometric_features'].get('vertices_count', '未知')}顶点")
+                    except Exception as e:
+                        messagebox.showerror("错误", f"处理3D模型时出错: {str(e)}")
+                        return
+                elif ext in ['.pdf']:
                     # 处理PDF文件
                     from src.modules.pdf_parsing_process import pdf_to_images
                     images = pdf_to_images(file_path)
@@ -279,8 +354,8 @@ class SimpleNC_GUI:
         # 在仅描述模式下，不应使用图像，直接从描述生成NC代码
         if self.only_description_mode.get():
             self.generate_nc_from_description_only()
-        elif self.current_image is None:
-            messagebox.showwarning("警告", "请先加载图纸并检测特征")
+        elif self.current_image is None and not hasattr(self, 'current_3d_model_path'):
+            messagebox.showwarning("警告", "请先加载图纸或3D模型并检测特征")
             return
         else:
             self.status_var.set("正在生成NC代码...")
@@ -292,15 +367,31 @@ class SimpleNC_GUI:
                 material = self.material.get()
                 user_description = self.description.get()
                 
+                # 获取2D文件路径（如果存在）
+                pdf_path = self.current_image_path if hasattr(self, 'current_image_path') and self.current_image_path else None
+                
+                # 获取3D模型路径（如果存在）
+                model_3d_path = getattr(self, 'current_3d_model_path', None)
+                
                 # 在后台线程中生成NC代码
                 def generate_in_thread():
                     try:
-                        nc_code = self.nc_helper.quick_nc_generation(
-                            self.current_image, 
-                            drawing_text, 
-                            material, 
-                            user_description
+                        # 使用统一生成器来处理2D/3D输入
+                        from src.modules.unified_generator import generate_cnc_with_unified_approach
+                        import os
+                        
+                        # 从环境变量获取API配置
+                        api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
+                        model_name = os.getenv('DEEPSEEK_MODEL', os.getenv('OPENAI_MODEL', 'deepseek-chat'))
+                        
+                        nc_code = generate_cnc_with_unified_approach(
+                            user_prompt=user_description,
+                            pdf_path=pdf_path,  # 可能为None
+                            model_3d_path=model_3d_path,  # 可能为None
+                            api_key=api_key,
+                            model=model_name
                         )
+                        
                         self.current_nc_code = nc_code
                         self.root.after(0, self.display_nc_code, nc_code)
                         self.root.after(0, self.update_report)
