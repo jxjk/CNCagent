@@ -29,7 +29,9 @@ class ConfigManager:
             'extent_threshold': 0.8,
             'aspect_ratio_tolerance': 0.2,
             'ellipse_eccentricity_min': 0.4,
-            'ellipse_eccentricity_max': 0.9
+            'ellipse_eccentricity_max': 0.9,
+            'corner_radius_threshold': 2.0,  # 圆角识别阈值
+            'pocket_solidity_threshold': 0.85  # 腔槽实心度阈值
         }
 
         # G代码生成参数
@@ -107,7 +109,14 @@ class ConfigManager:
         self.COORDINATE_CONFIG = {
             'default_coordinate_strategy': 'highest_y',
             'polar_coordinate_tolerance': 0.15,  # PCD半径的容差比例
-            'position_match_tolerance': 0.1      # 位置匹配容差
+            'position_match_tolerance': 0.1,     # 位置匹配容差
+            'pocket_tolerance': 0.2,             # 腔槽定位容差
+            'coordinate_systems': {
+                'absolute': '绝对坐标系',
+                'incremental': '增量坐标系',
+                'polar': '极坐标系',
+                'cartesian': '笛卡尔坐标系'
+            }
         }
 
         # OCR和文本处理参数

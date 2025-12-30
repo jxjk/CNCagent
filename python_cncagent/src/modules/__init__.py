@@ -1,29 +1,21 @@
-from . import ai_driven_generator
-from . import ocr_ai_inference
-from . import unified_generator
-from . import requirement_clarifier
-from . import nc_validator_optimizer
-from . import feature_definition
-from . import gcode_generation
-from . import material_tool_matcher
-from . import pdf_parsing_process
-from . import project_initialization
-from . import simulation_output
-from . import validation
-from . import fanuc_optimization
+# src/modules/__init__.py
+
+"""
+CNC Agent 模块初始化文件
+"""
+
+from .geometric_reasoning_engine import geometric_reasoning_engine
+from .ai_driven_generator import ai_generator
+from .feature_definition import identify_features
+from .gcode_generation import generate_gcode
+from .mechanical_drawing_expert import MechanicalDrawingExpert
+from .prompt_builder import prompt_builder
 
 __all__ = [
-    "ai_driven_generator",
-    "ocr_ai_inference",
-    "unified_generator",
-    "requirement_clarifier",
-    "nc_validator_optimizer",
-    "feature_definition",
-    "gcode_generation", 
-    "material_tool_matcher",
-    "pdf_parsing_process",
-    "project_initialization",
-    "simulation_output",
-    "validation",
-    "fanuc_optimization"
+    'geometric_reasoning_engine',
+    'ai_generator',
+    'identify_features',
+    'generate_gcode',
+    'MechanicalDrawingExpert',
+    'prompt_builder'
 ]

@@ -457,3 +457,132 @@ class MechanicalDrawingExpert:
                     normalized_coords[ref_name] = ref_point
         
         return normalized_coords
+    
+    def analyze_drawing_features(self, features: List[Dict], user_description: str) -> Dict[str, any]:
+        """
+        使用机械制图专业知识分析图纸特征
+        
+        Args:
+            features: 识别出的几何特征列表
+            user_description: 用户描述
+            
+        Returns:
+            Dict: 包含分析结果的字典
+        """
+        analysis = {
+        "features": features,
+        "user_description": user_description,
+        "interpretation": "根据机械制图标准分析图纸特征",
+        "recommendations": [],
+        "potential_issues": [],
+        "processing_sequence": [],
+        "processing_structure": "single_sided",  # "single_sided", "multi_sided"
+        "clamping_suggestions": [],
+        "tool_path_recommendations": []
+        }
+    
+        # 分析特征类型分布
+        feature_counts = {}
+        for feature in features:
+            shape = feature.get("shape", "unknown")
+        feature_counts[shape] = feature_counts.get(shape, 0) + 1
+    
+        # 生成解释
+        explanations = []
+        if "circle" in feature_counts:
+            explanations.append(f"识别到 {feature_counts['circle']} 个圆形特征，通常用于钻孔或螺栓孔")
+        if "rectangle" in feature_counts:
+            explanations.append(f"识别到 {feature_counts['rectangle']} 个矩形特征，可能用于键槽或其他矩形孔")
+        if "counterbore" in feature_counts:
+            explanations.append(f"识别到 {feature_counts['counterbore']} 个沉孔特征，用于螺钉头部沉孔")
+        if "rectangular_pocket" in feature_counts:
+            explanations.append(f"识别到 {feature_counts['rectangular_pocket']} 个矩形腔槽特征，用于安装或减重")
+        if "rounded_rectangular_pocket" in feature_counts:
+            explanations.append(f"识别到 {feature_counts['rounded_rectangular_pocket']} 个圆角矩形腔槽特征，用于减少应力集中")
+    
+        analysis["interpretation"] = ";".join(explanations) if explanations else "未识别到明显的几何特征"
+    
+        # 生成建议
+        recommendations = []
+        if user_description and ("攻丝" in user_description or "螺纹" in user_description):
+            recommendations.append("建议按先钻孔、后攻丝的顺序进行加工")
+        if user_description and ("沉孔" in user_description or "锪孔" in user_description):
+            recommendations.append("建议按先点孔、再钻孔、最后锪孔的顺序进行加工")
+        if user_description and ("腔" in user_description or "pocket" in user_description.lower()):
+            recommendations.append("腔槽加工建议采用分层铣削，避免刀具受力过大")
+        if user_description and ("槽" in user_description or "slot" in user_description.lower()):
+            recommendations.append("槽加工建议使用合适的槽铣刀，注意排屑")
+    
+        analysis["recommendations"] = recommendations
+    
+        # 检查潜在问题
+        potential_issues = []
+        if not features:
+            potential_issues.append("未识别到任何几何特征，可能需要检查图纸质量或调整识别参数")
+        if len(features) > 20:
+            potential_issues.append(f"识别到 {len(features)} 个特征，数量较多，建议分批处理或验证识别结果")
+    
+        # 检查多面加工需求
+        has_deep_features = any(
+        feature.get("dimensions") and 
+        len(feature.get("dimensions", [])) >= 3 and 
+        feature["dimensions"][2] > 20  # 假设深度大于20mm需要多面加工
+        for feature in features
+        )
+    
+        if has_deep_features:
+            potential_issues.append("检测到深度较大的特征，可能需要多面加工或特殊刀具")
+        analysis["processing_structure"] = "multi_sided"
+    
+        analysis["potential_issues"] = potential_issues
+    
+        # 推荐加工顺序
+        processing_sequence = []
+        for i, feature in enumerate(features):
+            if feature["shape"] == "counterbore":
+                processing_sequence.extend([
+                f"第{i*3+1}步: {feature['center']} 位置进行点孔加工",
+                f"第{i*3+2}步: {feature['center']} 位置进行钻孔加工", 
+                f"第{i*3+3}步: {feature['center']} 位置进行锪孔加工"
+            ])
+            elif feature["shape"] in ["rectangular_pocket", "rounded_rectangular_pocket"]:
+                processing_sequence.append(f"第{i+1}步: {feature['center']} 位置进行腔槽铣削加工，尺寸{feature['dimensions'][:2]}")
+            elif feature["shape"] in ["circle", "rectangle", "square"]:
+                processing_sequence.append(f"第{i+1}步: {feature['center']} 位置进行 {feature['shape']} 加工")
+    
+        analysis["processing_sequence"] = processing_sequence
+    
+        # 生成夹紧建议
+        clamping_suggestions = []
+        if analysis["processing_structure"] == "multi_sided":
+            clamping_suggestions.append("对于多面加工，建议使用专用夹具或分度装置")
+            clamping_suggestions.append("考虑加工顺序以减少工件翻转次数")
+        else:
+            clamping_suggestions.append("标准夹紧方式即可满足加工要求")
+    
+        if len([f for f in features if f.get("dimensions", [0,0])[0] > 100 or f.get("dimensions", [0,0])[1] > 100]) > 3:
+            clamping_suggestions.append("多个大尺寸特征，建议增加夹紧点以提高刚性")
+    
+        analysis["clamping_suggestions"] = clamping_suggestions
+    
+        # 刀具路径建议
+        tool_path_recommendations = []
+        for feature in features:
+            if feature["shape"] in ["rectangular_pocket", "rounded_rectangular_pocket"]:
+                tool_path_recommendations.append(
+                f"腔槽({feature['center']})建议采用螺旋铣削或环切路径，步距为刀具直径的60%"
+            )
+            elif feature["shape"] == "slot":
+                tool_path_recommendations.append(
+                f"槽({feature['center']})建议采用往复铣削路径，确保两端圆角处理"
+            )
+    
+        analysis["tool_path_recommendations"] = tool_path_recommendations if tool_path_recommendations else [
+        "根据特征形状选择合适的刀具路径策略"
+        ]
+    
+        return analysis
+
+
+# 全局实例
+mechanical_drawing_expert = MechanicalDrawingExpert()

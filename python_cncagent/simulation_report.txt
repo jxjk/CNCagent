@@ -1,50 +1,50 @@
 ============================================================
 CNC 加工模拟报告
 ============================================================
-生成时间: 2025-12-29 16:38:00
+生成时间: 2025-12-30 08:58:06
 
 识别出的几何特征:
 ------------------------------
 用户描述分析:
 ------------------------------
-加工类型: drilling
-所需刀具: drill_bit
-加工深度: 300.0 mm
+加工类型: milling
+所需刀具: end_mill
+加工深度: None mm
 进给速度: None mm/min
-主轴转速: None RPM
+主轴转速: 45.0 RPM
 材料: None
 精度要求: None
 
 NC程序统计:
 ------------------------------
-总行数: 124
-G代码行数: 46
-M代码行数: 6
-换刀次数: 5
+总行数: 115
+G代码行数: 34
+M代码行数: 4
+换刀次数: 2
 
 NC程序预览 (前20行):
 ------------------------------
-  O1000 (400X300 FACE & DRILL)
-  (*** PROGRAMMER: FANUC EXPERT ***)
-  (*** DATE: 2023-10-27 ***)
-  (*** MATERIAL: ALUMINUM ***)
-  (*** OPERATION: 1. ROUGH FACE MILLING ***)
-  (***           2. FINISH FACE MILLING ***)
-  (***           3. CENTER DRILL ***)
-  (***           4. DRILL Φ12 HOLE ***)
-  (***           5. CHAMFER ***)
+  %
+  O1000 (120X18X18 SHOULDER MILLING)
+  (Programmer: FANUC Expert)
+  (Date: 2023-10-27)
+  (Material: S45C - Medium Carbon Steel)
+  (Workpiece: 120x18x18 Shoulder, Start at X0 Y7)
+  (Stock: Assume from solid)
   
-  (========== 安全初始化与原点设定 ==========)
-  G90 G94 G80 G40 G49 G17 G21 (绝对编程，分进给，取消固定循环/刀补，选择XY平面，公制)
-  G91 G28 Z0.0 (Z轴回机床参考点，避免干涉)
-  G90 G54 G00 X0.0 Y0.0 (快速定位到工件G54原点)
-  M01 (选择性暂停，用于安全检查)
+  (TOOL LIST)
+  (T01 - D32 R5 WALTER 390 INSERT - ROUGHING)
+  (T02 - D25 R0.8 WALTER 390 INSERT - FINISHING)
   
-  (========== 刀具 T01: Φ63 面铣刀 (粗加工) ==========)
-  (*** 工艺要点：大直径刀具高效去除余量，采用75%步距，分层切削控制切削力 ***)
-  T01 M06 (调用1号刀 - Φ63 面铣刀)
-  G90 G54 G00 X-220.0 Y0.0 S1800 M03 (快速定位到起点，主轴正转1800rpm)
-  ... 还有 104 行
+  (SAFETY NOTES)
+  (1. Verify workpiece zero and fixture)
+  (2. Check tool offsets and wear compensation)
+  (3. Confirm coolant flow and pressure)
+  (4. First run in single block mode with reduced feed)
+  
+  G00 G17 G40 G49 G80 G90 G94 G98
+  G91 G28 Z0
+  ... 还有 95 行
 
 ============================================================
 报告结束

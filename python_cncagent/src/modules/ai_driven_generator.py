@@ -20,8 +20,18 @@ except ImportError:
     import logging
     logging.warning("警告: 未安装PyMuPDF库，PDF功能将受限")
 
+# 导入几何推理引擎
+try:
+    from .geometric_reasoning_engine import geometric_reasoning_engine
+    HAS_GEOMETRIC_REASONING = True
+except ImportError:
+    HAS_GEOMETRIC_REASONING = False
+    import logging
+    logging.warning("警告: 未安装几何推理引擎，复杂特征分析功能受限")
+
 # 不再导入OpenCV和numpy，因为我们现在使用大模型进行特征识别
 from .prompt_builder import prompt_builder
+from .geometric_reasoning_engine import geometric_reasoning_engine
 
 @dataclass
 class ProcessingRequirements:
@@ -195,6 +205,36 @@ class AIDrivenCNCGenerator:
                 except ValueError:
                     pass
         
+        # 扩展：识别腔槽特征描述
+        # 检查是否描述了腔槽特征
+        import re
+        cavity_pattern = r'(?:腔|cavity|槽|slot|Pocket|pocket).*?(\d+\.?\d*)\s*[x*]\s*(\d+\.?\d*)'
+        cavity_matches = re.findall(cavity_pattern, user_prompt)
+        if cavity_matches:
+            for match in cavity_matches:
+                try:
+                    length = float(match[0])
+                    width = float(match[1])
+                    requirements.special_requirements.append(f"RECTANGULAR_CAVITY:{length}x{width}")
+                except ValueError:
+                    pass
+        
+        # 检查是否描述了坐标系统
+        coord_system_pattern = r'(?:以|基于|相对).*?(?:中心|原点|基准).*?|coordinate.*?system|datum.*?based'
+        if re.search(coord_system_pattern, user_prompt, re.IGNORECASE):
+            requirements.special_requirements.append("DATUM_BASED_COORDINATE_SYSTEM")
+        
+        # 检查是否描述了圆角
+        corner_radius_pattern = r'(?:R|半径|radius)\s*(\d+\.?\d*)'
+        corner_radius_matches = re.findall(corner_radius_pattern, user_prompt)
+        if corner_radius_matches:
+            requirements.special_requirements.append(f"CORNER_RADIUS:{corner_radius_matches[0]}")
+        
+        # 检查是否是多面加工
+        multi_face_pattern = r'(?:双面|多面|两面|multiple.*?face|multi.*?face)'
+        if re.search(multi_face_pattern, user_prompt, re.IGNORECASE):
+            requirements.special_requirements.append("MULTI_FACE_PROCESSING")
+        
         # 提取孔数量信息
         count_matches = re.findall(r'(\d+)\s*个', user_prompt)
         if count_matches:
@@ -344,6 +384,12 @@ class AIDrivenCNCGenerator:
             process_constraints=process_constraints
         )
         
+        # 添加几何推理和工艺规划信息
+        if pdf_features:
+            geometric_insights = self._analyze_geometric_features_with_engine(pdf_features)
+            if geometric_insights:
+                prompt += f"\n\n# 几何推理和工艺规划分析\n{geometric_insights}"
+        
         # 添加大模型指令
         prompt += f"""
         
@@ -356,6 +402,84 @@ class AIDrivenCNCGenerator:
 - 遵循所有工艺要点和安全要求
 """
         return prompt
+    
+    def _analyze_geometric_features_with_engine(self, pdf_features: Dict) -> str:
+        """
+        使用几何推理引擎分析几何特征
+        
+        Args:
+            pdf_features: PDF提取的特征信息
+            
+        Returns:
+            str: 几何分析结果
+        """
+        try:
+            # 检查pdf_features中是否有几何特征信息
+            features_data = []
+            
+            # 首先检查pdf_features中是否有从图像处理提取的特征
+            if 'geometric_features' in pdf_features:
+                features_data = pdf_features['geometric_features']
+            elif 'image_features' in pdf_features:
+                features_data = pdf_features['image_features']
+            
+            if not features_data:
+                return ""
+            
+            # 使用几何推理引擎分析特征
+            geometric_features = geometric_reasoning_engine.analyze_geometric_features(features_data)
+            
+            # 推断几何关系
+            relationships = geometric_reasoning_engine.infer_geometric_relationships(geometric_features)
+            
+            # 生成工艺规划
+            process_plans = geometric_reasoning_engine.generate_process_plan(
+                geometric_features, 
+                material="Aluminum"  # 默认材料，可以从其他地方获取
+            )
+            
+            # 生成分析报告
+            analysis_report = []
+            analysis_report.append("## 几何特征分析结果：")
+            
+            # 特征统计
+            feature_count = len(geometric_features)
+            pocket_count = len([f for f in geometric_features if 'pocket' in f.shape_type.lower()])
+            circle_count = len([f for f in geometric_features if 'circle' in f.shape_type.lower()])
+            
+            analysis_report.append(f"- 识别到 {feature_count} 个几何特征")
+            analysis_report.append(f"- 其中腔槽特征 {pocket_count} 个")
+            analysis_report.append(f"- 圆形特征 {circle_count} 个")
+            
+            # 工艺规划建议
+            if process_plans:
+                analysis_report.append("\n## 工艺规划建议：")
+                for plan in process_plans:
+                    analysis_report.append(f"- 特征 {plan.feature_id}: {plan.operation_type} 使用 {plan.tool_selection}")
+                    analysis_report.append(f"  - 转速: {plan.cutting_parameters.get('spindle_speed', 0):.0f}rpm")
+                    analysis_report.append(f"  - 进给: {plan.cutting_parameters.get('feed_rate', 0):.0f}mm/min")
+                    analysis_report.append(f"  - 刀具路径: {plan.toolpath_strategy}")
+            
+            # 多面加工分析（如果适用）
+            from .mechanical_drawing_expert import MechanicalDrawingExpert
+            if 'text_content' in pdf_features:
+                expert = MechanicalDrawingExpert()
+                multi_face_analysis = expert.analyze_multi_face_structure(
+                    pdf_features['text_content'], 
+                    []  # 这里可以传入特征，但简单起见先传空列表
+                )
+                
+                if multi_face_analysis['is_multi_face']:
+                    analysis_report.append(f"\n## 多面加工分析：")
+                    analysis_report.append(f"- 确认为多面加工件，共{multi_face_analysis['face_count']}面")
+                    analysis_report.append(f"- 夹紧策略: {multi_face_analysis['clamping_strategy']}")
+                    analysis_report.append(f"- 刀具可达性: {multi_face_analysis['tool_accessibility']}")
+            
+            return "\n".join(analysis_report)
+            
+        except Exception as e:
+            self.logger.warning(f"几何推理引擎分析失败: {str(e)}")
+            return ""
     
     def _call_large_language_model(self, prompt: str) -> str:
         """
@@ -518,10 +642,15 @@ class AIDrivenCNCGenerator:
         elif "铣" in prompt_lower or "mill" in prompt_lower:
             fallback_code.extend([
                 "(MILLING OPERATIONS)",
+                "(TOOL RADIUS COMPENSATION CHECK - IMPORTANT!)",
+                "(VERIFY G41D** COMPENSATION VALUES BEFORE STARTING)",
                 "T4 M06 (TOOL CHANGE - END MILL)",
                 "G43 H4 Z100. (TOOL LENGTH COMPENSATION)",
                 "M03 S1200 (SPINDLE SPEED)",
                 "M08 (COOLANT ON)",
+                "(SAFETY CHECK: VERIFY TOOL RADIUS COMPENSATION VALUES)",
+                "(G41D4 - ONLY FOR WEAR COMPENSATION, NOT MAIN DIMENSION)",
+                "(MAIN DIMENSION COMPENSATION IS CALCULATED INTO COORDINATES)",
                 "G00 X50.0 Y50.0 (MOVE TO START POSITION)",
                 "G01 Z-5.0 F200.0 (ENGAGE WORKPIECE)",
                 "G02 X60.0 Y50.0 I5.0 J0 F400.0 (CIRCULAR MILLING)",
@@ -655,7 +784,16 @@ class AIDrivenCNCGenerator:
             str: 生成的NC程序代码
         """
         try:
-            # 步骤1: 使用智能提示词构建器整合多源信息
+            # 步骤1: 提取PDF特征信息
+            pdf_features = {}
+            if pdf_path:
+                pdf_features = self.extract_features_from_pdf(pdf_path)
+            
+            # 步骤2: 使用几何推理引擎进行特征分析
+            self.logger.info("使用几何推理引擎分析特征...")
+            geometric_analysis = self._analyze_geometric_features_with_engine(pdf_features)
+            
+            # 步骤3: 使用智能提示词构建器整合多源信息
             self.logger.info("使用智能提示词构建器整合多源信息...")
             full_prompt = prompt_builder.build_optimized_prompt(
                 user_description=user_prompt,
@@ -667,11 +805,15 @@ class AIDrivenCNCGenerator:
                 process_constraints=process_constraints
             )
             
-            # 步骤2: 调用大模型生成NC程序
+            # 添加几何推理分析结果
+            if geometric_analysis:
+                full_prompt += f"\n\n# 几何推理和工艺规划分析\n{geometric_analysis}"
+            
+            # 步骤4: 调用大模型生成NC程序
             self.logger.info("使用大模型生成NC程序...")
             nc_program = self._call_large_language_model(full_prompt)
             
-            # 步骤3: 验证和优化
+            # 步骤5: 验证和优化
             self.logger.info("验证和优化NC程序...")
             validated_program = self.validate_and_optimize(nc_program)
             

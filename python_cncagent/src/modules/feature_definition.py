@@ -151,6 +151,9 @@ def identify_features(image: np.ndarray, min_area: float = None, min_perimeter: 
     # 识别复合孔特征（如沉孔）- 现在使用图纸文本辅助识别
     features = identify_counterbore_features(features, "", drawing_text)
     
+    # 识别腔槽特征（铣削加工特征）
+    features = identify_pocket_features(features, "", drawing_text)
+    
     return features
 
 
@@ -211,7 +214,7 @@ def identify_shape_advanced(contour: np.ndarray, area: float, circle_area: float
     if num_vertices == 3 and solidity > FEATURE_RECOGNITION_CONFIG['solidity_threshold']:
         return "triangle", min(1.0, solidity * 1.2)
     
-    # 四边形判断
+    # 四边形判断 - 检查是否是矩形或方形
     if num_vertices == 4 and solidity > FEATURE_RECOGNITION_CONFIG['solidity_threshold']:
         # 根据长宽比判断正方形还是矩形
         aspect_ratio_tolerance = FEATURE_RECOGNITION_CONFIG['aspect_ratio_tolerance']
@@ -222,6 +225,36 @@ def identify_shape_advanced(contour: np.ndarray, area: float, circle_area: float
     elif num_vertices == 4 and solidity > FEATURE_RECOGNITION_CONFIG['solidity_threshold'] - 0.1:  # 0.7
         # 可能是平行四边形
         return "parallelogram", min(1.0, solidity * extent * 1.1)
+    
+    # 腔槽特征识别 - 检查是否是矩形或带圆角的矩形
+    if num_vertices > 4 and num_vertices <= 8:  # 矩形腔槽可能在检测时有轻微变形
+        # 检查是否是带圆角的矩形（腔槽特征）
+        if 0.7 <= aspect_ratio <= 3.0:  # 检查是否是接近正方形或矩形的比例
+            # 检查实心度是否很高（腔槽通常是实心的）
+            if solidity > 0.9:
+                # 检查是否接近矩形
+                rect_approx = cv2.boxPoints(cv2.minAreaRect(contour))
+                rect_approx = np.int0(rect_approx)
+                rect_area = cv2.contourArea(rect_approx)
+                area_ratio = area / rect_area if rect_area > 0 else 0
+                
+                if area_ratio > 0.8:  # 如果面积比很高，这可能是矩形腔槽
+                    # 检查轮廓的圆角特征
+                    corner_radius = estimate_corner_radius(contour)
+                    if corner_radius > 0:
+                        return "rounded_rectangular_pocket", min(1.0, solidity * extent * 1.2)
+                    else:
+                        return "rectangular_pocket", min(1.0, solidity * extent * 1.2)
+
+    # 圆角矩形识别 - 基于轮廓的圆角估计
+    if num_vertices > 4 and solidity > 0.95 and 0.5 <= aspect_ratio <= 5.0:
+        corner_radius = estimate_corner_radius(contour)
+        if corner_radius > 0:
+            # 这是一个圆角矩形
+            if 0.8 <= aspect_ratio <= 1.2:
+                return "rounded_square", min(1.0, solidity * extent * 1.1)
+            else:
+                return "rounded_rectangle", min(1.0, solidity * extent * 1.1)
     
     # 圆形判断：使用更广泛的圆形度范围和多条件验证
     if area > 0 and circle_area > 0:
@@ -393,170 +426,160 @@ def identify_counterbore_features(features: List[Dict], user_description: str = 
             smallest_circle = sorted_by_radius[1] if len(sorted_by_radius) > 1 else sorted_by_radius[0]  # 取第二大，如果只有一组则取本身
             
             # 判断是否可能是沉孔特征 (φ22沉孔 + φ14.5底孔)
-            largest_radius = largest_circle.get("radius", 0)
-            smallest_radius = smallest_circle.get("radius", 0)
-            
-            # 检查半径比例是否符合沉孔特征
-            # φ22沉孔 vs φ14.5底孔，半径比约为 11:7.25 ≈ 1.52
-            radius_ratio = largest_radius / smallest_radius if smallest_radius > 0 and smallest_radius != largest_radius else 0
-            
-            # 根据是否严格要求设置不同的半径比范围
-            if strict_threshold:
-                # 如果用户明确要求沉孔，使用更精确的范围
-                valid_ratio = 1.4 <= radius_ratio <= 1.6  # 针对φ22/φ14.5的情况
-            else:
-                # 默认范围
-                valid_ratio = (FEATURE_RECOGNITION_CONFIG['radius_ratio_min'] <= 
-                               radius_ratio <= 
-                               FEATURE_RECOGNITION_CONFIG['radius_ratio_max'])
-            
-            # 检查圆形度以确保是真正的圆形
-            largest_circularity = largest_circle.get("circularity", 0)
-            smallest_circularity = smallest_circle.get("circularity", 0)
-            circularity_threshold = FEATURE_RECOGNITION_CONFIG['solidity_threshold'] if strict_threshold else FEATURE_RECOGNITION_CONFIG['circularity_threshold']  # 如果用户明确要求，降低圆形度要求
-            
-            if valid_ratio and largest_circularity > circularity_threshold and smallest_circularity > circularity_threshold:
-                # 创建沉孔特征 - 这是同心圆沉孔
-                counterbore_feature = {
-                    "shape": "counterbore",  # 沉孔特征
-                    "center": group_center,
-                    "outer_radius": largest_radius,  # 沉孔半径
-                    "inner_radius": smallest_radius,  # 底孔半径
-                    "outer_diameter": largest_radius * 2,  # 沉孔直径
-                    "inner_diameter": smallest_radius * 2,  # 底孔直径
-                    "depth": 20.0,  # 沉孔深度 - 可以从用户描述或图纸中提取
-                    "contour": largest_circle["contour"],  # 使用外圆轮廓
-                    "bounding_box": largest_circle["bounding_box"],
-                    "area": largest_circle["area"],
-                    "confidence": (largest_circle.get("confidence", 0) + smallest_circle.get("confidence", 0)) / 2,
-                    "aspect_ratio": largest_circle.get("aspect_ratio", 0),
-                    "circularity": largest_circularity
-                }
-                
-                # 从用户描述或图纸中提取深度信息
-                depth_from_description = extract_depth_from_description(user_description + " " + drawing_text)
-                if depth_from_description is not None:
-                    counterbore_feature["depth"] = depth_from_description
-                
-                # 如果用户要求沉孔加工，或者图纸中提到沉孔，或者没有明确要求但识别到了沉孔特征，则保留
-                if user_wants_counterbore or drawing_has_counterbore:
-                    # 提高置信度，因为有文本支持
-                    counterbore_feature["confidence"] = min(1.0, counterbore_feature["confidence"] + 0.2)
-                    counterbore_features.append(counterbore_feature)
-                else:
-                    # 如果用户没有明确要求沉孔加工，也保留沉孔特征，但降低置信度
-                    # 以便在后续处理中可以基于用户需求进行过滤
-                    counterbore_feature["confidence"] = min(counterbore_feature["confidence"], 0.6)  # 降低置信度
-                    counterbore_features.append(counterbore_feature)
-                
-                # 记录这个组已经识别为沉孔
-                valid_counterbore_groups.append(group_center)
-            else:
-                # 如果不是同心圆沉孔特征，将原始圆形特征添加回列表
-                filtered_features.extend(group_features)
+
+
+def identify_pocket_features(features: List[Dict], user_description: str = "", drawing_text: str = "") -> List[Dict]:
+    """
+    识别腔槽（Pocket）特征，包括矩形腔槽、圆形腔槽等铣削加工特征
+    根据机械图纸规则和用户描述智能识别腔槽特征
+    
+    Args:
+        features: 识别出的几何特征列表
+        user_description: 用户描述，用于辅助判断是否需要识别腔槽特征
+        drawing_text: 图纸OCR文本，用于辅助判断腔槽特征
+    
+    Returns:
+        识别后特征列表，包含腔槽特征
+    """
+    # 查找矩形腔槽特征
+    rectangular_pockets = [f for f in features if f.get("shape") in ["rectangle", "square", "rectangular_pocket", "rounded_rectangle", "rounded_square", "rounded_rectangular_pocket"]]
+    
+    # 检查用户描述和图纸文本中是否明确提到腔槽加工需求
+    user_wants_pocket = False
+    drawing_has_pocket = False
+    
+    if user_description:
+        description_lower = user_description.lower()
+        if any(keyword in description_lower for keyword in ["腔槽", "铣槽", "铣削", "槽", "pocket", "milling", "铣平面", "面铣", "铣平", "圆角"]):
+            user_wants_pocket = True
+    
+    if drawing_text:
+        drawing_lower = drawing_text.lower()
+        if any(keyword in drawing_lower for keyword in ["腔槽", "铣槽", "铣削", "槽", "pocket", "milling", "铣平面", "面铣", "铣平", "圆角"]):
+            drawing_has_pocket = True
+    
+    # 如果用户明确要求腔槽加工，或图纸文本中包含腔槽信息，则提高识别阈值
+    strict_threshold = user_wants_pocket or drawing_has_pocket
+    
+    # 过滤后的特征列表
+    filtered_features = [f for f in features if f.get("shape") not in ["rectangle", "square", "rectangular_pocket", "rounded_rectangle", "rounded_square", "rounded_rectangular_pocket"]]
+    
+    # 识别腔槽特征
+    pocket_features = []
+    
+    for feature in rectangular_pockets:
+        # 检查是否为腔槽特征
+        # 腔槽通常具有较高的实心度和特定的长宽比
+        aspect_ratio = feature.get("aspect_ratio", 1.0)
+        solidity = feature.get("solidity", 0.0)
+        area = feature.get("area", 0.0)
+        
+        # 计算实心度（如果未提供）
+        if solidity == 0.0 and "contour" in feature:
+            hull = cv2.convexHull(feature["contour"])
+            hull_area = cv2.contourArea(hull)
+            solidity = area / hull_area if hull_area > 0 else 0
+        
+        # 检查是否为圆角矩形
+        corner_radius = 0.0
+        if "contour" in feature:
+            corner_radius = estimate_corner_radius(feature["contour"])
+        
+        # 腔槽特征的判断条件
+        is_pocket = False
+        confidence = feature.get("confidence", 0.7)
+        
+        # 如果用户明确要求腔槽加工，使用较低的判断标准
+        if strict_threshold:
+            # 严格模式：更精确的腔槽识别
+            if 0.2 <= aspect_ratio <= 5.0:  # 长宽比合理范围
+                if solidity > 0.8:  # 实心度较高
+                    is_pocket = True
+                    confidence = min(1.0, confidence + 0.15)  # 增加置信度
         else:
-            # 只有一个圆，添加回列表
-            filtered_features.extend(group_features)
-    
-    # 如果用户明确要求沉孔加工，但没有找到明确的同心圆沉孔特征，
-    # 则采用基于工程图纸规则的分度圆分析方法
-    if user_wants_counterbore:
-        # 查找图纸中的基准特征（如φ234圆）
-        baseline_feature = find_baseline_feature(circle_features, drawing_text)
+            # 宽松模式：基于几何特征的基础识别
+            if 0.1 <= aspect_ratio <= 10.0:  # 较宽的长宽比范围
+                if solidity > 0.7:  # 较低的实心度要求
+                    is_pocket = True
+                    confidence = min(0.8, confidence + 0.1)  # 适度增加置信度
         
-        if baseline_feature:
-            # 基于基准特征分析分度圆
-            pcd_features = analyze_pcd_features(circle_features, baseline_feature, hole_count, user_description)
+        if is_pocket:
+            pocket_feature = feature.copy()
+            # 根据是否为圆角矩形设置形状类型
+            if corner_radius > 0 and feature.get("shape") in ["rounded_rectangle", "rounded_square", "rounded_rectangular_pocket"]:
+                pocket_feature["shape"] = "rounded_rectangular_pocket"
+                pocket_feature["corner_radius"] = corner_radius
+            else:
+                pocket_feature["shape"] = "rectangular_pocket"
+            pocket_feature["confidence"] = confidence
             
-            # 如果找到了分度圆上的特征点，则创建沉孔特征
-            if len(pcd_features) >= hole_count:
-                # 选择置信度最高的几个作为沉孔位置
-                pcd_features = sorted(pcd_features, key=lambda x: x.get("confidence", 0), reverse=True)[:hole_count]
-                
-                for i, feature in enumerate(pcd_features):
-                    # 创建基于分度圆分析的沉孔特征
-                    counterbore_feature = {
-                        "shape": "counterbore",  # 沉孔特征
-                        "center": feature["center"],
-                        "outer_radius": 11.0,  # φ22沉孔的半径
-                        "inner_radius": 7.25,  # φ14.5底孔的半径
-                        "outer_diameter": 22.0,  # 沉孔直径
-                        "inner_diameter": 14.5,  # 底孔直径
-                        "depth": 20.0,  # 沉孔深度
-                        "contour": feature.get("contour", []),
-                        "bounding_box": feature.get("bounding_box", (0, 0, 10, 10)),
-                        "area": feature.get("area", 380),
-                        "confidence": feature.get("confidence", 0.85),  # 基于几何关系的较高置信度
-                        "aspect_ratio": feature.get("aspect_ratio", 1.0),
-                        "circularity": feature.get("circularity", 0.9)
-                    }
-                    
-                    # 从用户描述或图纸中提取深度信息
-                    depth_from_description = extract_depth_from_description(user_description + " " + drawing_text)
-                    if depth_from_description is not None:
-                        counterbore_feature["depth"] = depth_from_description
-                    
-                    counterbore_features.append(counterbore_feature)
+            # 从用户描述或图纸中提取深度信息
+            depth_from_description = extract_depth_from_description(user_description + " " + drawing_text)
+            if depth_from_description is not None:
+                pocket_feature["depth"] = depth_from_description
+            else:
+                # 默认深度
+                pocket_feature["depth"] = 5.0  # 默认5mm深度
+            
+            # 添加腔槽特有的参数
+            pocket_feature["feature_type"] = "milling_pocket"
+            pocket_feature["operation"] = "pocket_milling"
+            if corner_radius > 0:
+                pocket_feature["operation"] = "rounded_pocket_milling"
+                pocket_feature["corner_radius"] = corner_radius
+            
+            pocket_features.append(pocket_feature)
+        else:
+            # 不是腔槽特征，添加回原列表
+            filtered_features.append(feature)
+    
+    # 识别圆形腔槽（圆形铣削区域）
+    circular_features = [f for f in features if f.get("shape") == "circle"]
+    circular_pockets = []
+    
+    for feature in circular_features:
+        # 圆形腔槽的判断
+        area = feature.get("area", 0.0)
+        radius = feature.get("radius", 0.0)
+        circularity = feature.get("circularity", 0.0)
         
-        # 如果通过PCD分析没有找到足够的沉孔特征，或者没有进行PCD分析，则使用基于规则的圆形特征选择
-        if len(counterbore_features) < hole_count:
-            # 获取还没有被识别为沉孔的圆形特征
-            remaining_circles = []
-            for group_center, group_features in grouped_features.items():
-                if group_center not in [cb["center"] for cb in counterbore_features]:
-                    # 添加组中最大半径的圆形
-                    sorted_by_radius = sorted(group_features, key=lambda x: x.get("radius", 0), reverse=True)
-                    remaining_circles.append(sorted_by_radius[0])
+        # 检查是否为圆形腔槽
+        is_circular_pocket = False
+        confidence = feature.get("confidence", 0.7)
+        
+        # 圆形度较高，面积适中（不是小的定位孔）
+        if circularity > 0.8 and 100 < area < 5000:  # 面积范围：100-5000像素
+            if user_wants_pocket or drawing_has_pocket:
+                # 用户明确要求时，降低判断标准
+                is_circular_pocket = True
+                confidence = min(1.0, confidence + 0.2)
+            elif area > 500:  # 面积较大，可能是腔槽而非定位孔
+                is_circular_pocket = True
+                confidence = min(0.9, confidence + 0.1)
+        
+        if is_circular_pocket:
+            circular_pocket = feature.copy()
+            circular_pocket["shape"] = "circular_pocket"
+            circular_pocket["confidence"] = confidence
+            circular_pocket["feature_type"] = "milling_pocket"
+            circular_pocket["operation"] = "circular_pocket_milling"
             
-            # 如果有太多剩余圆形特征，根据工程图纸规则进行筛选
-            # 例如，排除明显是基准圆的特征（通常是最大的圆）
-            if baseline_feature and len(remaining_circles) > hole_count:
-                # 移除基准特征（如果它被包含在剩余圆形中）
-                remaining_circles = [c for c in remaining_circles if c["center"] != baseline_feature["center"]]
+            # 从用户描述或图纸中提取深度信息
+            depth_from_description = extract_depth_from_description(user_description + " " + drawing_text)
+            if depth_from_description is not None:
+                circular_pocket["depth"] = depth_from_description
+            else:
+                circular_pocket["depth"] = 5.0  # 默认深度
             
-            if remaining_circles:
-                # 根据用户描述中的孔数量选择圆形特征
-                remaining_circles = sorted(remaining_circles, key=lambda x: x.get("confidence", 0), reverse=True)
-                selected_circles = remaining_circles[:hole_count - len(counterbore_features)]  # 只选择还需要的特征数量
-                
-                for i, circle in enumerate(selected_circles):
-                    # 创建模拟的沉孔特征，使用用户描述中的典型尺寸
-                    counterbore_feature = {
-                        "shape": "counterbore",  # 沉孔特征
-                        "center": circle["center"],
-                        "outer_radius": 11.0,  # φ22沉孔的半径
-                        "inner_radius": 7.25,  # φ14.5底孔的半径
-                        "outer_diameter": 22.0,  # 沉孔直径
-                        "inner_diameter": 14.5,  # 底孔直径
-                        "depth": 20.0,  # 沉孔深度
-                        "contour": circle.get("contour", []),
-                        "bounding_box": circle.get("bounding_box", (0, 0, 10, 10)),
-                        "area": circle.get("area", 380),
-                        "confidence": circle.get("confidence", 0.8),
-                        "aspect_ratio": circle.get("aspect_ratio", 1.0),
-                        "circularity": circle.get("circularity", 0.9)
-                    }
-                    
-                    # 从用户描述或图纸中提取深度信息
-                    depth_from_description = extract_depth_from_description(user_description + " " + drawing_text)
-                    if depth_from_description is not None:
-                        counterbore_feature["depth"] = depth_from_description
-                    
-                    # 提高置信度，因为用户明确要求沉孔加工
-                    counterbore_feature["confidence"] = min(1.0, counterbore_feature["confidence"] + 0.1)
-                    counterbore_features.append(counterbore_feature)
+            circular_pockets.append(circular_pocket)
+        else:
+            # 不是圆形腔槽，添加回原列表
+            filtered_features.append(feature)
     
-    # 根据用户描述的孔数量过滤沉孔特征
-    if user_wants_counterbore and counterbore_features:
-        # 按置信度排序，只保留用户要求的数量
-        counterbore_features = sorted(counterbore_features, key=lambda x: x.get("confidence", 0), reverse=True)
-        counterbore_features = counterbore_features[:hole_count]
+    # 添加腔槽特征到最终列表
+    filtered_features.extend(pocket_features)
+    filtered_features.extend(circular_pockets)
     
-    # 添加沉孔特征到最终列表
-    filtered_features.extend(counterbore_features)
-    
-    # 重要：如果AI优先模式被使用，我们应减少对几何特征的依赖
-    # 这里我们只保留那些与用户描述高度匹配的特征
     return filtered_features
 
 
@@ -852,7 +875,7 @@ def adjust_coordinate_system(features: List[Dict], origin: Tuple[float, float],
     Args:
         features: 特征列表
         origin: 新的坐标原点 (x, y)
-        reference_strategy: 坐标基准策略 ("absolute", "relative", "custom", "highest_y", "lowest_y", "leftmost_x", "rightmost_x", "center", "geometric_center")
+        reference_strategy: 坐标基准策略 ("absolute", "relative", "custom", "highest_y", "lowest_y", "leftmost_x", "rightmost_x", "center", "geometric_center", "pocket_center", "feature_origin")
         custom_origin: 自定义原点坐标，当reference_strategy为"custom"时使用
     
     Returns:
@@ -876,6 +899,10 @@ def adjust_coordinate_system(features: List[Dict], origin: Tuple[float, float],
         actual_origin = calculate_geometric_center(features)
     elif reference_strategy == "geometric_center":
         actual_origin = calculate_all_features_center(features)
+    elif reference_strategy == "pocket_center":
+        actual_origin = extract_pocket_center_point(features)
+    elif reference_strategy == "feature_origin":
+        actual_origin = extract_feature_origin_point(features)
     elif reference_strategy == "relative":
         # 相对坐标策略：以第一个特征的中心点为原点
         if features:
@@ -893,6 +920,11 @@ def adjust_coordinate_system(features: List[Dict], origin: Tuple[float, float],
         # 调整边界框坐标
         x, y, w, h = feature["bounding_box"]
         adjusted_feature["bounding_box"] = (x - actual_origin[0], y - actual_origin[1], w, h)
+        
+        # 如果是腔槽特征，添加坐标系统信息
+        if feature.get("shape") in ["rectangular_pocket", "circular_pocket"]:
+            adjusted_feature["coordinate_system"] = reference_strategy
+            adjusted_feature["original_origin"] = actual_origin
         
         adjusted_features.append(adjusted_feature)
     
@@ -914,6 +946,8 @@ def select_coordinate_reference(features: List[Dict], strategy: str = "highest_y
                  - "center": 图纸中心点
                  - "custom": 使用自定义参考点
                  - "geometric_center": 所有特征的几何中心
+                 - "pocket_center": 腔槽特征的中心点
+                 - "feature_origin": 特定特征作为原点
         
         custom_reference: 自定义参考点坐标
     
@@ -938,9 +972,66 @@ def select_coordinate_reference(features: List[Dict], strategy: str = "highest_y
         return calculate_geometric_center(features)
     elif strategy == "geometric_center":
         return calculate_all_features_center(features)
+    elif strategy == "pocket_center":
+        # 查找腔槽特征的中心点作为坐标原点
+        return extract_pocket_center_point(features)
+    elif strategy == "feature_origin":
+        # 查找特定特征作为原点
+        return extract_feature_origin_point(features)
     else:
         # 默认使用最高Y坐标点
         return extract_highest_y_center_point(features)
+
+
+def extract_pocket_center_point(features: List[Dict]) -> Tuple[float, float]:
+    """
+    提取腔槽特征的中心点作为坐标原点
+    
+    Args:
+        features: 包含腔槽特征的特征列表
+    
+    Returns:
+        Tuple[float, float]: 腔槽中心点的坐标 (x, y)
+    """
+    pocket_features = [f for f in features if f.get("shape") in ["rectangular_pocket", "circular_pocket"]]
+    
+    if not pocket_features:
+        # 如果没有腔槽特征，则在所有特征中查找
+        if not features:
+            return (0.0, 0.0)
+        # 返回第一个特征的中心
+        return features[0]["center"]
+    
+    # 返回第一个腔槽特征的中心
+    return pocket_features[0]["center"]
+
+
+def extract_feature_origin_point(features: List[Dict]) -> Tuple[float, float]:
+    """
+    提取特定特征（如基准特征）作为坐标原点
+    
+    Args:
+        features: 特征列表
+    
+    Returns:
+        Tuple[float, float]: 选定特征的坐标 (x, y)
+    """
+    if not features:
+        return (0.0, 0.0)
+    
+    # 优先查找带有"基准"标记的特征
+    for feature in features:
+        if "datum" in feature.get("annotation", "").lower() or "reference" in feature.get("annotation", "").lower():
+            return feature["center"]
+    
+    # 没有基准特征时，返回最大圆形特征的中心（通常为基准圆）
+    circle_features = [f for f in features if f.get("shape") in ["circle", "counterbore"]]
+    if circle_features:
+        largest_circle = max(circle_features, key=lambda x: x.get("radius", x.get("area", 0)))
+        return largest_circle["center"]
+    
+    # 否则返回几何中心
+    return calculate_geometric_center(features)
 
 
 def extract_highest_y_center_point(features: List[Dict]) -> Tuple[float, float]:
@@ -1062,6 +1153,47 @@ def calculate_all_features_center(features: List[Dict]) -> Tuple[float, float]:
     return (center_x, center_y)
 
 
+def estimate_corner_radius(contour: np.ndarray) -> float:
+    """
+    估计轮廓的圆角半径
+    
+    Args:
+        contour: 轮廓数组
+    
+    Returns:
+        float: 估计的圆角半径，如果没有圆角则返回0
+    """
+    # 使用轮廓的凸包和轮廓之间的距离来估计圆角
+    hull = cv2.convexHull(contour)
+    
+    # 计算轮廓点到凸包的距离
+    # 如果轮廓与凸包差异较大，可能是由于圆角造成的
+    hull_area = cv2.contourArea(hull)
+    contour_area = cv2.contourArea(contour)
+    
+    # 如果面积差异显著，可能有圆角
+    area_diff_ratio = abs(hull_area - contour_area) / hull_area if hull_area > 0 else 0
+    
+    # 估算圆角半径
+    if area_diff_ratio > 0.01:  # 面积差异超过1%
+        # 通过计算轮廓的最小外接矩形和实际轮廓的差异来估算圆角
+        rect = cv2.minAreaRect(contour)
+        rect_box = cv2.boxPoints(rect)
+        rect_area = cv2.contourArea(np.int0(rect_box))
+        
+        # 如果实际轮廓面积小于最小外接矩形面积，说明有圆角
+        if contour_area < rect_area:
+            # 估算圆角半径（这是一个近似算法）
+            corner_area = rect_area - contour_area
+            avg_side_length = (rect[1][0] + rect[1][1]) / 2
+            if avg_side_length > 0:
+                # 基于圆角所占面积估算半径
+                estimated_radius = (corner_area / 4) / avg_side_length  # 简化的估算方法
+                return max(0, estimated_radius)  # 确保返回非负值
+    
+    return 0.0
+
+
 def extract_dimensions(features: List[Dict], scale: float = 1.0) -> List[Dict]:
     """
     根据比例尺提取特征的实际尺寸
@@ -1088,6 +1220,9 @@ def extract_dimensions(features: List[Dict], scale: float = 1.0) -> List[Dict]:
         if 'dimensions' in scaled_feature:
             w, h = scaled_feature['dimensions']
             scaled_feature['dimensions'] = (w * scale, h * scale)
+        # 添加圆角半径的缩放
+        if 'corner_radius' in scaled_feature:
+            scaled_feature['corner_radius'] = scaled_feature['corner_radius'] * scale
         
         scaled_features.append(scaled_feature)
     

@@ -8,79 +8,204 @@ from .mechanical_drawing_expert import MechanicalDrawingExpert
 from src.exceptions import InputValidationError, handle_exception
 
 
-def analyze_user_description(description: str) -> Dict:
+def analyze_user_description(user_description: str) -> Dict[str, any]:
     """
-    分析用户描述，提取关键信息
+    分析用户描述，提取加工参数
     
     Args:
-        description (str): 用户对加工需求的描述
-    
+        user_description: 用户的加工需求描述
+        
     Returns:
-        dict: 包含提取信息的字典
+        Dict: 包含分析结果的字典
     """
-    # 确保描述字符串使用UTF-8编码处理中文字符
-    if isinstance(description, bytes):
-        try:
-            description = description.decode('utf-8')
-        except UnicodeError:
-            description = description.decode('utf-8', errors='replace')
-    elif not isinstance(description, str):
-        description = str(description)
-    
-    # 分析加工类型
-    processing_type = _identify_processing_type(description)
-    
-    # 提取数值信息（深度、转速等）
-    depth = _extract_depth(description)
-    feed_rate = _extract_feed_rate(description)
-    spindle_speed = _extract_spindle_speed(description)
-    
-    # 提取材料信息
-    material = _extract_material(description)
-    
-    # 提取精度要求
-    precision = _extract_precision(description)
-    
-    # 提取孔位置信息
-    hole_positions = _extract_hole_positions(description)
-    
-    # 提取参考点信息
-    reference_points = _extract_reference_points(description)
-    
-    # 提取沉孔直径信息
-    outer_diameter, inner_diameter = _extract_counterbore_diameters(description)
-    
-    # 确定所需刀具
-    tool_required = _identify_tool_required(processing_type)
-    
-    # 从描述中提取孔数量
-    hole_count = _extract_hole_count(description)
-    
-    # 提取工件尺寸信息
-    workpiece_dimensions = _extract_workpiece_dimensions(description)
-    
-    result = {
-        "processing_type": processing_type,
-        "tool_required": tool_required,
-        "depth": depth,
-        "feed_rate": feed_rate,
-        "spindle_speed": spindle_speed,
-        "material": material,
-        "precision": precision,
-        "hole_positions": hole_positions,  # 添加孔位置信息
-        "reference_points": reference_points,  # 添加参考点信息
-        "hole_count": hole_count,  # 添加孔数量信息
-        "workpiece_dimensions": workpiece_dimensions,  # 添加工件尺寸信息
-        "description": description
+    import re
+    analysis = {
+        "description": user_description,
+        "processing_type": "general",
+        "material": "aluminum",
+        "depth": None,
+        "feed_rate": None,
+        "spindle_speed": None,
+        "tool_required": None,
+        "workpiece_dimensions": None,
+        "precision": "general",
+        "thread_size": None,
+        "outer_diameter": None,
+        "inner_diameter": None,
+        "hole_positions": [],
+        "reference_points": {},
+        "cavity_features": [],
+        "coordinate_system": "absolute",  # "absolute", "datum_based", "relative"
+        "corner_radius": None,
+        "processing_sides": ["top"],  # ["top"], ["top", "bottom"], etc.
+        "feature_center": None  # 特征中心坐标
     }
     
-    # 如果提取到沉孔直径信息，添加到结果中
-    if outer_diameter is not None:
-        result["outer_diameter"] = outer_diameter
-    if inner_diameter is not None:
-        result["inner_diameter"] = inner_diameter
+    # 确保用户描述是字符串并正确处理中文字符
+    if isinstance(user_description, bytes):
+        try:
+            user_description = user_description.decode('utf-8')
+        except UnicodeError:
+            user_description = user_description.decode('utf-8', errors='replace')
+    elif not isinstance(user_description, str):
+        user_description = str(user_description)
     
-    return result
+    # 转换为小写用于模式匹配（保留原始字符串用于提取精确值）
+    desc_lower = user_description.lower()
+    
+    # 识别加工类型，扩展支持腔槽加工
+    if "攻丝" in desc_lower or "tapping" in desc_lower or "螺纹" in desc_lower:
+        analysis["processing_type"] = "tapping"
+    elif "钻孔" in desc_lower or "drill" in desc_lower or "孔" in desc_lower:
+        analysis["processing_type"] = "drilling"
+    elif "铣" in desc_lower or "mill" in desc_lower:
+        # 进一步区分铣削类型
+        if "腔" in desc_lower or "cavity" in desc_lower or "pocket" in desc_lower:
+            analysis["processing_type"] = "pocket_milling"
+        elif "槽" in desc_lower or "slot" in desc_lower:
+            analysis["processing_type"] = "slot_milling"
+        else:
+            analysis["processing_type"] = "milling"
+    elif "车" in desc_lower or "turn" in desc_lower:
+        analysis["processing_type"] = "turning"
+    elif "沉孔" in desc_lower or "counterbore" in desc_lower or "锪孔" in desc_lower:
+        analysis["processing_type"] = "counterbore"
+    else:
+        analysis["processing_type"] = "general"
+    
+    # 提取深度信息
+    depth_pattern = r'(\d+\.?\d*)\s*(?:mm|毫米)?\s*(?:深|深度|depth)'
+    depth_matches = re.findall(depth_pattern, user_description)
+    if depth_matches:
+        try:
+            analysis["depth"] = float(depth_matches[0])
+        except ValueError:
+            pass
+    
+    # 提取进给率
+    feed_pattern = r'进给(?:率)?\s*(\d+\.?\d*)|f\d+\.?\d*|feed.*?(\d+\.?\d*)'
+    feed_matches = re.findall(feed_pattern, user_description)
+    if feed_matches:
+        for match in feed_matches[0] if isinstance(feed_matches[0], tuple) else feed_matches:
+            if match:
+                try:
+                    analysis["feed_rate"] = float(match)
+                    break
+                except ValueError:
+                    continue
+    
+    # 提取转速
+    speed_pattern = r'(?:转速|spindle|s)\s*(\d+\.?\d*)'
+    speed_matches = re.findall(speed_pattern, user_description)
+    if speed_matches:
+        try:
+            analysis["spindle_speed"] = int(speed_matches[0])
+        except ValueError:
+            pass
+    
+    # 提取螺纹规格
+    thread_pattern = r'm(\d+(?:\.\d+)?)'
+    thread_matches = re.findall(thread_pattern, user_description.lower())
+    if thread_matches:
+        analysis["thread_size"] = f"M{thread_matches[0]}"
+    
+    # 提取工件尺寸
+    dimension_pattern = r'(\d+\.?\d*)\s*[x*]\s*(\d+\.?\d*)\s*[x*]\s*(\d+\.?\d*)'
+    dim_matches = re.findall(dimension_pattern, user_description)
+    if dim_matches:
+        try:
+            dims = [float(x) for x in dim_matches[0]]
+            analysis["workpiece_dimensions"] = tuple(dims)
+        except ValueError:
+            pass
+    
+    # 提取腔槽特征尺寸
+    cavity_pattern = r'(?:腔|cavity|槽|slot|Pocket|pocket).*?(\d+\.?\d*)\s*[x*]\s*(\d+\.?\d*)'
+    cavity_matches = re.findall(cavity_pattern, user_description)
+    if cavity_matches:
+        for match in cavity_matches:
+            try:
+                length = float(match[0])
+                width = float(match[1])
+                analysis["cavity_features"].append({
+                    "type": "rectangular",
+                    "dimensions": (length, width),
+                    "center": None  # 需要从位置信息中获取
+                })
+            except ValueError:
+                pass
+    
+    # 提取孔位置和特征中心
+    pos_pattern = r'x\s*(\d+\.?\d*)\s*[，,]?\s*y\s*(\d+\.?\d*)|x[=:]\s*(\d+\.?\d*)\s*[，,]?\s*y[=:]\s*(\d+\.?\d*)'
+    pos_matches = re.findall(pos_pattern, user_description)
+    for match in pos_matches:
+        # match 是一个包含多个组的元组，我们需要找到非空的值
+        if match[0] and match[1]:  # 第一组匹配 (x, y)
+            try:
+                x, y = float(match[0]), float(match[1])
+                analysis["hole_positions"].append((x, y))
+                # 如果这是腔槽的中心，也设置为特征中心
+                if analysis["processing_type"] in ["pocket_milling", "slot_milling"]:
+                    analysis["feature_center"] = (x, y)
+            except ValueError:
+                pass
+        elif match[2] and match[3]:  # 第二组匹配 (x, y)
+            try:
+                x, y = float(match[2]), float(match[3])
+                analysis["hole_positions"].append((x, y))
+                # 如果这是腔槽的中心，也设置为特征中心
+                if analysis["processing_type"] in ["pocket_milling", "slot_milling"]:
+                    analysis["feature_center"] = (x, y)
+            except ValueError:
+                pass
+    
+    # 提取坐标系统信息
+    if "以.*?为原点" in user_description or "基于.*?定位" in user_description or "datum" in desc_lower:
+        analysis["coordinate_system"] = "datum_based"
+    elif "相对" in desc_lower or "偏移" in desc_lower:
+        analysis["coordinate_system"] = "relative"
+    else:
+        analysis["coordinate_system"] = "absolute"
+    
+    # 提取圆角信息
+    corner_radius_pattern = r'(?:R|半径|radius)\s*(\d+\.?\d*)'
+    corner_radius_matches = re.findall(corner_radius_pattern, user_description)
+    if corner_radius_matches:
+        try:
+            analysis["corner_radius"] = float(corner_radius_matches[0])
+        except ValueError:
+            pass
+    
+    # 提取多面加工信息
+    if "双面" in desc_lower or "两面" in desc_lower or "多面" in desc_lower or "multiple.*?face" in desc_lower:
+        analysis["processing_sides"] = ["top", "bottom"]
+    elif "侧面" in desc_lower or "side" in desc_lower:
+        analysis["processing_sides"] = ["side"]
+    
+    # 提取材料信息
+    material_keywords = {
+        'aluminum': ['铝', 'aluminum', 'al', '铝合金'],
+        'steel': ['钢', 'steel', 'steel', '合金钢'],
+        'stainless_steel': ['不锈钢', 'stainless', 'ss', '304', '316'],
+        'copper': ['铜', 'copper', 'cu'],
+        'plastic': ['塑料', 'plastic', 'pvc', 'abs']
+    }
+    
+    for material, keywords in material_keywords.items():
+        for keyword in keywords:
+            if keyword in desc_lower:
+                analysis["material"] = material
+                break
+        if analysis["material"] != "aluminum":
+            break
+    
+    # 提取精度要求
+    if "精" in desc_lower or "精密" in desc_lower or "精密" in desc_lower:
+        analysis["precision"] = "high"
+    elif "粗" in desc_lower or "粗加工" in desc_lower:
+        analysis["precision"] = "low"
+    
+    return analysis
 
 
 def _identify_processing_type(description: str) -> str:
@@ -95,6 +220,15 @@ def _identify_processing_type(description: str) -> str:
         r'(?:沉孔|counterbore|锪孔|counter bore|counter-bore|沉头孔|锪平孔|埋头孔)',
         r'(?:沉孔|锪孔).*?(?:深|深度|φ\d+|底孔)',
         r'φ\d+.*?(?:沉孔|锪孔)',
+    ]
+    
+    # 腔槽相关关键词（高优先级）
+    pocket_patterns = [
+        r'(?:腔槽|铣槽|槽|pocket|rectangular pocket|square pocket|圆形腔|圆槽)',
+        r'(?:铣.*?槽|槽.*?铣)',
+        r'(?:铣平|面铣|平面铣削)',
+        r'(?:加工.*?腔|腔.*?加工)',
+        r'铣.*?(?:方槽|圆槽|矩形槽|圆形槽)',
     ]
     
     # 攻丝相关关键词（第二优先级）
@@ -131,6 +265,11 @@ def _identify_processing_type(description: str) -> str:
         if re.search(pattern, description_lower):
             return 'counterbore'
     
+    # 检查腔槽相关关键词
+    for pattern in pocket_patterns:
+        if re.search(pattern, description_lower):
+            return 'pocket_milling'  # 新增腔槽铣削类型
+    
     for pattern in tapping_patterns:
         if re.search(pattern, description_lower):
             return 'tapping'
@@ -145,6 +284,9 @@ def _identify_processing_type(description: str) -> str:
             # 额外检查是否包含锪孔/沉孔关键词，如果有则优先返回counterbore
             if re.search(r'(?:沉孔|锪孔|counterbore)', description_lower):
                 return 'counterbore'  # 沉孔优先级更高
+            # 检查是否为腔槽相关铣削
+            elif re.search(r'(?:槽|腔|pocket|方槽|圆槽|矩形槽|圆形槽)', description_lower):
+                return 'pocket_milling'
             return 'milling'
     
     for pattern in turning_patterns:
@@ -164,6 +306,7 @@ def _identify_tool_required(processing_type: str) -> str:
     tool_mapping = {
         'drilling': 'drill_bit',
         'milling': 'end_mill',
+        'pocket_milling': 'end_mill',  # 腔槽铣削使用立铣刀
         'turning': 'cutting_tool',
         'grinding': 'grinding_wheel',
         'tapping': 'tap',  # 新增攻丝类型
