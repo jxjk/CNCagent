@@ -372,6 +372,42 @@ class OptimizedCNC_GUI:
                 messagebox.showerror("❌ 错误", f"加载文件时出错: {str(e)}")
     
     def display_pil_image(self):
+        """在画布上显示PIL图像，支持缩放、旋转、平移"""
+        if hasattr(self, 'current_pil_image') and self.current_pil_image is not None:
+            try:
+                # 转换PIL图像为Tkinter可用的格式
+                pil_image = self.current_pil_image
+                
+                # 应用用户缩放比例
+                img_width, img_height = pil_image.size
+                new_width = int(img_width * self.canvas_scale)
+                new_height = int(img_height * self.canvas_scale)
+                
+                # 调整图像大小
+                resized_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
+                # 如果需要旋转，则旋转图像
+                if self.canvas_rotation != 0:
+                    resized_image = resized_image.rotate(self.canvas_rotation, expand=True)
+                    # 更新宽高以适应旋转后的尺寸
+                    new_width, new_height = resized_image.size
+                
+                self.photo = ImageTk.PhotoImage(resized_image)
+                
+                # 清除画布并绘制图像
+                self.canvas.delete("all")
+                # 居中显示，考虑缩放和平移
+                canvas_width = self.canvas.winfo_width()
+                canvas_height = self.canvas.winfo_height()
+                
+                if canvas_width <= 1: canvas_width = 400
+                if canvas_height <= 1: canvas_height = 300
+                
+                x = (canvas_width - new_width) // 2 + self.canvas_offset_x
+                y = (canvas_height - new_height) // 2 + self.canvas_offset_y
+                self.canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
+            except Exception as e:
+                print(f"显示PIL图像时出错: {e}")
     
     def detect_features(self):
         """检测图纸中的特征"""

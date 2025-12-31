@@ -174,3 +174,21 @@
 2025-12-31 10:43:35,230 - root - INFO - 已删除临时2D文件: C:\Users\00596\AppData\Local\Temp\tmprwqoynuk.pdf
 2025-12-31 10:43:35,232 - root - INFO - 已删除临时3D文件: C:\Users\00596\AppData\Local\Temp\tmpx3mipcql.step
 2025-12-31 10:43:35,233 - werkzeug - INFO - 127.0.0.1 - - [31/Dec/2025 10:43:35] "POST /generate_nc HTTP/1.1" 200 -
+2025-12-31 11:40:05,924 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 11:40:09,932 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 11:40:10,061 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 12:28:32,441 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 12:28:34,313 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 12:28:34,325 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 12:28:34,385 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-31 12:28:34,386 - __main__ - INFO - 预加载核心模块成功
+2025-12-31 12:28:34,390 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-31 12:28:34,392 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-31 12:28:34,446 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-31 12:28:34,447 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-31 12:28:36,393 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-31 12:28:36,394 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-31 12:30:08,101 - src.modules.model_3d_processor - INFO - 开始处理3D模型: D:/Users/00596/Desktop/fetureCAM二次开发/featureCAM 培训/图纸-含3D/U-001.stl
