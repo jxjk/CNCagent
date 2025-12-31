@@ -34,6 +34,10 @@ class CNC_GUI:
         self.material = tk.StringVar(value="Aluminum")
         self.description = tk.StringVar(value="")
         
+        # 3D查看器相关
+        self.enhanced_3d_viewer = None
+        self.ai_3d_analyzer = None
+        
         self.setup_ui()
     
     def setup_ui(self):
@@ -69,6 +73,16 @@ class CNC_GUI:
         
         # 右侧内容
         self.setup_right_panel(right_frame)
+        
+        # 初始化3D查看器和AI分析器
+        try:
+            from .enhanced_3d_viewer import Enhanced3DViewer, AIEnhanced3DAnalyzer
+            self.enhanced_3d_viewer = Enhanced3DViewer(self.root)
+            self.ai_3d_analyzer = AIEnhanced3DAnalyzer()
+        except ImportError:
+            print("警告: 无法导入增强3D查看器模块，3D高级功能将受限")
+            self.enhanced_3d_viewer = None
+            self.ai_3d_analyzer = None
     
     def setup_left_panel(self, parent):
         """设置左侧输入面板"""
@@ -81,6 +95,14 @@ class CNC_GUI:
         
         # 3D模型上传
         ttk.Button(file_frame, text="上传3D模型", command=self.load_3d_model).pack(fill=tk.X, pady=2)
+        
+        # 3D模型查看（仅在加载3D模型后启用）
+        self.view_3d_btn = ttk.Button(file_frame, text="查看3D模型", command=self.view_3d_model, state=tk.DISABLED)
+        self.view_3d_btn.pack(fill=tk.X, pady=2)
+        
+        # AI增强分析按钮
+        self.ai_analyze_3d_btn = ttk.Button(file_frame, text="AI分析3D模型", command=self.ai_analyze_3d_model, state=tk.DISABLED)
+        self.ai_analyze_3d_btn.pack(fill=tk.X, pady=2)
         
         # 图纸预览
         preview_frame = ttk.LabelFrame(parent, text="图纸预览", padding=5)
@@ -268,8 +290,110 @@ class CNC_GUI:
                 
                 vertices_count = model_data['geometric_features'].get('vertices_count', '未知')
                 self.status_var.set(f"已加载3D模型: {os.path.basename(file_path)} - {vertices_count}顶点")
+                
+                # 启用3D查看和AI分析按钮
+                if self.enhanced_3d_viewer:
+                    self.view_3d_btn.config(state=tk.NORMAL)
+                    self.ai_analyze_3d_btn.config(state=tk.NORMAL)
             except Exception as e:
                 messagebox.showerror("错误", f"处理3D模型时出错: {str(e)}")
+    
+    def view_3d_model(self):
+        """查看3D模型 - 调用增强的3D查看器"""
+        if not self.current_3d_model_path:
+            messagebox.showwarning("警告", "请先加载3D模型")
+            return
+            
+        if not self.enhanced_3d_viewer:
+            messagebox.showwarning("警告", "3D查看器不可用，请安装open3d库")
+            return
+            
+        try:
+            # 调用增强3D查看器
+            self.enhanced_3d_viewer.load_model(self.current_3d_model_path)
+            self.enhanced_3d_viewer.create_interactive_window()
+        except Exception as e:
+            messagebox.showerror("错误", f"启动3D查看器失败: {str(e)}")
+    
+    def ai_analyze_3d_model(self):
+        """AI分析3D模型"""
+        if not self.current_3d_model_path:
+            messagebox.showwarning("警告", "请先加载3D模型")
+            return
+            
+        if not self.ai_3d_analyzer:
+            messagebox.showwarning("警告", "AI分析器不可用")
+            return
+            
+        # 在新线程中执行AI分析，避免阻塞GUI
+        def analyze_in_thread():
+            try:
+                analysis_result = self.ai_3d_analyzer.analyze_model_for_cnc(self.current_3d_model_path)
+                
+                if analysis_result:
+                    # 在主线程中更新GUI
+                    self.root.after(0, self.show_analysis_result, analysis_result)
+                else:
+                    self.root.after(0, lambda: messagebox.showerror("错误", "AI分析失败"))
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("错误", f"AI分析出错: {str(e)}"))
+        
+        analysis_thread = threading.Thread(target=analyze_in_thread, daemon=True)
+        analysis_thread.start()
+        self.status_var.set("AI正在分析3D模型...")
+    
+    def show_analysis_result(self, analysis_result):
+        """显示AI分析结果"""
+        # 创建新窗口显示分析结果
+        result_window = tk.Toplevel(self.root)
+        result_window.title("AI 3D模型分析结果")
+        result_window.geometry("600x400")
+        
+        # 创建文本框显示结果
+        text_frame = ttk.Frame(result_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        text_widget = scrolledtext.ScrolledText(text_frame, wrap=tk.WORD)
+        text_widget.pack(fill=tk.BOTH, expand=True)
+        
+        # 格式化输出分析结果
+        result_text = "AI 3D模型分析结果\n"
+        result_text += "=" * 50 + "\n\n"
+        
+        # 基本信息
+        basic_info = analysis_result.get('basic_info', {})
+        result_text += "基本模型信息:\n"
+        result_text += f"- 顶点数: {basic_info.get('vertices_count', 'N/A')}\n"
+        result_text += f"- 面数: {basic_info.get('faces_count', 'N/A')}\n"
+        result_text += f"- 体积: {basic_info.get('volume', 'N/A')}\n"
+        result_text += f"- 表面积: {basic_info.get('surface_area', 'N/A')}\n\n"
+        
+        # 处理特征
+        processing_features = analysis_result.get('processing_features', [])
+        result_text += f"识别的加工特征: {len(processing_features)} 个\n"
+        for i, feature in enumerate(processing_features, 1):
+            result_text += f"{i}. {feature.get('type', 'Unknown')}: {feature.get('dimensions', {})}\n"
+        result_text += "\n"
+        
+        # CNC建议
+        recommendations = analysis_result.get('cnc_recommendations', [])
+        result_text += f"CNC加工建议:\n"
+        for rec in recommendations:
+            result_text += f"- {rec}\n"
+        result_text += "\n"
+        
+        # 几何分析（如果可用）
+        if 'geometric_analysis' in analysis_result:
+            result_text += "几何特征分析:\n"
+            # 这里可以进一步格式化几何分析结果
+            result_text += f"检测到 {len(analysis_result['geometric_analysis'])} 个几何特征\n\n"
+        
+        # 添加到文本框
+        text_widget.insert(tk.END, result_text)
+        text_widget.config(state=tk.DISABLED)  # 设置为只读
+        
+        # 更新状态
+        self.status_var.set(f"AI分析完成: {len(analysis_result.get('processing_features', []))}个特征")
     
     def create_virtual_image_from_3d(self, model_data):
         """根据3D模型数据创建虚拟2D图像"""
@@ -724,17 +848,17 @@ def run_gui():
     """运行GUI界面"""
     root = tk.Tk()
     
-            # 设置样式
-            style = ttk.Style()
-            style.theme_use('clam')  # 使用更现代的主题
-            
-            # 配置各种样式
-            style.configure('Accent.TButton', font=('Arial', 10, 'bold'))
-            style.configure('TLabelFrame', font=('Arial', 10, 'bold'))
-            style.configure('TCombobox', padding=5)
-            style.map('TButton', 
-                     foreground=[('pressed', 'blue'), ('active', 'red')],
-                     background=[('pressed', '!disabled', 'lightblue'), ('active', 'lightgray')])    
+    # 设置样式
+    style = ttk.Style()
+    style.theme_use('clam')  # 使用更现代的主题
+    
+    # 配置各种样式
+    style.configure('Accent.TButton', font=('Arial', 10, 'bold'))
+    style.configure('TLabelFrame', font=('Arial', 10, 'bold'))
+    style.configure('TCombobox', padding=5)
+    style.map('TButton', 
+             foreground=[('pressed', 'blue'), ('active', 'red')],
+             background=[('pressed', '!disabled', 'lightblue'), ('active', 'lightgray')])    
     app = CNC_GUI(root)
     root.mainloop()
 

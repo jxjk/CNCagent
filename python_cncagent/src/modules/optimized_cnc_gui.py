@@ -84,6 +84,24 @@ class OptimizedCNC_GUI:
                                     state="readonly")
         material_combo.pack(side=tk.LEFT, padx=(0, 10))
         
+        # 3D模型查看按钮（初始禁用，加载模型后启用）
+        self.view_3d_btn = ttk.Button(control_frame, text="👁️ 3D查看", command=self.view_3d_model, state=tk.DISABLED)
+        self.view_3d_btn.pack(side=tk.LEFT, padx=(10, 5))
+        
+        # AI分析3D模型按钮（初始禁用，加载模型后启用）
+        self.ai_analyze_3d_btn = ttk.Button(control_frame, text="🤖 AI分析", command=self.ai_analyze_3d_model, state=tk.DISABLED)
+        self.ai_analyze_3d_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # 初始化3D查看器和AI分析器
+        try:
+            from .enhanced_3d_viewer import Enhanced3DViewer, AIEnhanced3DAnalyzer
+            self.enhanced_3d_viewer = Enhanced3DViewer(self.root)
+            self.ai_3d_analyzer = AIEnhanced3DAnalyzer()
+        except ImportError:
+            print("警告: 无法导入增强3D查看器模块，3D高级功能将受限")
+            self.enhanced_3d_viewer = None
+            self.ai_3d_analyzer = None
+        
         # 主内容区域
         content_frame = ttk.Frame(main_frame)
         content_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -317,6 +335,12 @@ class OptimizedCNC_GUI:
                         self.create_virtual_image_from_3d(model_data)
                         self.display_cv_image()
                         self.status_var.set(f"✅ 已加载3D模型: {os.path.basename(file_path)} - {model_data['geometric_features'].get('vertices_count', '未知')}顶点")
+                        
+                        # 启用3D查看和AI分析按钮（需要先添加这些按钮）
+                        if hasattr(self, 'view_3d_btn'):
+                            self.view_3d_btn.config(state=tk.NORMAL)
+                        if hasattr(self, 'ai_analyze_3d_btn'):
+                            self.ai_analyze_3d_btn.config(state=tk.NORMAL)
                     except Exception as e:
                         messagebox.showerror("❌ 错误", f"处理3D模型时出错: {str(e)}")
                         return
@@ -348,38 +372,6 @@ class OptimizedCNC_GUI:
                 messagebox.showerror("❌ 错误", f"加载文件时出错: {str(e)}")
     
     def display_pil_image(self):
-        """在画布上显示PIL图像"""
-        if hasattr(self, 'current_pil_image') and self.current_pil_image is not None:
-            try:
-                # 转换PIL图像为Tkinter可用的格式
-                pil_image = self.current_pil_image
-                # 调整图像大小以适应画布
-                canvas_width = self.canvas.winfo_width()
-                canvas_height = self.canvas.winfo_height()
-                
-                if canvas_width <= 1: canvas_width = 400
-                if canvas_height <= 1: canvas_height = 300
-                
-                # 计算缩放比例，保持宽高比
-                img_width, img_height = pil_image.size
-                scale_x = canvas_width / img_width
-                scale_y = canvas_height / img_height
-                scale = min(scale_x, scale_y, 1.0)  # 不放大图像
-                new_width = int(img_width * scale)
-                new_height = int(img_height * scale)
-                
-                # 调整图像大小
-                resized_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                
-                self.photo = ImageTk.PhotoImage(resized_image)
-                
-                # 清除画布并绘制图像
-                self.canvas.delete("all")
-                x = (canvas_width - new_width) // 2
-                y = (canvas_height - new_height) // 2
-                self.canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
-            except Exception as e:
-                print(f"显示PIL图像时出错: {e}")
     
     def detect_features(self):
         """检测图纸中的特征"""
@@ -798,6 +790,103 @@ class OptimizedCNC_GUI:
                 self.canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
             except Exception as e:
                 print(f"显示PIL图像时出错: {e}")
+    
+    def view_3d_model(self):
+        """查看3D模型 - 调用增强的3D查看器"""
+        if not self.current_3d_model_path:
+            messagebox.showwarning("⚠️ 警告", "请先加载3D模型")
+            return
+            
+        if not self.enhanced_3d_viewer:
+            messagebox.showwarning("⚠️ 警告", "3D查看器不可用，请安装open3d库")
+            return
+            
+        try:
+            # 调用增强3D查看器
+            self.enhanced_3d_viewer.load_model(self.current_3d_model_path)
+            self.enhanced_3d_viewer.create_interactive_window()
+        except Exception as e:
+            messagebox.showerror("❌ 错误", f"启动3D查看器失败: {str(e)}")
+    
+    def ai_analyze_3d_model(self):
+        """AI分析3D模型"""
+        if not self.current_3d_model_path:
+            messagebox.showwarning("⚠️ 警告", "请先加载3D模型")
+            return
+            
+        if not self.ai_3d_analyzer:
+            messagebox.showwarning("⚠️ 警告", "AI分析器不可用")
+            return
+            
+        # 在新线程中执行AI分析，避免阻塞GUI
+        def analyze_in_thread():
+            try:
+                analysis_result = self.ai_3d_analyzer.analyze_model_for_cnc(self.current_3d_model_path)
+                
+                if analysis_result:
+                    # 在主线程中更新GUI
+                    self.root.after(0, self.show_analysis_result, analysis_result)
+                else:
+                    self.root.after(0, lambda: messagebox.showerror("❌ 错误", "AI分析失败"))
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("❌ 错误", f"AI分析出错: {str(e)}"))
+        
+        analysis_thread = threading.Thread(target=analyze_in_thread, daemon=True)
+        analysis_thread.start()
+        self.status_var.set("🤖 AI正在分析3D模型...")
+    
+    def show_analysis_result(self, analysis_result):
+        """显示AI分析结果"""
+        # 创建新窗口显示分析结果
+        result_window = tk.Toplevel(self.root)
+        result_window.title("🤖 AI 3D模型分析结果")
+        result_window.geometry("600x400")
+        
+        # 创建文本框显示结果
+        text_frame = ttk.Frame(result_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        text_widget = scrolledtext.ScrolledText(text_frame, wrap=tk.WORD)
+        text_widget.pack(fill=tk.BOTH, expand=True)
+        
+        # 格式化输出分析结果
+        result_text = "🤖 AI 3D模型分析结果\n"
+        result_text += "=" * 50 + "\n\n"
+        
+        # 基本信息
+        basic_info = analysis_result.get('basic_info', {})
+        result_text += "基本模型信息:\n"
+        result_text += f"- 顶点数: {basic_info.get('vertices_count', 'N/A')}\n"
+        result_text += f"- 面数: {basic_info.get('faces_count', 'N/A')}\n"
+        result_text += f"- 体积: {basic_info.get('volume', 'N/A')}\n"
+        result_text += f"- 表面积: {basic_info.get('surface_area', 'N/A')}\n\n"
+        
+        # 处理特征
+        processing_features = analysis_result.get('processing_features', [])
+        result_text += f"识别的加工特征: {len(processing_features)} 个\n"
+        for i, feature in enumerate(processing_features, 1):
+            result_text += f"{i}. {feature.get('type', 'Unknown')}: {feature.get('dimensions', {})}\n"
+        result_text += "\n"
+        
+        # CNC建议
+        recommendations = analysis_result.get('cnc_recommendations', [])
+        result_text += f"💡 CNC加工建议:\n"
+        for rec in recommendations:
+            result_text += f"- {rec}\n"
+        result_text += "\n"
+        
+        # 几何分析（如果可用）
+        if 'geometric_analysis' in analysis_result:
+            result_text += "🔍 几何特征分析:\n"
+            # 这里可以进一步格式化几何分析结果
+            result_text += f"检测到 {len(analysis_result['geometric_analysis'])} 个几何特征\n\n"
+        
+        # 添加到文本框
+        text_widget.insert(tk.END, result_text)
+        text_widget.config(state=tk.DISABLED)  # 设置为只读
+        
+        # 更新状态
+        self.status_var.set(f"✅ AI分析完成: {len(analysis_result.get('processing_features', []))}个特征")
 
 
 def run_optimized_gui():

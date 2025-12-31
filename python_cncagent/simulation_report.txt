@@ -1,7 +1,7 @@
 ============================================================
 CNC 加工模拟报告
 ============================================================
-生成时间: 2025-12-31 09:34:24
+生成时间: 2025-12-31 10:43:35
 
 识别出的几何特征:
 ------------------------------
@@ -17,34 +17,34 @@ CNC 加工模拟报告
 
 NC程序统计:
 ------------------------------
-总行数: 193
-G代码行数: 41
-M代码行数: 11
+总行数: 203
+G代码行数: 35
+M代码行数: 12
 换刀次数: 2
 
 NC程序预览 (前20行):
 ------------------------------
   %
-  O1000 (RECTANGULAR POCKET MILLING - S45C)
-  (Programmer: FANUC Expert)
-  (Date: 2024-05-20)
-  (Material: S45C Steel)
-  (Workpiece: 120x18 Pocket, Depth 18mm)
-  (Origin: Lower Left Corner (0,7))
+  O1000(120X18X18 SLOT MILLING - S45C)
+  (========================================)
+  (PROGRAMMER: FANUC EXPERT)
+  (DATE: 2023-10-27)
+  (MACHINE: VMC WITH FANUC CONTROL)
+  (MATERIAL: S45C STEEL)
+  (FEATURE: RECTANGULAR SLOT)
+  (DIMENSIONS: 120 X 18 X 18 DEEP)
+  (LOCATION: LOWER LEFT CORNER AT X0 Y7)
+  (TOOLS: T01 - 32MM ROUGHING END MILL)
+  (       T02 - 25MM FINISHING END MILL)
+  (========================================)
   
-  (--- SAFETY & INITIALIZATION ---)
+  (********** SAFETY & INITIALIZATION **********)
   G00 G17 G40 G49 G80 G90 G94 G98
-  (Use G54 as workpiece coordinate system)
-  G91 G28 Z0. (Return to Z home)
-  G90
-  G54
-  
-  (--- TOOL & PARAMETER DEFINITION ---)
-  (T01: WALTER 390 ROUGHING ENDMILL D32R6)
-  (T02: WALTER 390 FINISHING ENDMILL D25R5)
-  (Note: Tool length offsets H01, H02. Cutter radius comp D21, D22)
-  
-  ... 还有 173 行
+  (SAFE STARTUP - CANCEL ALL MODALS)
+  G91 G28 Z0
+  (REFERENCE RETURN IN Z)
+  G91 G28 X0 Y0
+  ... 还有 183 行
 
 ============================================================
 报告结束

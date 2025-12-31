@@ -98,3 +98,79 @@
 2025-12-31 10:29:44,752 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
 2025-12-31 10:29:47,308 - __main__ - INFO - 预加载 start_server 模块成功
 2025-12-31 10:29:47,319 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 10:31:56,801 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 10:32:01,790 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 10:32:01,808 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 10:35:29,310 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 10:35:32,174 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 10:35:32,203 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 10:35:32,243 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-31 10:35:32,244 - __main__ - INFO - 预加载核心模块成功
+2025-12-31 10:35:32,249 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-31 10:35:32,251 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-31 10:35:32,300 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-31 10:35:32,301 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-31 10:35:34,251 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-31 10:35:34,252 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-31 10:37:44,292 - src.modules.model_3d_processor - INFO - 开始处理3D模型: D:/Users/00596/Desktop/fetureCAM二次开发/featureCAM 培训/图纸-含3D/U-001.stl
+2025-12-31 10:37:44,445 - src.modules.model_3d_processor - INFO - 3D模型处理完成: D:/Users/00596/Desktop/fetureCAM二次开发/featureCAM 培训/图纸-含3D/U-001.stl
+2025-12-31 10:38:43,598 - werkzeug - INFO - 127.0.0.1 - - [31/Dec/2025 10:38:43] "GET / HTTP/1.1" 200 -
+2025-12-31 10:39:16,781 - root - INFO - 收到生成NC程序请求
+2025-12-31 10:39:16,817 - root - INFO - 收到用户描述: 在加工中心上用瓦尔特390的刀具加工120*18 深18的槽，左下角位置（0,7）。粗加工刀具直径32，精加工刀具直径25，注意使用半径补偿功能前检查相应的刀具补偿值，对于超出正确补偿值0.5以上的，...
+2025-12-31 10:39:16,821 - root - INFO - 已保存2D文件到临时路径: C:\Users\00596\AppData\Local\Temp\tmpr8kp244s.png
+2025-12-31 10:39:16,822 - root - INFO - 使用模型: deepseek-chat, API密钥设置: 已设置
+2025-12-31 10:39:16,823 - root - INFO - 开始调用generate_nc_from_pdf函数
+2025-12-31 10:39:16,823 - root - INFO - 开始处理输入文件...
+2025-12-31 10:39:16,824 - root - INFO - 使用大模型直接生成NC程序，PDF/3D模型特征仅作为辅助参考...
+2025-12-31 10:39:16,880 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-31 10:39:16,881 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-31 10:39:47,403 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: 'NoneType' object is not iterable
+2025-12-31 10:39:47,501 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-31 10:39:47,502 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-31 10:39:47,502 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-31 10:39:53,007 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-31 10:41:26,256 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 6158
+2025-12-31 10:41:26,257 - src.modules.ai_driven_generator - INFO - 使用模式 '```(?:nc|gcode|fanuc)?\n(.*?)\n```' 提取到 1 个代码块
+2025-12-31 10:41:26,257 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-31 10:41:26,257 - src.modules.ai_driven_generator - WARNING - 检测到缺少关键指令: ['G21']
+2025-12-31 10:41:26,258 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-31 10:41:26,258 - root - INFO - 正在生成模拟报告...
+2025-12-31 10:41:26,259 - root - INFO - 模拟报告已生成: simulation_report.txt
+2025-12-31 10:41:26,260 - root - INFO - NC程序生成完成
+2025-12-31 10:41:26,261 - root - INFO - NC程序已保存到临时文件: C:\Users\00596\AppData\Local\Temp\tmp4orea1uu.nc
+2025-12-31 10:41:26,262 - root - INFO - 成功返回响应
+2025-12-31 10:41:26,263 - root - INFO - 已删除临时2D文件: C:\Users\00596\AppData\Local\Temp\tmpr8kp244s.png
+2025-12-31 10:41:26,266 - werkzeug - INFO - 127.0.0.1 - - [31/Dec/2025 10:41:26] "POST /generate_nc HTTP/1.1" 200 -
+2025-12-31 10:41:28,141 - root - INFO - 收到生成NC程序请求
+2025-12-31 10:41:28,158 - root - INFO - 收到用户描述: 在加工中心上用瓦尔特390的刀具加工120*18 深18的槽，左下角位置（0,7）。粗加工刀具直径32，精加工刀具直径25，注意使用半径补偿功能前检查相应的刀具补偿值，对于超出正确补偿值0.5以上的，...
+2025-12-31 10:41:28,161 - root - INFO - 已保存2D文件到临时路径: C:\Users\00596\AppData\Local\Temp\tmprwqoynuk.pdf
+2025-12-31 10:41:28,165 - root - INFO - 已保存3D模型到临时路径: C:\Users\00596\AppData\Local\Temp\tmpx3mipcql.step
+2025-12-31 10:41:28,168 - root - INFO - 使用模型: deepseek-chat, API密钥设置: 已设置
+2025-12-31 10:41:28,169 - root - INFO - 开始调用generate_nc_from_pdf函数
+2025-12-31 10:41:28,171 - root - INFO - 开始处理输入文件...
+2025-12-31 10:41:28,172 - root - INFO - 使用大模型直接生成NC程序，PDF/3D模型特征仅作为辅助参考...
+2025-12-31 10:41:28,230 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-31 10:41:28,230 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-31 10:41:32,061 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: 'NoneType' object is not iterable
+2025-12-31 10:41:32,065 - src.modules.model_3d_processor - INFO - 开始处理3D模型: C:\Users\00596\AppData\Local\Temp\tmpx3mipcql.step
+2025-12-31 10:41:32,102 - src.modules.prompt_builder - WARNING - 处理3D模型时出错: 加载3D模型失败: No module named 'cascadio'
+2025-12-31 10:41:32,103 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-31 10:41:32,104 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-31 10:41:32,105 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-31 10:41:34,953 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-31 10:43:35,222 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 7337
+2025-12-31 10:43:35,222 - src.modules.ai_driven_generator - INFO - 使用模式 '```(?:nc|gcode|fanuc)?\n(.*?)\n```' 提取到 1 个代码块
+2025-12-31 10:43:35,223 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-31 10:43:35,224 - src.modules.ai_driven_generator - WARNING - 检测到缺少关键指令: ['G21']
+2025-12-31 10:43:35,224 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-31 10:43:35,224 - root - INFO - 正在生成模拟报告...
+2025-12-31 10:43:35,226 - root - INFO - 模拟报告已生成: simulation_report.txt
+2025-12-31 10:43:35,227 - root - INFO - NC程序生成完成
+2025-12-31 10:43:35,228 - root - INFO - NC程序已保存到临时文件: C:\Users\00596\AppData\Local\Temp\tmpwqaqexi_.nc
+2025-12-31 10:43:35,229 - root - INFO - 成功返回响应
+2025-12-31 10:43:35,230 - root - INFO - 已删除临时2D文件: C:\Users\00596\AppData\Local\Temp\tmprwqoynuk.pdf
+2025-12-31 10:43:35,232 - root - INFO - 已删除临时3D文件: C:\Users\00596\AppData\Local\Temp\tmpx3mipcql.step
+2025-12-31 10:43:35,233 - werkzeug - INFO - 127.0.0.1 - - [31/Dec/2025 10:43:35] "POST /generate_nc HTTP/1.1" 200 -

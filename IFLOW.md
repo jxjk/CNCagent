@@ -2,25 +2,27 @@
 
 ## 项目概述
 
-CNC Agent 是一个 AI 辅助的从 PDF 图纸自动生成 FANUC NC 程序的 Python 实现项目。该项目能够从 PDF 图纸中识别几何特征、理解用户加工描述，并生成符合 FANUC 标准的 G 代码程序。项目采用插件式架构设计，支持一键式处理流程，并提供图形界面、Web API 和命令行三种操作方式。
+CNC Agent 是一个 AI 驱动的从 PDF 图纸、3D 模型自动生成 FANUC NC 程序的 Python 实现项目。该项目能够从图纸中识别几何特征、理解用户加工描述，并生成符合 FANUC 标准的 G 代码程序。项目采用 AI 优先的技术框架，支持多模态输入（2D 图纸、3D 模型、用户描述），并提供图形界面、Web API 和命令行三种操作方式。
 
 ### 核心功能
 
 1. **PDF 图纸解析与 OCR 处理** - 从 PDF 文件中提取文本和图像信息
-2. **几何特征识别** - 识别圆形、矩形、多边形等几何形状及复合特征（如沉孔、螺纹孔）
-3. **用户描述理解** - 分析用户加工要求并提取工艺参数
-4. **FANUC NC 程序生成** - 生成符合 FANUC 控制系统标准的 G 代码
-5. **完整流程整合** - 将上述功能整合为一键式处理流程
-6. **AI 辅助 NC 编程工具** - 提供图形界面和简化操作
-7. **多格式导出** - 支持 CamBam、Mastercam、Fusion 360 等主流CAM软件格式
-8. **智能工艺推荐** - 基于特征类型智能推荐加工参数
-9. **统一代码生成入口** - 整合AI驱动、OCR推理和传统图像处理功能
-10. **Web API 接口** - 提供 RESTful API 服务，支持远程调用
-11. **统一启动器** - 支持同时或单独启动GUI界面和Web服务器
-12. **3D模型处理** - 支持STL、STEP等格式的3D模型，提取几何特征用于CNC加工
+2. **3D 模型处理** - 支持 STL、STEP、IGES、OBJ、PLY 等格式的 3D 模型，提取几何特征用于 CNC 加工
+3. **几何特征识别** - 识别圆形、矩形、多边形等几何形状及复合特征（如沉孔、螺纹孔）
+4. **用户描述理解** - 分析用户加工要求并提取工艺参数
+5. **FANUC NC 程序生成** - 生成符合 FANUC 控制系统标准的 G 代码
+6. **完整流程整合** - 将上述功能整合为一键式处理流程
+7. **AI 辅助 NC 编程工具** - 提供图形界面和简化操作
+8. **多格式导出** - 支持 CamBam、Mastercam、Fusion 360 等主流 CAM 软件格式
+9. **智能工艺推荐** - 基于特征类型智能推荐加工参数
+10. **统一代码生成入口** - 整合 AI 驱动、OCR 推理和传统图像处理功能
+11. **Web API 接口** - 提供 RESTful API 服务，支持远程调用
+12. **统一启动器** - 支持同时或单独启动 GUI 界面和 Web 服务器
 13. **特征完整性评估** - 评估图纸和描述信息的完整性，识别缺失信息并提供补充建议
 14. **智能信息补充** - 当信息不完整时，生成针对性问题引导用户提供必要信息
-12. **AI优先生成** - 直接使用大模型生成NC代码，PDF特征仅作辅助参考
+15. **AI 优先生成** - 直接使用大模型生成 NC 代码，图纸特征仅作辅助参考
+16. **几何推理引擎** - 高级几何特征分析和工艺规划
+17. **多源信息融合** - 整合 2D、3D、文本信息进行统一处理
 
 ### 支持的加工工艺
 
@@ -31,6 +33,8 @@ CNC Agent 是一个 AI 辅助的从 PDF 图纸自动生成 FANUC NC 程序的 Py
 - **车削加工** - 外径车削
 - **极坐标加工** - 支持极坐标系下的孔位加工
 - **复合工艺** - 支持多刀具的完整加工工艺（如攻丝的点孔→钻孔→攻丝）
+- **腔槽加工** - 矩形腔、圆形腔、复杂轮廓腔的加工
+- **多面加工** - 支持双面或多面加工工艺
 
 ## 项目架构
 
@@ -46,19 +50,30 @@ src/
 │   ├── __init__.py
 │   ├── ai_driven_generator.py   # AI驱动的NC生成模块
 │   ├── ai_nc_helper.py          # AI辅助NC编程工具核心
+│   ├── beautified_cnc_gui.py    # 美化版GUI界面（简洁设计）
+│   ├── cnc_ui_template.py       # Web UI模板
+│   ├── cutting_optimization.py  # 切削参数优化
 │   ├── fanuc_optimization.py    # FANUC代码优化模块
-│   ├── feature_definition.py    # 几何特征识别模块
+│   ├── feature_completeness_evaluator.py # 特征完整性评估
 │   ├── feature_definition_optimized.py # 优化版几何特征识别模块
+│   ├── feature_definition.py    # 几何特征识别模块
 │   ├── gcode_generation.py      # FANUC NC代码生成模块
+│   ├── geometric_reasoning_engine.py # 几何推理引擎
 │   ├── material_tool_matcher.py # 用户描述分析模块
 │   ├── mechanical_drawing_expert.py # 机械制图专家系统
+│   ├── milling_strategy_optimizer.py # 铣削策略优化
+│   ├── model_3d_processor.py    # 3D模型处理器
+│   ├── nc_code_validator.py     # NC代码验证器
 │   ├── nc_validator_optimizer.py # NC验证优化模块
 │   ├── ocr_ai_inference.py      # OCR与AI推理模块
+│   ├── optimized_cnc_gui.py     # 优化版GUI界面（AI优先）
 │   ├── pdf_parsing_process.py   # PDF解析和OCR处理模块
 │   ├── project_initialization.py # 项目初始化模块
+│   ├── prompt_builder.py        # 智能提示词构建器
 │   ├── requirement_clarifier.py # 需求澄清模块
 │   ├── simple_nc_gui.py         # 简化的NC编程GUI界面
 │   ├── simulation_output.py     # 模拟报告生成模块
+│   ├── tool_compensation_optimizer.py # 刀具补偿优化
 │   ├── unified_generator.py     # 统一CNC程序生成入口
 │   ├── validation.py            # 数据验证模块
 │   └── subprocesses/
@@ -86,9 +101,13 @@ src/
 - **transformers==4.34.0** - 预训练模型库
 - **flask==2.3.3** - Web API服务
 - **flask-cors==4.0.0** - 跨域资源共享支持
+- **trimesh>=3.23.0** - 3D模型处理
 
 ### 核心技术
 
+- **AI大模型集成** - 支持DeepSeek、OpenAI等多种大模型API
+- **几何推理引擎** - 高级几何特征分析和工艺规划
+- **智能提示词构建** - 多源信息融合的智能提示词生成
 - **计算机视觉** - 使用 OpenCV 识别几何特征
 - **图像处理** - 高斯模糊、边缘检测、轮廓识别、形态学操作
 - **OCR技术** - 从图纸中提取文字信息
@@ -97,7 +116,7 @@ src/
 - **多模态AI** - 整合OCR、视觉识别和自然语言处理
 - **Web API** - 提供RESTful API接口
 - **多线程处理** - GUI和Web服务器同时运行
-- **AI大模型集成** - 支持DeepSeek和OpenAI API
+- **3D模型处理** - 支持多种3D格式的几何特征提取
 
 ## 使用方法
 
@@ -112,8 +131,23 @@ python start_unified.py
 # 仅启动GUI界面
 python start_unified.py gui
 
+# 仅启动优化版GUI界面（AI优先）
+python start_unified.py gui-optimized
+
+# 仅启动美化版GUI界面（简洁设计）
+python start_unified.py gui-beautified
+
 # 仅启动Web服务器
 python start_unified.py web
+
+# 同时启动标准GUI和Web服务器
+python start_unified.py both
+
+# 同时启动优化版GUI和Web服务器
+python start_unified.py both-optimized
+
+# 同时启动美化版GUI和Web服务器
+python start_unified.py both-beautified
 
 # 同时启动，Web服务器使用指定端口
 python start_unified.py both --port 8080
@@ -199,14 +233,25 @@ export OPENAI_MODEL="gpt-3.5-turbo"
 
 ### 图形界面
 
-运行 `python start_ai_nc_helper.py gui` 或 `python start_unified.py gui` 启动图形界面，支持：
+项目提供三种GUI界面选项：
 
-- 拖拽导入 PDF、图像等格式文件
-- 一键识别主要加工特征
-- 简单确认界面，减少用户操作
-- 工艺模板拖拽：将预定义工艺直接拖到特征上
-- 点击特征直接调整相关参数
-- 支持导出到CamBam、Mastercam、Fusion 360等格式
+- **标准GUI界面** (`python start_unified.py gui` 或 `python start_ai_nc_helper.py gui`):
+  - 拖拽导入 PDF、图像等格式文件
+  - 一键识别主要加工特征
+  - 简单确认界面，减少用户操作
+  - 支持导出到CamBam、Mastercam、Fusion 360等格式
+
+- **优化版GUI界面** (`python start_unified.py gui-optimized`):
+  - AI优先模式，强调大模型驱动
+  - 支持2D/3D图纸、描述词输入和NC程序输出
+  - 更详细的参数配置选项
+  - AI分析报告功能
+
+- **美化版GUI界面** (`python start_unified.py gui-beautified`):
+  - 简洁美观的设计
+  - 专注于核心功能
+  - 支持图像缩放、旋转、平移
+  - 特征点可视化显示
 
 ### 批处理脚本
 
@@ -302,6 +347,27 @@ pytest -m "not slow"  # 跳过慢速测试
 - **代码验证** - 生成后验证NC代码的正确性
 - **容错机制** - API调用失败时的备用生成方案
 
+### 几何推理引擎 (geometric_reasoning_engine.py)
+
+- **复杂几何分析** - 识别腔槽、螺纹、齿轮等复杂特征
+- **工艺规划** - 生成加工顺序和刀具路径策略
+- **切削参数优化** - 根据材料和特征自动推荐参数
+- **加工可行性分析** - 评估加工过程中的潜在问题
+
+### 智能提示词构建器 (prompt_builder.py)
+
+- **多源信息融合** - 整合2D图纸、3D模型、用户描述信息
+- **语义对齐** - 确保多源信息的一致性
+- **自适应权重** - 根据信息源质量调整权重
+- **工艺知识嵌入** - 在提示词中嵌入工艺专业知识
+
+### 3D模型处理器 (model_3d_processor.py)
+
+- **多格式支持** - 支持STL、STEP、IGES、OBJ、PLY等多种3D格式
+- **几何特征提取** - 提取顶点、面、体积、表面积等几何信息
+- **语义标注** - 为3D模型生成语义标注
+- **制造特征识别** - 识别适合CNC加工的特征
+
 ### 配置管理 (config.py)
 
 - **图像处理参数** - 配置图像处理相关参数
@@ -344,6 +410,7 @@ pytest -m "not slow"  # 跳过慢速测试
 - NC代码验证 - 验证生成的NC代码的正确性
 - 文件路径安全 - 防止路径遍历攻击
 - API调用容错 - 大模型API调用失败时的备用方案
+- 3D模型处理错误 - 对不支持的格式给出提示
 
 ## 部署说明
 
@@ -371,8 +438,11 @@ pytest -m "not slow"  # 跳过慢速测试
 8. **多模态AI** - 整合OCR、视觉识别和自然语言处理
 9. **配置化** - 通过配置文件管理参数，便于定制
 10. **统一启动** - 通过start_unified.py支持同时或单独启动GUI和Web服务器
-11. **AI优先** - 重构为AI驱动的NC生成，PDF特征仅作辅助参考
+11. **AI优先** - 重构为AI驱动的NC生成，图纸特征仅作辅助参考
 12. **多API支持** - 支持DeepSeek、OpenAI等多种大模型API
+13. **多GUI选项** - 提供标准、优化、美化三种GUI界面
+14. **3D支持增强** - 支持更多3D格式和复杂几何分析
+15. **几何推理** - 先进的几何特征分析和工艺规划能力
 
 ## 应用场景
 
@@ -392,15 +462,17 @@ pytest -m "not slow"  # 跳过慢速测试
 - 灵活的配置选项，支持自定义端口和主机地址
 - 统一的日志记录和错误处理
 - 优雅的进程管理，支持信号处理
+- 支持多种GUI模式（标准、优化、美化）
 
 ### 新特性：3D模型支持与特征完整性评估
 
 #### 3D模型处理能力
 CNC Agent现在支持多种3D模型格式，能够：
-- 加载STL、STEP、IGES、OBJ等常见3D格式
+- 加载STL、STEP、IGES、OBJ、PLY等多种3D格式
 - 提取几何特征（顶点、面、体积、表面积等）
 - 检测几何基元（平面、圆柱面等）
 - 将3D信息与2D图纸信息融合，生成更精确的NC代码
+- 支持复杂几何特征的识别和加工规划
 
 #### 特征完整性评估
 系统现在具备智能评估能力：
@@ -422,7 +494,17 @@ CNC Agent现在支持多种3D模型格式，能够：
 
 重构后的系统采用AI优先的NC代码生成策略：
 - 直接使用大模型生成NC代码，提高准确性和灵活性
-- PDF特征仅作为辅助参考，不依赖传统图像识别
+- 图纸特征仅作为辅助参考，不依赖传统图像识别
 - 支持多种AI模型（DeepSeek、OpenAI等）
 - 提供API容错机制，确保系统稳定性
 - 生成更加符合实际加工需求的代码
+- 智能提示词构建，融合多源信息
+
+### 新特性：几何推理引擎
+
+系统集成了高级几何推理引擎，能够：
+- 分析复杂几何特征（腔槽、螺纹、齿轮等）
+- 生成优化的工艺规划
+- 推荐合适的刀具和切削参数
+- 分析加工可行性和潜在问题
+- 实现语义对齐和多模态信息融合
