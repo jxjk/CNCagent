@@ -11,6 +11,15 @@ from src.modules.ai_nc_helper import AI_NC_Helper
 import threading
 from PIL import Image, ImageTk
 
+# 尝试导入3D查看相关库
+try:
+    import plotly.graph_objects as go
+    from plotly.offline import plot
+    HAS_PLOTLY = True
+except ImportError:
+    HAS_PLOTLY = False
+    print("警告: 未安装plotly库，3D模型可视化功能受限。请运行: pip install plotly")
+
 
 class SimpleNC_GUI:
     """
@@ -95,6 +104,28 @@ class SimpleNC_GUI:
         self.canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.canvas.bind("<Button-1>", self.on_canvas_click)
         
+        # 添加滚动事件支持
+        self.canvas.bind("<MouseWheel>", self.on_canvas_scroll)  # Windows
+        self.canvas.bind("<Button-4>", self.on_canvas_scroll)    # Linux
+        self.canvas.bind("<Button-5>", self.on_canvas_scroll)    # Linux
+        
+        # 添加拖拽支持
+        self.canvas.bind("<ButtonPress-2>", self.on_canvas_drag_start)
+        self.canvas.bind("<B2-Motion>", self.on_canvas_drag)
+        
+        # 添加缩放和旋转支持
+        self.canvas.bind("<Control-KeyPress-plus>", self.zoom_in)
+        self.canvas.bind("<Control-KeyPress-minus>", self.zoom_out)
+        self.canvas.bind("<Control-KeyPress-r>", self.rotate_image)
+        
+        # 初始化视图参数
+        self.canvas_scale = 1.0
+        self.canvas_rotation = 0
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+        self.canvas_offset_x = 0
+        self.canvas_offset_y = 0
+        
         # 初始化时显示欢迎信息
         self.show_welcome_message()
         
@@ -156,6 +187,11 @@ class SimpleNC_GUI:
             self.status_var.set("已切换到正常模式 - 请导入图纸")
             # 重置当前图像
             self.current_image = None
+            # 重置3D模型数据
+            if hasattr(self, 'current_3d_model_path'):
+                delattr(self, 'current_3d_model_path')
+            if hasattr(self, 'current_3d_model_data'):
+                delattr(self, 'current_3d_model_data')
             self.show_welcome_message()
     
     def create_virtual_image_from_3d(self, model_data):
@@ -236,6 +272,114 @@ class SimpleNC_GUI:
         self.current_image = virtual_image
         self.current_image_path = None  # 表示这是虚拟图像
     
+    def show_3d_model_plotly(self, file_path):
+        """使用Plotly显示3D模型"""
+        if not HAS_PLOTLY:
+            # 如果没有Plotly，回退到虚拟图像
+            from src.modules.model_3d_processor import process_3d_model
+            model_data = process_3d_model(file_path)
+            self.create_virtual_image_from_3d(model_data)
+            self.display_cv_image()
+            return
+        
+        try:
+            # 尝试加载STL文件进行可视化
+            ext = file_path.lower().split('.')[-1]
+            
+            if ext == 'stl':
+                # 使用numpy-stl库加载STL文件
+                try:
+                    import numpy as np
+                    from stl import mesh
+                    import tkinterweb  # 用于在Tkinter中显示HTML
+                    
+                    # 加载STL文件
+                    stl_mesh = mesh.Mesh.from_file(file_path)
+                    
+                    # 创建Plotly 3D图形
+                    figure = go.Figure(data=go.Mesh3d(
+                        x=stl_mesh.x.flatten(),
+                        y=stl_mesh.y.flatten(),
+                        z=stl_mesh.z.flatten(),
+                        alphahull=0,  # 使用凸包
+                        opacity=0.8,
+                        color='lightblue'
+                    ))
+                    
+                    figure.update_layout(
+                        title="3D模型预览",
+                        scene=dict(
+                            xaxis_title="X轴",
+                            yaxis_title="Y轴", 
+                            zaxis_title="Z轴"
+                        ),
+                        width=600,
+                        height=400
+                    )
+                    
+                    # 生成HTML并在新窗口中显示
+                    html_str = figure.to_html(include_plotlyjs='cdn', config={'displayModeBar': True})
+                    
+                    # 创建新窗口显示3D模型
+                    model_window = tk.Toplevel(self.root)
+                    model_window.title("3D模型查看器")
+                    model_window.geometry("800x600")
+                    
+                    # 如果有tkinterweb可用，使用它显示3D模型
+                    try:
+                        import tkinterweb as web
+                        browser = web.HtmlFrame(model_window)
+                        browser.load_html(html_str)
+                        browser.pack(fill=tk.BOTH, expand=True)
+                    except ImportError:
+                        # 如果没有tkinterweb，显示一个简单的消息
+                        label = tk.Label(model_window, text="3D模型已加载，需要安装tkinterweb以可视化显示", 
+                                       font=("Arial", 12))
+                        label.pack(pady=50)
+                        # 同时在命令行输出提示
+                        print("提示：安装tkinterweb以在GUI中查看3D模型：pip install tkinterweb")
+                
+                except ImportError:
+                    print("提示：安装numpy-stl以支持STL文件可视化：pip install numpy-stl")
+                    # 回退到虚拟图像
+                    from src.modules.model_3d_processor import process_3d_model
+                    model_data = process_3d_model(file_path)
+                    self.create_virtual_image_from_3d(model_data)
+                    self.display_cv_image()
+            else:
+                # 对于其他3D格式，显示一个信息窗口
+                info_window = tk.Toplevel(self.root)
+                info_window.title("3D模型信息")
+                info_window.geometry("400x200")
+                
+                tk.Label(info_window, text=f"已加载3D模型: {os.path.basename(file_path)}", 
+                         font=("Arial", 12, "bold")).pack(pady=10)
+                
+                # 显示模型统计信息
+                from src.modules.model_3d_processor import process_3d_model
+                model_data = process_3d_model(file_path)
+                features = model_data.get('geometric_features', {})
+                
+                stats = f"""
+格式: {file_path.split('.')[-1].upper()}
+顶点数: {features.get('vertices_count', '未知')}
+面数: {features.get('faces_count', '未知')}
+体积: {features.get('volume', '未知'):.2f}
+表面积: {features.get('surface_area', '未知'):.2f}
+                """.strip()
+                
+                tk.Label(info_window, text=stats, justify=tk.LEFT, font=("Courier", 10)).pack(pady=10)
+                
+                tk.Button(info_window, text="关闭", command=info_window.destroy).pack(pady=10)
+                
+        except Exception as e:
+            print(f"显示3D模型时出错: {e}")
+            # 出错时回退到虚拟图像
+            from src.modules.model_3d_processor import process_3d_model
+            model_data = process_3d_model(file_path)
+            self.create_virtual_image_from_3d(model_data)
+            self.display_cv_image()
+    
     def load_drawing(self):
         """加载图纸文件"""
         file_path = filedialog.askopenfilename(
@@ -256,9 +400,14 @@ class SimpleNC_GUI:
                         self.current_3d_model_path = file_path
                         self.current_3d_model_data = model_data
                         
-                        # 创建虚拟2D图像用于显示
-                        self.create_virtual_image_from_3d(model_data)
-                        self.display_cv_image()
+                        # 尝试显示3D模型（如果支持）
+                        if HAS_PLOTLY:
+                            self.show_3d_model_plotly(file_path)
+                        else:
+                            # 创建虚拟2D图像用于显示
+                            self.create_virtual_image_from_3d(model_data)
+                            self.display_cv_image()
+                        
                         self.status_var.set(f"已加载3D模型: {os.path.basename(file_path)} - {model_data['geometric_features'].get('vertices_count', '未知')}顶点")
                     except Exception as e:
                         messagebox.showerror("错误", f"处理3D模型时出错: {str(e)}")
@@ -296,30 +445,34 @@ class SimpleNC_GUI:
             try:
                 # 转换PIL图像为Tkinter可用的格式
                 pil_image = self.current_pil_image
-                # 调整图像大小以适应画布
+                
+                # 应用用户缩放比例
+                img_width, img_height = pil_image.size
+                new_width = int(img_width * self.canvas_scale)
+                new_height = int(img_height * self.canvas_scale)
+                
+                # 调整图像大小
+                resized_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
+                # 如果需要旋转，则旋转图像
+                if self.canvas_rotation != 0:
+                    resized_image = resized_image.rotate(self.canvas_rotation, expand=True)
+                    # 更新宽高以适应旋转后的尺寸
+                    new_width, new_height = resized_image.size
+                
+                self.photo = ImageTk.PhotoImage(resized_image)
+                
+                # 清除画布并绘制图像
+                self.canvas.delete("all")
+                # 居中显示，考虑缩放和平移
                 canvas_width = self.canvas.winfo_width()
                 canvas_height = self.canvas.winfo_height()
                 
                 if canvas_width <= 1: canvas_width = 400
                 if canvas_height <= 1: canvas_height = 300
                 
-                # 计算缩放比例，保持宽高比
-                img_width, img_height = pil_image.size
-                scale_x = canvas_width / img_width
-                scale_y = canvas_height / img_height
-                scale = min(scale_x, scale_y, 1.0)  # 不放大图像
-                new_width = int(img_width * scale)
-                new_height = int(img_height * scale)
-                
-                # 调整图像大小
-                resized_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                
-                self.photo = ImageTk.PhotoImage(resized_image)
-                
-                # 清除画布并绘制图像
-                self.canvas.delete("all")
-                x = (canvas_width - new_width) // 2
-                y = (canvas_height - new_height) // 2
+                x = (canvas_width - new_width) // 2 + self.canvas_offset_x
+                y = (canvas_height - new_height) // 2 + self.canvas_offset_y
                 self.canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
             except Exception as e:
                 print(f"显示PIL图像时出错: {e}")
@@ -538,6 +691,70 @@ class SimpleNC_GUI:
         # 这里可以添加选择特征后高亮显示在画布上的功能
         pass
     
+    def on_canvas_scroll(self, event):
+        """画布滚动事件处理（缩放）"""
+        # 检测是否按住了Ctrl键进行缩放
+        if event.state & 0x4:  # Ctrl键
+            if event.delta > 0 or event.num == 4:  # 向上滚动或Linux的Button-4
+                self.zoom_in()
+            elif event.delta < 0 or event.num == 5:  # 向下滚动或Linux的Button-5
+                self.zoom_out()
+        else:
+            # 普通滚动（上下平移）
+            if event.delta > 0 or event.num == 4:
+                self.canvas.yview_scroll(-1, "units")
+            elif event.delta < 0 or event.num == 5:
+                self.canvas.yview_scroll(1, "units")
+
+    def on_canvas_drag_start(self, event):
+        """开始拖拽"""
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+
+    def on_canvas_drag(self, event):
+        """拖拽事件处理（平移）"""
+        # 计算拖拽距离
+        dx = event.x - self.drag_start_x
+        dy = event.y - self.drag_start_y
+        
+        # 更新画布偏移量
+        self.canvas_offset_x += dx
+        self.canvas_offset_y += dy
+        
+        # 移动画布上的所有项目
+        self.canvas.move(tk.ALL, dx, dy)
+        
+        # 更新起始位置
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+
+    def zoom_in(self, event=None):
+        """放大图像"""
+        self.canvas_scale *= 1.2
+        self.redraw_canvas_image()
+
+    def zoom_out(self, event=None):
+        """缩小图像"""
+        self.canvas_scale /= 1.2
+        if self.canvas_scale < 0.1:  # 最小缩放限制
+            self.canvas_scale = 0.1
+        self.redraw_canvas_image()
+
+    def rotate_image(self, event=None):
+        """旋转图像90度"""
+        self.canvas_rotation = (self.canvas_rotation + 90) % 360
+        self.redraw_canvas_image()
+
+    def redraw_canvas_image(self):
+        """重新绘制画布图像"""
+        if self.current_image is not None:
+            self.display_cv_image()
+        elif hasattr(self, 'current_pil_image') and self.current_pil_image is not None:
+            self.display_pil_image()
+        elif self.only_description_mode.get():
+            self.create_virtual_image()
+            self.display_cv_image()
+    
     def display_cv_image(self):
         """在画布上显示OpenCV图像"""
         if self.current_image is not None:
@@ -552,15 +769,20 @@ class SimpleNC_GUI:
                 if canvas_width <= 1: canvas_width = 400
                 if canvas_height <= 1: canvas_height = 300
                 
-                # 计算缩放比例
-                scale_x = canvas_width / width
-                scale_y = canvas_height / height
-                scale = min(scale_x, scale_y, 1.0)  # 不放大图像
-                new_width = int(width * scale)
-                new_height = int(height * scale)
+                # 应用用户缩放比例
+                new_width = int(width * self.canvas_scale)
+                new_height = int(height * self.canvas_scale)
                 
                 # 调整图像大小
                 resized_image = cv2.resize(image_rgb, (new_width, new_height), interpolation=cv2.INTER_AREA)
+                
+                # 如果需要旋转，则旋转图像
+                if self.canvas_rotation != 0:
+                    center = (new_width // 2, new_height // 2)
+                    rotation_matrix = cv2.getRotationMatrix2D(center, self.canvas_rotation, 1.0)
+                    resized_image = cv2.warpAffine(resized_image, rotation_matrix, (new_width, new_height))
+                    # 更新宽高以适应旋转后的尺寸
+                    height, width = resized_image.shape[:2]
                 
                 # 转换为Tkinter可用的格式
                 from PIL import Image, ImageTk
@@ -569,8 +791,9 @@ class SimpleNC_GUI:
                 
                 # 清除画布并绘制图像
                 self.canvas.delete("all")
-                x = (canvas_width - new_width) // 2
-                y = (canvas_height - new_height) // 2
+                # 居中显示，考虑缩放和平移
+                x = (canvas_width - new_width) // 2 + self.canvas_offset_x
+                y = (canvas_height - new_height) // 2 + self.canvas_offset_y
                 self.canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
             except Exception as e:
                 print(f"显示图像时出错: {e}")

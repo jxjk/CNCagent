@@ -438,6 +438,9 @@ class AIDrivenCNCGenerator:
                 material="Aluminum"  # 默认材料，可以从其他地方获取
             )
             
+            # 执行加工结构分析
+            processing_structure = geometric_reasoning_engine.analyze_processing_structure(geometric_features)
+            
             # 生成分析报告
             analysis_report = []
             analysis_report.append("## 几何特征分析结果：")
@@ -446,39 +449,81 @@ class AIDrivenCNCGenerator:
             feature_count = len(geometric_features)
             pocket_count = len([f for f in geometric_features if 'pocket' in f.shape_type.lower()])
             circle_count = len([f for f in geometric_features if 'circle' in f.shape_type.lower()])
+            rect_count = len([f for f in geometric_features if 'rect' in f.shape_type.lower()])
             
             analysis_report.append(f"- 识别到 {feature_count} 个几何特征")
             analysis_report.append(f"- 其中腔槽特征 {pocket_count} 个")
             analysis_report.append(f"- 圆形特征 {circle_count} 个")
+            analysis_report.append(f"- 矩形特征 {rect_count} 个")
+            
+            # 详细特征信息
+            if geometric_features:
+                analysis_report.append("\n### 详细特征信息：")
+                for i, feature in enumerate(geometric_features[:5]):  # 限制显示前5个特征
+                    analysis_report.append(f"  - 特征{i+1}: {feature.shape_type}, 位置({feature.center[0]:.2f}, {feature.center[1]:.2f}), "
+                                         f"尺寸({feature.dimensions[0]:.2f}×{feature.dimensions[1]:.2f}), "
+                                         f"置信度:{feature.confidence:.2f}")
             
             # 工艺规划建议
             if process_plans:
                 analysis_report.append("\n## 工艺规划建议：")
-                for plan in process_plans:
+                for plan in process_plans[:3]:  # 限制显示前3个工艺计划
                     analysis_report.append(f"- 特征 {plan.feature_id}: {plan.operation_type} 使用 {plan.tool_selection}")
                     analysis_report.append(f"  - 转速: {plan.cutting_parameters.get('spindle_speed', 0):.0f}rpm")
                     analysis_report.append(f"  - 进给: {plan.cutting_parameters.get('feed_rate', 0):.0f}mm/min")
                     analysis_report.append(f"  - 刀具路径: {plan.toolpath_strategy}")
+                    analysis_report.append(f"  - 预估时间: {plan.estimated_time:.1f}分钟")
             
-            # 多面加工分析（如果适用）
-            from .mechanical_drawing_expert import MechanicalDrawingExpert
-            if 'text_content' in pdf_features:
-                expert = MechanicalDrawingExpert()
-                multi_face_analysis = expert.analyze_multi_face_structure(
-                    pdf_features['text_content'], 
-                    []  # 这里可以传入特征，但简单起见先传空列表
-                )
+            # 几何关系分析
+            if relationships:
+                if relationships.get('feature_interactions'):
+                    analysis_report.append(f"\n## 特征间关系分析：")
+                    for interaction in relationships['feature_interactions'][:3]:  # 限制显示前3个
+                        analysis_report.append(f"- 特征{interaction['feature1_id']}与特征{interaction['feature2_id']}距离较近({interaction['center_distance']:.2f}mm)")
                 
-                if multi_face_analysis['is_multi_face']:
-                    analysis_report.append(f"\n## 多面加工分析：")
-                    analysis_report.append(f"- 确认为多面加工件，共{multi_face_analysis['face_count']}面")
-                    analysis_report.append(f"- 夹紧策略: {multi_face_analysis['clamping_strategy']}")
-                    analysis_report.append(f"- 刀具可达性: {multi_face_analysis['tool_accessibility']}")
+                if relationships.get('dimensional_constraints'):
+                    analysis_report.append(f"\n## 尺寸约束：")
+                    for constraint in relationships['dimensional_constraints'][:3]:  # 限制显示前3个
+                        analysis_report.append(f"- 特征{constraint['feature_id']}在{constraint['dimension']}方向接近边界")
+            
+            # 加工结构分析
+            if processing_structure:
+                analysis_report.append(f"\n## 加工结构分析：")
+                analysis_report.append(f"- 单面加工特征: {len(processing_structure['single_sided_features'])}个")
+                analysis_report.append(f"- 多面加工特征: {len(processing_structure['multi_sided_features'])}个")
+                
+                if processing_structure['clamping_suggestions']:
+                    analysis_report.append(f"\n## 夹紧建议：")
+                    for suggestion in processing_structure['clamping_suggestions']:
+                        analysis_report.append(f"- {suggestion}")
+                
+                if processing_structure['tool_accessibility']:
+                    analysis_report.append(f"\n## 刀具可达性：")
+                    for access_info in processing_structure['tool_accessibility'][:3]:  # 限制显示前3个
+                        analysis_report.append(f"- 特征{access_info['feature_id']}: {access_info['accessibility']}可达, "
+                                             f"推荐工具: {', '.join(access_info['recommended_tools'])}")
+                
+                if processing_structure['process_feasibility']:
+                    feasibility = processing_structure['process_feasibility']
+                    analysis_report.append(f"\n## 工艺可行性：")
+                    analysis_report.append(f"- 整体可行性: {feasibility['overall_feasibility']}")
+                    
+                    if feasibility['potential_issues']:
+                        analysis_report.append(f"- 潜在问题:")
+                        for issue in feasibility['potential_issues']:
+                            analysis_report.append(f"  * {issue}")
+                    
+                    if feasibility['suggestions']:
+                        analysis_report.append(f"- 改进建议:")
+                        for suggestion in feasibility['suggestions']:
+                            analysis_report.append(f"  * {suggestion}")
             
             return "\n".join(analysis_report)
             
         except Exception as e:
             self.logger.warning(f"几何推理引擎分析失败: {str(e)}")
+            import traceback
+            self.logger.warning(f"详细错误信息: {traceback.format_exc()}")
             return ""
     
     def _call_large_language_model(self, prompt: str) -> str:

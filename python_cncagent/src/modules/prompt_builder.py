@@ -78,9 +78,58 @@ class PromptBuilder:
         # 6. 生成要求
         prompt_parts.append(self._build_generation_requirements_section())
         
+        # 7. 语义对齐和上下文增强
+        prompt_parts.append(self._build_context_enhancement_section(pdf_path, model_3d_path, user_description))
+        
         # 合并所有部分
         full_prompt = "\n\n".join(prompt_parts)
         return full_prompt
+    
+    def _build_context_enhancement_section(self, pdf_path: Optional[str], model_3d_path: Optional[str], user_description: str) -> str:
+        """构建上下文增强部分，实现多模态信息的语义对齐"""
+        sections = ["# 上下文增强与语义对齐"]
+        
+        # 分析信息源的一致性
+        consistency_check = []
+        
+        if pdf_path and model_3d_path:
+            # 这里可以实现PDF和3D模型的交叉验证逻辑
+            consistency_check.append("已提供PDF图纸和3D模型，进行信息交叉验证")
+            consistency_check.append("确保几何特征和尺寸在两个源之间保持一致")
+        elif pdf_path:
+            consistency_check.append("仅提供PDF图纸，基于2D信息生成NC代码")
+        elif model_3d_path:
+            consistency_check.append("仅提供3D模型，基于3D几何特征生成NC代码")
+        else:
+            consistency_check.append("未提供图纸或模型，仅基于用户描述生成NC代码")
+        
+        # 添加加工特征的语义关联
+        semantic_links = []
+        
+        # 检测用户描述中的关键加工特征
+        import re
+        if '孔' in user_description or 'hole' in user_description.lower():
+            semantic_links.append("检测到孔加工需求，关联几何特征中的圆形特征")
+        if '槽' in user_description or 'cavity' in user_description.lower():
+            semantic_links.append("检测到腔槽加工需求，关联几何特征中的矩形或异形特征")
+        if '铣' in user_description or 'mill' in user_description.lower():
+            semantic_links.append("检测到铣削需求，关联几何特征中的平面和轮廓特征")
+        if '沉孔' in user_description or 'counterbore' in user_description.lower():
+            semantic_links.append("检测到沉孔需求，关联同心圆几何特征")
+        
+        sections.append("## 信息源一致性检查:\n" + "\n".join(f"- {item}" for item in consistency_check))
+        
+        if semantic_links:
+            sections.append("## 语义关联分析:\n" + "\n".join(f"- {item}" for item in semantic_links))
+        
+        # 添加自适应权重建议
+        sections.append("## 自适应信息融合策略:")
+        sections.append("- 优先级: 用户描述 > 3D模型 > PDF图纸 > 图像")
+        sections.append("- 当多个信息源一致时，增强置信度")
+        sections.append("- 当信息源冲突时，优先考虑3D模型信息")
+        sections.append("- 对于缺失信息，使用工艺知识进行智能推断")
+        
+        return "\n\n".join(sections)
     
     def _build_system_role_section(self) -> str:
         """构建系统角色设定部分"""

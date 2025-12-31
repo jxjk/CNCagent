@@ -87,7 +87,7 @@ class Model3DProcessor:
     
     def extract_geometric_features(self, model: Any) -> Dict[str, Any]:
         """
-        从3D模型中提取几何特征
+        从3D模型中提取几何特征，增强版本
         
         Args:
             model: 3D模型对象
@@ -107,7 +107,10 @@ class Model3DProcessor:
             'slots': [],
             'cylindrical_surfaces': [],
             'planar_surfaces': [],
-            'dimensions': {}
+            'dimensions': {},
+            'semantic_annotations': [],  # 语义标注
+            'feature_relationships': [],  # 特征关系
+            'manufacturing_features': []  # 制造特征
         }
         
         # 优先使用trimesh进行处理，因为它对Python 3.14有更好的支持
@@ -123,6 +126,13 @@ class Model3DProcessor:
                     'min': bounds[0].tolist(),
                     'max': bounds[1].tolist(),
                     'size': (bounds[1] - bounds[0]).tolist()
+                }
+                
+                # 提取基本尺寸信息
+                features['dimensions'] = {
+                    'length': float(bounds[1][0] - bounds[0][0]),
+                    'width': float(bounds[1][1] - bounds[0][1]),
+                    'height': float(bounds[1][2] - bounds[0][2])
                 }
             
             # 计算表面积和体积
@@ -141,10 +151,20 @@ class Model3DProcessor:
             # 检测孔、槽等特征
             features['holes'] = self._detect_holes_trimesh(model)
             features['slots'] = self._detect_slots_trimesh(model)
+            features['pockets'] = self._detect_pockets_trimesh(model)
             
             # 检测更多高级特征
             features['cylindrical_surfaces'] = self._detect_cylindrical_surfaces_trimesh(model)
             features['planar_surfaces'] = self._detect_planar_surfaces_trimesh(model)
+            
+            # 增强：语义标注
+            features['semantic_annotations'] = self._generate_semantic_annotations(model, features)
+            
+            # 增强：特征关系分析
+            features['feature_relationships'] = self._analyze_feature_relationships(model, features)
+            
+            # 增强：制造特征识别
+            features['manufacturing_features'] = self._identify_manufacturing_features(model, features)
             
         elif HAS_OPEN3D and isinstance(model, o3d.geometry.TriangleMesh):
             # 如果没有trimesh但有Open3D，则使用Open3D
@@ -163,6 +183,13 @@ class Model3DProcessor:
                     'max': max_bound.tolist(),
                     'size': (max_bound - min_bound).tolist()
                 }
+                
+                # 提取基本尺寸信息
+                features['dimensions'] = {
+                    'length': float(max_bound[0] - min_bound[0]),
+                    'width': float(max_bound[1] - min_bound[1]),
+                    'height': float(max_bound[2] - min_bound[2])
+                }
             
             # 计算表面积和体积（仅对封闭网格）
             if hasattr(model, 'is_watertight') and model.is_watertight():
@@ -180,7 +207,242 @@ class Model3DProcessor:
             geometric_primitives = self._detect_geometric_primitives_o3d(model)
             features['geometric_primitives'] = geometric_primitives
             
+            # 增强：语义标注
+            features['semantic_annotations'] = self._generate_semantic_annotations(model, features)
+            
         return features
+    
+    def _generate_semantic_annotations(self, model: Any, features: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        生成语义标注，增强3D模型的语义理解能力
+        
+        Args:
+            model: 3D模型对象
+            features: 已提取的几何特征
+            
+        Returns:
+            语义标注列表
+        """
+        annotations = []
+        
+        # 基于几何特征生成语义标注
+        dimensions = features.get('dimensions', {})
+        if dimensions:
+            length = dimensions.get('length', 0)
+            width = dimensions.get('width', 0)
+            height = dimensions.get('height', 0)
+            
+            # 识别基本形状类别
+            if abs(length - width - height) < min(length, width, height) * 0.1:
+                annotations.append({
+                    'type': 'shape_classification',
+                    'label': 'cube',
+                    'confidence': 0.9,
+                    'description': f'近似立方体，尺寸: {length:.2f} x {width:.2f} x {height:.2f}'
+                })
+            elif abs(length - width) < min(length, width) * 0.1 and height < min(length, width) * 0.1:
+                annotations.append({
+                    'type': 'shape_classification',
+                    'label': 'flat_plate',
+                    'confidence': 0.85,
+                    'description': f'平板状，厚度: {height:.2f}, 面积: {length * width:.2f}'
+                })
+            elif abs(length - width) < min(length, width) * 0.2 and height > 2 * max(length, width):
+                annotations.append({
+                    'type': 'shape_classification',
+                    'label': 'cylindrical_bar',
+                    'confidence': 0.8,
+                    'description': f'圆柱棒料，直径: {max(length, width):.2f}, 长度: {height:.2f}'
+                })
+        
+        # 基于体积和表面积的标注
+        volume = features.get('volume', 0)
+        surface_area = features.get('surface_area', 0)
+        if volume > 0 and surface_area > 0:
+            surface_to_volume_ratio = surface_area / volume if volume > 0 else 0
+            if surface_to_volume_ratio > 10:
+                annotations.append({
+                    'type': 'complexity_assessment',
+                    'label': 'complex_geometry',
+                    'confidence': 0.75,
+                    'description': f'几何形状复杂，表面积与体积比: {surface_to_volume_ratio:.2f}'
+                })
+        
+        # 检测特征的语义含义
+        holes = features.get('holes', [])
+        if len(holes) > 0:
+            annotations.append({
+                'type': 'manufacturing_feature',
+                'label': 'has_holes',
+                'confidence': 0.9,
+                'description': f'包含{len(holes)}个孔特征'
+            })
+        
+        pockets = features.get('pockets', [])
+        if len(pockets) > 0:
+            annotations.append({
+                'type': 'manufacturing_feature',
+                'label': 'has_pockets',
+                'confidence': 0.85,
+                'description': f'包含{len(pockets)}个腔槽特征'
+            })
+        
+        return annotations
+    
+    def _analyze_feature_relationships(self, model: Any, features: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        分析特征间的关系，实现语义对齐
+        
+        Args:
+            model: 3D模型对象
+            features: 已提取的几何特征
+            
+        Returns:
+            特征关系列表
+        """
+        relationships = []
+        
+        # 分析孔与表面的关系
+        holes = features.get('holes', [])
+        planar_surfaces = features.get('planar_surfaces', [])
+        
+        for i, hole in enumerate(holes):
+            for j, surface in enumerate(planar_surfaces):
+                relationships.append({
+                    'feature1': f'hole_{i}',
+                    'feature2': f'surface_{j}',
+                    'relationship_type': 'passes_through' if hole.get('is_through', False) else 'blind_hole',
+                    'confidence': 0.8
+                })
+        
+        # 分析腔槽与边界的关系
+        pockets = features.get('pockets', [])
+        bounding_box = features.get('bounding_box')
+        
+        if bounding_box and pockets:
+            for i, pocket in enumerate(pockets):
+                relationships.append({
+                    'feature1': f'pocket_{i}',
+                    'feature2': 'bounding_box',
+                    'relationship_type': 'within_bounds',
+                    'confidence': 0.9
+                })
+        
+        # 分析特征间的距离关系
+        geometric_primitives = features.get('geometric_primitives', [])
+        for i, prim1 in enumerate(geometric_primitives):
+            for j, prim2 in enumerate(geometric_primitives):
+                if i < j:  # 避免重复
+                    # 计算特征中心之间的距离
+                    center1 = prim1.get('center', [0, 0, 0])
+                    center2 = prim2.get('center', [0, 0, 0])
+                    dist = sum((a - b)**2 for a, b in zip(center1, center2))**0.5
+                    relationships.append({
+                        'feature1': f'primitive_{i}',
+                        'feature2': f'primitive_{j}',
+                        'relationship_type': 'distance',
+                        'distance': dist,
+                        'confidence': 0.7
+                    })
+        
+        return relationships
+    
+    def _identify_manufacturing_features(self, model: Any, features: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        识别制造相关特征，提升CNC加工的语义理解
+        
+        Args:
+            model: 3D模型对象
+            features: 已提取的几何特征
+            
+        Returns:
+            制造特征列表
+        """
+        mfg_features = []
+        
+        # 识别可加工性特征
+        dimensions = features.get('dimensions', {})
+        if dimensions:
+            length, width, height = dimensions.get('length', 0), dimensions.get('width', 0), dimensions.get('height', 0)
+            
+            # 分析加工方向
+            min_dim = min(length, width, height)
+            max_dim = max(length, width, height)
+            
+            mfg_features.append({
+                'type': 'machining_direction',
+                'primary_axis': ['length', 'width', 'height'][[length, width, height].index(max_dim)],
+                'secondary_axis': ['length', 'width', 'height'][[length, width, height].index(sorted([length, width, height])[1])],
+                'description': '根据尺寸分析确定的主要和次要加工方向',
+                'confidence': 0.85
+            })
+        
+        # 识别特征类型及其加工建议
+        geometric_primitives = features.get('geometric_primitives', [])
+        for i, prim in enumerate(geometric_primitives):
+            if prim.get('type') == 'cylinder_approximation':
+                mfg_features.append({
+                    'type': 'machining_operation',
+                    'operation': 'drilling or turning',
+                    'feature_id': f'cylinder_{i}',
+                    'tool_recommendation': 'drill or turning tool',
+                    'description': '圆柱特征，适合钻孔或车削加工',
+                    'confidence': 0.9
+                })
+            elif prim.get('type') == 'cube_approximation':
+                mfg_features.append({
+                    'type': 'machining_operation',
+                    'operation': 'milling',
+                    'feature_id': f'cube_{i}',
+                    'tool_recommendation': 'end mill',
+                    'description': '立方体特征，适合铣削加工',
+                    'confidence': 0.85
+                })
+        
+        # 分析壁厚等加工约束
+        if hasattr(model, 'face_normals') and hasattr(model, 'vertices'):
+            try:
+                # 计算近似的壁厚
+                extents = features.get('bounding_box', {}).get('size', [1, 1, 1])
+                min_extent = min(extents) if extents else 1
+                mfg_features.append({
+                    'type': 'manufacturing_constraint',
+                    'constraint': 'minimum_wall_thickness',
+                    'estimated_value': min_extent * 0.1,  # 简单估算
+                    'description': '估算的最小壁厚，影响刀具选择和加工策略',
+                    'confidence': 0.6
+                })
+            except:
+                pass
+        
+        return mfg_features
+    
+    def _detect_pockets_trimesh(self, mesh) -> List[Dict[str, Any]]:
+        """使用trimesh检测腔槽"""
+        if not HAS_TRIMESH:
+            return []
+        
+        pockets = []
+        
+        # 腔槽检测：通过分析网格的凹陷部分来识别
+        try:
+            # 使用trimesh的凸包功能来检测凹陷
+            if hasattr(mesh, 'convex_hull') and len(mesh.vertices) > 4:
+                # 比较网格和其凸包的差异
+                convex_hull = mesh.convex_hull
+                volume_diff = convex_hull.volume - mesh.volume if convex_hull.volume > mesh.volume else 0
+                
+                if volume_diff > mesh.volume * 0.05:  # 如果体积差异超过5%
+                    pockets.append({
+                        'type': 'pocket_approximation',
+                        'volume_difference': volume_diff,
+                        'relative_size': volume_diff / mesh.volume,
+                        'description': f'检测到凹陷特征，体积差异: {volume_diff:.4f}'
+                    })
+        except:
+            pass
+        
+        return pockets
     
     def _detect_geometric_primitives_o3d(self, mesh) -> List[Dict[str, Any]]:
         """使用Open3D检测几何基元"""

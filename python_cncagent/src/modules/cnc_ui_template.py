@@ -306,12 +306,91 @@ HTML_TEMPLATE = '''
             background: #f0f8ff;
             border-radius: var(--border-radius);
             border: 1px dashed #3498db;
+            position: relative;
         }
         
         .file-preview p {
             margin: 0;
             font-size: 0.9em;
             color: #555;
+        }
+        
+        .pdf-viewer-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            background-color: #f5f5f5;
+            margin-top: 10px;
+        }
+        
+        .pdf-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .pdf-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            z-index: 10;
+        }
+        
+        .pdf-control-btn {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .pdf-control-btn:hover {
+            background: rgba(255, 255, 255, 1);
+        }
+        
+        .model-viewer-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            background-color: #f5f5f5;
+            margin-top: 10px;
+        }
+        
+        #modelViewer {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .model-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            z-index: 10;
+        }
+        
+        .model-control-btn {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .model-control-btn:hover {
+            background: rgba(255, 255, 255, 1);
         }
         
         .api-info {
@@ -414,14 +493,33 @@ HTML_TEMPLATE = '''
                         <label for="pdfFile">2D图纸文件 (可选)</label>
                         <div class="optional-label">支持PDF、JPG、PNG、BMP等格式</div>
                         <input type="file" id="pdfFile" name="pdf" accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff">
-                        <div id="pdfPreview" class="file-preview" style="display: none;"></div>
+                        <div id="pdfPreview" class="file-preview" style="display: none;">
+                            <div class="pdf-viewer-container" id="pdfViewerContainer" style="display: none;">
+                                <canvas id="pdfCanvas" class="pdf-canvas"></canvas>
+                                <div class="pdf-controls">
+                                    <button type="button" class="pdf-control-btn" onclick="zoomInPdf()">+</button>
+                                    <button type="button" class="pdf-control-btn" onclick="zoomOutPdf()">-</button>
+                                    <button type="button" class="pdf-control-btn" onclick="rotatePdf()">↻</button>
+                                    <button type="button" class="pdf-control-btn" onclick="resetPdfView()">↺</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="form-group">
                         <label for="model3DFile">3D模型文件 (可选)</label>
                         <div class="optional-label">支持STL、STEP、IGES、OBJ等格式</div>
                         <input type="file" id="model3DFile" name="model_3d" accept=".stl,.step,.stp,.igs,.iges,.obj,.ply">
-                        <div id="model3DPreview" class="file-preview" style="display: none;"></div>
+                        <div id="model3DPreview" class="file-preview" style="display: none;">
+                            <div class="model-viewer-container" id="modelViewerContainer" style="display: none;">
+                                <canvas id="modelViewer" class="model-canvas"></canvas>
+                                <div class="model-controls">
+                                    <button type="button" class="model-control-btn" onclick="zoomInModel()">+</button>
+                                    <button type="button" class="model-control-btn" onclick="zoomOutModel()">-</button>
+                                    <button type="button" class="model-control-btn" onclick="resetModelView()">↺</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="form-group">
@@ -446,7 +544,7 @@ HTML_TEMPLATE = '''
                     
                     <div class="form-group">
                         <label for="scale">图纸比例 (可选)</label>
-                        <input type="number" id="scale" name="scale" value="1.0" min="0.001" max="100" step="0.1">
+                        <input type="number" id="scale" name="scale" value="1.0" step="any">
                     </div>
                     
                     <div class="advanced-options">
@@ -531,13 +629,249 @@ HTML_TEMPLATE = '''
     </div>
 
     <script>
+        // PDF查看器状态变量
+        let pdfDoc = null;
+        let pdfPage = null;
+        let pdfScale = 1;
+        let pdfRotation = 0;
+        let pdfContainer = null;
+        
+        // 3D模型查看器状态变量
+        let modelViewer = null;
+        let modelScale = 1;
+        let modelRotationX = 0;
+        let modelRotationY = 0;
+        let isDragging = false;
+        let previousMouseX = 0;
+        let previousMouseY = 0;
+        
+        // PDF查看器相关函数
+        async function loadPdf(file) {
+            const url = URL.createObjectURL(file);
+            
+            try {
+                // 加载pdf.js库（如果尚未加载）
+                if (typeof pdfjsLib === 'undefined') {
+                    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                }
+                
+                // 加载PDF文档
+                const loadingTask = pdfjsLib.getDocument(url);
+                pdfDoc = await loadingTask.promise;
+                
+                // 渲染第一页
+                renderPdfPage(1);
+            } catch (error) {
+                console.error('PDF加载失败:', error);
+                document.getElementById('pdfPreview').innerHTML = '<p style="color: red;">PDF加载失败: ' + error.message + '</p>';
+            }
+        }
+        
+        function renderPdfPage(pageNum) {
+            pdfDoc.getPage(pageNum).then(function(page) {
+                pdfPage = page;
+                
+                const canvas = document.getElementById('pdfCanvas');
+                const context = canvas.getContext('2d');
+                
+                const viewport = page.getViewport({ scale: pdfScale, rotation: pdfRotation });
+                
+                // 设置canvas尺寸
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                // 清除画布
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // 渲染PDF页面
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+                
+                page.render(renderContext);
+            });
+        }
+        
+        function zoomInPdf() {
+            pdfScale *= 1.2;
+            if (pdfPage) renderPdfPage(pdfPage.pageNumber);
+        }
+        
+        function zoomOutPdf() {
+            pdfScale /= 1.2;
+            if (pdfScale < 0.5) pdfScale = 0.5; // 最小缩放
+            if (pdfPage) renderPdfPage(pdfPage.pageNumber);
+        }
+        
+        function rotatePdf() {
+            pdfRotation += 90;
+            if (pdfRotation >= 360) pdfRotation = 0;
+            if (pdfPage) renderPdfPage(pdfPage.pageNumber);
+        }
+        
+        function resetPdfView() {
+            pdfScale = 1;
+            pdfRotation = 0;
+            if (pdfPage) renderPdfPage(pdfPage.pageNumber);
+        }
+        
+        // 3D模型查看器相关函数
+        function initModelViewer(file) {
+            const canvas = document.getElementById('modelViewer');
+            const gl = canvas.getContext('webgl');
+            
+            if (!gl) {
+                console.error('WebGL不支持');
+                document.getElementById('model3DPreview').innerHTML = '<p style="color: red;">浏览器不支持WebGL</p>';
+                return;
+            }
+            
+            // 简单的3D渲染设置
+            gl.clearColor(0.9, 0.9, 0.9, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            // 这里可以扩展为完整的3D模型渲染器
+            // 目前显示一个简单的提示信息
+            const ext = file.name.split('.').pop().toLowerCase();
+            drawPlaceholderModel(gl, ext);
+            
+            // 添加鼠标事件处理
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('wheel', handleMouseWheel);
+            
+            // 保存当前文件引用
+            modelViewer = { canvas, gl, file };
+        }
+        
+        function drawPlaceholderModel(gl, fileType) {
+            // 简单的占位符绘制
+            gl.clearColor(0.9, 0.9, 0.9, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            // 在Canvas上绘制文本提示
+            const canvas = gl.canvas;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.font = '16px Arial';
+            ctx.fillStyle = 'gray';
+            ctx.textAlign = 'center';
+            ctx.fillText(`3D模型: ${fileType.toUpperCase()}`, canvas.width / 2, canvas.height / 2 - 20);
+            ctx.fillText('拖拽旋转，滚轮缩放', canvas.width / 2, canvas.height / 2 + 20);
+        }
+        
+        function handleMouseDown(event) {
+            isDragging = true;
+            previousMouseX = event.clientX;
+            previousMouseY = event.clientY;
+        }
+        
+        function handleMouseMove(event) {
+            if (!isDragging) return;
+            
+            const deltaX = event.clientX - previousMouseX;
+            const deltaY = event.clientY - previousMouseY;
+            
+            modelRotationY += deltaX * 0.01;
+            modelRotationX += deltaY * 0.01;
+            
+            previousMouseX = event.clientX;
+            previousMouseY = event.clientY;
+            
+            // 重新渲染模型
+            if (modelViewer) {
+                drawPlaceholderModel(modelViewer.gl, modelViewer.file.name.split('.').pop());
+            }
+        }
+        
+        function handleMouseUp() {
+            isDragging = false;
+        }
+        
+        function handleMouseWheel(event) {
+            event.preventDefault();
+            const delta = event.deltaY > 0 ? 0.9 : 1.1;
+            modelScale *= delta;
+            if (modelScale < 0.1) modelScale = 0.1;
+            if (modelScale > 5) modelScale = 5;
+            
+            // 重新渲染模型
+            if (modelViewer) {
+                drawPlaceholderModel(modelViewer.gl, modelViewer.file.name.split('.').pop());
+            }
+        }
+        
+        function zoomInModel() {
+            modelScale *= 1.2;
+            if (modelScale > 5) modelScale = 5;
+            
+            // 重新渲染模型
+            if (modelViewer) {
+                drawPlaceholderModel(modelViewer.gl, modelViewer.file.name.split('.').pop());
+            }
+        }
+        
+        function zoomOutModel() {
+            modelScale /= 1.2;
+            if (modelScale < 0.1) modelScale = 0.1;
+            
+            // 重新渲染模型
+            if (modelViewer) {
+                drawPlaceholderModel(modelViewer.gl, modelViewer.file.name.split('.').pop());
+            }
+        }
+        
+        function resetModelView() {
+            modelScale = 1;
+            modelRotationX = 0;
+            modelRotationY = 0;
+            
+            // 重新渲染模型
+            if (modelViewer) {
+                drawPlaceholderModel(modelViewer.gl, modelViewer.file.name.split('.').pop());
+            }
+        }
+        
+        async function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+        
         // 文件预览功能
         document.getElementById('pdfFile').addEventListener('change', function(e) {
             const file = e.target.files[0];
             const preview = document.getElementById('pdfPreview');
             
             if (file) {
-                preview.innerHTML = '<p>📁 ' + file.name + ' (' + formatFileSize(file.size) + ')</p>';
+                const ext = file.name.split('.').pop().toLowerCase();
+                
+                if (ext === 'pdf') {
+                    // 显示PDF查看器
+                    preview.innerHTML = `
+                        <p>📁 ${file.name} (${formatFileSize(file.size)})</p>
+                        <div class="pdf-viewer-container" id="pdfViewerContainer">
+                            <canvas id="pdfCanvas" class="pdf-canvas"></canvas>
+                            <div class="pdf-controls">
+                                <button type="button" class="pdf-control-btn" onclick="zoomInPdf()">+</button>
+                                <button type="button" class="pdf-control-btn" onclick="zoomOutPdf()">-</button>
+                                <button type="button" class="pdf-control-btn" onclick="rotatePdf()">↻</button>
+                                <button type="button" class="pdf-control-btn" onclick="resetPdfView()">↺</button>
+                            </div>
+                        </div>
+                    `;
+                    loadPdf(file);
+                } else {
+                    // 普通文件预览
+                    preview.innerHTML = '<p>📁 ' + file.name + ' (' + formatFileSize(file.size) + ')</p>';
+                }
                 preview.style.display = 'block';
             } else {
                 preview.style.display = 'none';
@@ -549,7 +883,26 @@ HTML_TEMPLATE = '''
             const preview = document.getElementById('model3DPreview');
             
             if (file) {
-                preview.innerHTML = '<p>📦 ' + file.name + ' (' + formatFileSize(file.size) + ')</p>';
+                const ext = file.name.split('.').pop().toLowerCase();
+                
+                if (['stl', 'obj', 'ply', 'step', 'stp', 'igs', 'iges'].includes(ext)) {
+                    // 显示3D模型查看器
+                    preview.innerHTML = `
+                        <p>📦 ${file.name} (${formatFileSize(file.size)})</p>
+                        <div class="model-viewer-container" id="modelViewerContainer">
+                            <canvas id="modelViewer" class="model-canvas"></canvas>
+                            <div class="model-controls">
+                                <button type="button" class="model-control-btn" onclick="zoomInModel()">+</button>
+                                <button type="button" class="model-control-btn" onclick="zoomOutModel()">-</button>
+                                <button type="button" class="model-control-btn" onclick="resetModelView()">↺</button>
+                            </div>
+                        </div>
+                    `;
+                    initModelViewer(file);
+                } else {
+                    // 普通文件预览
+                    preview.innerHTML = '<p>📦 ' + file.name + ' (' + formatFileSize(file.size) + ')</p>';
+                }
                 preview.style.display = 'block';
             } else {
                 preview.style.display = 'none';
