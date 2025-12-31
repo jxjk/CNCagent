@@ -1,0 +1,55 @@
+2025-12-31 09:28:04,209 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 09:28:08,232 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 09:28:08,288 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 09:28:08,480 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-31 09:28:08,499 - __main__ - INFO - 预加载核心模块成功
+2025-12-31 09:28:08,547 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-31 09:28:08,549 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-31 09:28:08,616 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-31 09:28:08,617 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-31 09:28:10,551 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-31 09:28:10,558 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-31 09:29:47,303 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-31 09:29:47,304 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-31 09:29:51,177 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: 'NoneType' object is not iterable
+2025-12-31 09:29:51,180 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-31 09:29:51,181 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-31 09:29:51,181 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-31 09:29:56,310 - werkzeug - INFO - 127.0.0.1 - - [31/Dec/2025 09:29:56] "GET / HTTP/1.1" 200 -
+2025-12-31 09:29:56,662 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-31 09:30:08,992 - werkzeug - INFO - 127.0.0.1 - - [31/Dec/2025 09:30:08] "GET / HTTP/1.1" 200 -
+2025-12-31 09:30:10,358 - werkzeug - INFO - 127.0.0.1 - - [31/Dec/2025 09:30:10] "GET / HTTP/1.1" 200 -
+2025-12-31 09:31:12,633 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 4312
+2025-12-31 09:31:12,634 - src.modules.ai_driven_generator - INFO - 使用模式 '```(?:nc|gcode|fanuc)?\n(.*?)\n```' 提取到 1 个代码块
+2025-12-31 09:31:12,634 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-31 09:31:12,635 - src.modules.ai_driven_generator - WARNING - 检测到缺少关键指令: ['G21']
+2025-12-31 09:31:12,635 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-31 09:32:27,879 - root - INFO - 收到生成NC程序请求
+2025-12-31 09:32:27,882 - root - INFO - 收到用户描述: 在加工中心上用瓦尔特390的刀具加工120*18 深18的槽，左下角位置（0,7）。粗加工刀具直径32，精加工刀具直径25，注意使用半径补偿功能前检查相应的刀具补偿值，对于超出正确补偿值0.5以上的，...
+2025-12-31 09:32:27,886 - root - INFO - 已保存2D文件到临时路径: C:\Users\00596\AppData\Local\Temp\tmpbh6c6b_c.pdf
+2025-12-31 09:32:27,887 - root - INFO - 使用模型: deepseek-chat, API密钥设置: 已设置
+2025-12-31 09:32:27,887 - root - INFO - 开始调用generate_nc_from_pdf函数
+2025-12-31 09:32:27,888 - root - INFO - 开始处理输入文件...
+2025-12-31 09:32:27,888 - root - INFO - 使用大模型直接生成NC程序，PDF/3D模型特征仅作为辅助参考...
+2025-12-31 09:32:27,922 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-31 09:32:27,922 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-31 09:32:31,673 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: 'NoneType' object is not iterable
+2025-12-31 09:32:31,677 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-31 09:32:31,677 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-31 09:32:31,678 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-31 09:32:34,813 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-31 09:34:24,634 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 7383
+2025-12-31 09:34:24,635 - src.modules.ai_driven_generator - INFO - 使用模式 '```(?:nc|gcode|fanuc)?\n(.*?)\n```' 提取到 1 个代码块
+2025-12-31 09:34:24,636 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-31 09:34:24,636 - src.modules.ai_driven_generator - WARNING - 检测到缺少关键指令: ['G21']
+2025-12-31 09:34:24,637 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-31 09:34:24,637 - root - INFO - 正在生成模拟报告...
+2025-12-31 09:34:24,639 - root - INFO - 模拟报告已生成: simulation_report.txt
+2025-12-31 09:34:24,640 - root - INFO - NC程序生成完成
+2025-12-31 09:34:24,641 - root - INFO - NC程序已保存到临时文件: C:\Users\00596\AppData\Local\Temp\tmpemtd21oe.nc
+2025-12-31 09:34:24,642 - root - INFO - 成功返回响应
+2025-12-31 09:34:24,643 - root - INFO - 已删除临时2D文件: C:\Users\00596\AppData\Local\Temp\tmpbh6c6b_c.pdf
+2025-12-31 09:34:24,644 - werkzeug - INFO - 127.0.0.1 - - [31/Dec/2025 09:34:24] "POST /generate_nc HTTP/1.1" 200 -
