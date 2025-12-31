@@ -90,6 +90,44 @@ class CNC_GUI:
         self.preview_canvas = tk.Canvas(preview_frame, bg='white', width=350, height=200)
         self.preview_canvas.pack(fill=tk.BOTH, expand=True)
         
+        # 添加滚动事件支持 - 缩放功能
+        self.preview_canvas.bind("<MouseWheel>", self.on_canvas_scroll)  # Windows
+        self.preview_canvas.bind("<Button-4>", self.on_canvas_scroll)    # Linux
+        self.preview_canvas.bind("<Button-5>", self.on_canvas_scroll)    # Linux
+        
+        # 添加拖拽支持 - 平移功能
+        self.preview_canvas.bind("<ButtonPress-2>", self.on_canvas_drag_start)
+        self.preview_canvas.bind("<B2-Motion>", self.on_canvas_drag)
+        
+        # 添加缩放和旋转支持
+        self.preview_canvas.bind("<Control-KeyPress-plus>", self.zoom_in)
+        self.preview_canvas.bind("<Control-KeyPress-minus>", self.zoom_out)
+        self.preview_canvas.bind("<Control-KeyPress-equal>", self.zoom_in)  # Ctrl+= also zooms in
+        self.preview_canvas.bind("<Control-KeyPress-r>", self.rotate_image)
+        
+        # 添加右键菜单支持
+        self.preview_canvas.bind("<Button-3>", self.show_canvas_context_menu)
+        
+        # 初始化视图参数
+        self.canvas_scale = 1.0
+        self.canvas_rotation = 0
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+        self.canvas_offset_x = 0
+        self.canvas_offset_y = 0
+        
+        # 特征点存储
+        self.feature_points = []
+        
+        # 创建右键菜单
+        self.canvas_context_menu = tk.Menu(self.preview_canvas, tearoff=0)
+        self.canvas_context_menu.add_command(label="重置视图", command=self.reset_view)
+        self.canvas_context_menu.add_command(label="显示特征点", command=self.toggle_feature_points)
+        self.canvas_context_menu.add_separator()
+        self.canvas_context_menu.add_command(label="放大 (Ctrl +)", command=self.zoom_in)
+        self.canvas_context_menu.add_command(label="缩小 (Ctrl -)", command=self.zoom_out)
+        self.canvas_context_menu.add_command(label="旋转 (Ctrl R)", command=self.rotate_image)
+        
         # 材料选择
         material_frame = ttk.Frame(parent)
         material_frame.pack(fill=tk.X, pady=(0, 10))
@@ -110,13 +148,22 @@ class CNC_GUI:
         self.desc_text = scrolledtext.ScrolledText(desc_frame, wrap=tk.WORD, height=6)
         self.desc_text.pack(fill=tk.BOTH, expand=True)
         
-        # 生成按钮
+        # 控制按钮区域
+        control_frame = ttk.Frame(parent)
+        control_frame.pack(fill=tk.X, pady=(10, 0))
+        
         ttk.Button(
-            parent,
+            control_frame,
+            text="🔍 识别特征",
+            command=self.detect_features
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+        
+        ttk.Button(
+            control_frame,
             text="🚀 生成NC程序",
             command=self.generate_nc,
             style='Accent.TButton'
-        ).pack(fill=tk.X, pady=(10, 0))
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
     
     def setup_right_panel(self, parent):
         """设置右侧输出面板"""
@@ -275,96 +322,7 @@ class CNC_GUI:
         
         self.current_image = virtual_image
     
-    def display_pil_image(self):
-        """在画布上显示PIL图像"""
-        if hasattr(self, 'current_pil_image') and self.current_pil_image is not None:
-            try:
-                # 转换PIL图像为Tkinter可用的格式
-                pil_image = self.current_pil_image
-                # 调整图像大小以适应画布
-                canvas_width = 350  # 固定画布宽度
-                canvas_height = 200  # 固定画布高度
-                
-                # 计算缩放比例，保持宽高比
-                img_width, img_height = pil_image.size
-                scale_x = canvas_width / img_width
-                scale_y = canvas_height / img_height
-                scale = min(scale_x, scale_y, 1.0)  # 不放大图像
-                new_width = int(img_width * scale)
-                new_height = int(img_height * scale)
-                
-                # 调整图像大小
-                resized_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                
-                self.photo = ImageTk.PhotoImage(resized_image)
-                
-                # 清除画布并绘制图像
-                self.preview_canvas.delete("all")
-                x = (canvas_width - new_width) // 2
-                y = (canvas_height - new_height) // 2
-                self.preview_canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
-            except Exception as e:
-                print(f"显示PIL图像时出错: {e}")
-    
-    def display_cv_image(self):
-        """在画布上显示OpenCV图像"""
-        if self.current_image is not None:
-            try:
-                # 如果是numpy数组，转换BGR到RGB
-                if isinstance(self.current_image, np.ndarray):
-                    image_rgb = cv2.cvtColor(self.current_image, cv2.COLOR_BGR2RGB)
-                    # 调整图像大小以适应画布
-                    height, width = image_rgb.shape[:2]
-                    canvas_width = 350  # 固定画布宽度
-                    canvas_height = 200  # 固定画布高度
-                
-                    # 计算缩放比例
-                    scale_x = canvas_width / width
-                    scale_y = canvas_height / height
-                    scale = min(scale_x, scale_y, 1.0)  # 不放大图像
-                    new_width = int(width * scale)
-                    new_height = int(height * scale)
-                
-                    # 调整图像大小
-                    resized_image = cv2.resize(image_rgb, (new_width, new_height), interpolation=cv2.INTER_AREA)
-                
-                    # 转换为Tkinter可用的格式
-                    from PIL import Image, ImageTk
-                    pil_image = Image.fromarray(resized_image)
-                    self.photo = ImageTk.PhotoImage(pil_image)
-                
-                    # 清除画布并绘制图像
-                    self.preview_canvas.delete("all")
-                    x = (canvas_width - new_width) // 2
-                    y = (canvas_height - new_height) // 2
-                    self.preview_canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
-                else:
-                    # 如果是PIL图像，直接调整大小
-                    pil_image = self.current_image
-                    # 调整图像大小以适应画布
-                    canvas_width = 350  # 固定画布宽度
-                    canvas_height = 200  # 固定画布高度
-                
-                    # 计算缩放比例，保持宽高比
-                    img_width, img_height = pil_image.size
-                    scale_x = canvas_width / img_width
-                    scale_y = canvas_height / img_height
-                    scale = min(scale_x, scale_y, 1.0)  # 不放大图像
-                    new_width = int(img_width * scale)
-                    new_height = int(img_height * scale)
-                
-                    # 调整图像大小
-                    resized_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                
-                    self.photo = ImageTk.PhotoImage(resized_image)
-                
-                    # 清除画布并绘制图像
-                    self.preview_canvas.delete("all")
-                    x = (canvas_width - new_width) // 2
-                    y = (canvas_height - new_height) // 2
-                    self.preview_canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
-            except Exception as e:
-                print(f"显示图像时出错: {e}")
+
     
     def generate_nc(self):
         """生成NC代码"""
@@ -436,6 +394,86 @@ class CNC_GUI:
             except Exception as e:
                 messagebox.showerror("错误", f"保存文件时出错: {str(e)}")
     
+    def detect_features(self):
+        """检测图纸中的特征"""
+        if self.current_image is None and not hasattr(self, 'current_pil_image'):
+            messagebox.showwarning("警告", "请先加载图纸")
+            return
+        
+        self.status_var.set("正在检测特征...")
+        self.root.update()
+        
+        try:
+            # 使用AI_NC_Helper进行特征检测
+            from src.modules.ai_nc_helper import AI_NC_Helper
+            ai_helper = AI_NC_Helper()
+            
+            # 确定使用哪个图像进行特征检测
+            image_for_detection = None
+            original_size = None
+            
+            if hasattr(self, 'current_pil_image') and self.current_pil_image is not None:
+                # 将PIL图像转换为numpy数组
+                original_size = self.current_pil_image.size
+                image_for_detection = np.array(self.current_pil_image.convert('L'))
+            elif self.current_image is not None:
+                if isinstance(self.current_image, np.ndarray):
+                    # 如果是OpenCV图像，转换为灰度图
+                    original_size = (self.current_image.shape[1], self.current_image.shape[0])  # width, height
+                    if len(self.current_image.shape) == 3:
+                        image_for_detection = cv2.cvtColor(self.current_image, cv2.COLOR_BGR2GRAY)
+                    else:
+                        image_for_detection = self.current_image
+                else:
+                    # 如果是PIL图像，转换为numpy数组
+                    original_size = self.current_image.size
+                    image_for_detection = np.array(self.current_image.convert('L'))
+            
+            if image_for_detection is not None and original_size is not None:
+                drawing_text = self.desc_text.get(1.0, tk.END).strip()
+                features_data = ai_helper.feature_detector.detect_features(image_for_detection, drawing_text)
+                
+                # 保存检测到的特征点，用于后续显示
+                self.feature_points = []
+                for feature in features_data["all_features"]:
+                    if 'center' in feature:
+                        # 转换特征点坐标以适应当前显示比例和变换
+                        orig_x, orig_y = feature['center']
+                        # 考虑当前的缩放、旋转和平移
+                        # 简化处理：按当前显示比例调整坐标
+                        scaled_x = orig_x * self.canvas_scale
+                        scaled_y = orig_y * self.canvas_scale
+                        self.feature_points.append({
+                            'x': scaled_x,
+                            'y': scaled_y,
+                            'shape': feature.get('shape', 'unknown'),
+                            'confidence': feature.get('confidence', 1.0)
+                        })
+                
+                # 显示检测结果
+                feature_count = len(features_data["all_features"])
+                self.status_var.set(f"特征检测完成: 检测到{feature_count}个特征")
+                
+                # 在状态栏显示详细信息
+                if feature_count > 0:
+                    shape_types = {}
+                    for feature in features_data["all_features"]:
+                        shape = feature.get("shape", "unknown")
+                        shape_types[shape] = shape_types.get(shape, 0) + 1
+                    
+                    shapes_info = ", ".join([f"{shape}:{count}" for shape, count in shape_types.items()])
+                    messagebox.showinfo("特征检测完成", f"检测到{feature_count}个特征:\n{shapes_info}")
+                    
+                    # 重新绘制图像以显示特征点
+                    self.redraw_canvas_image()
+                else:
+                    messagebox.showinfo("特征检测完成", "未检测到明显特征")
+            else:
+                self.status_var.set("无法检测特征：图像格式不支持")
+        except Exception as e:
+            self.status_var.set("特征检测失败")
+            messagebox.showerror("错误", f"特征检测时出错: {str(e)}")
+    
     def copy_nc(self):
         """复制NC代码到剪贴板"""
         if not self.current_nc_code:
@@ -449,18 +487,254 @@ class CNC_GUI:
         except Exception as e:
             messagebox.showerror("错误", f"复制到剪贴板时出错: {str(e)}")
 
+    def on_canvas_scroll(self, event):
+        """画布滚动事件处理（缩放）"""
+        # 检测是否按住了Ctrl键进行缩放
+        if event.state & 0x4:  # Ctrl键
+            if event.delta > 0 or event.num == 4:  # 向上滚动或Linux的Button-4
+                self.zoom_in()
+            elif event.delta < 0 or event.num == 5:  # 向下滚动或Linux的Button-5
+                self.zoom_out()
+        else:
+            # 普通滚动（上下平移）
+            if event.delta > 0 or event.num == 4:
+                self.preview_canvas.yview_scroll(-1, "units")
+            elif event.delta < 0 or event.num == 5:
+                self.preview_canvas.yview_scroll(1, "units")
+
+    def on_canvas_drag_start(self, event):
+        """开始拖拽"""
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+
+    def on_canvas_drag(self, event):
+        """拖拽事件处理（平移）"""
+        # 计算拖拽距离
+        dx = event.x - self.drag_start_x
+        dy = event.y - self.drag_start_y
+        
+        # 更新画布偏移量
+        self.canvas_offset_x += dx
+        self.canvas_offset_y += dy
+        
+        # 移动画布上的所有项目
+        self.preview_canvas.move(tk.ALL, dx, dy)
+        
+        # 更新起始位置
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+
+    def zoom_in(self, event=None):
+        """放大图像"""
+        self.canvas_scale *= 1.2
+        self.redraw_canvas_image()
+
+    def zoom_out(self, event=None):
+        """缩小图像"""
+        self.canvas_scale /= 1.2
+        if self.canvas_scale < 0.1:  # 最小缩放限制
+            self.canvas_scale = 0.1
+        self.redraw_canvas_image()
+
+    def rotate_image(self, event=None):
+        """旋转图像90度"""
+        self.canvas_rotation = (self.canvas_rotation + 90) % 360
+        self.redraw_canvas_image()
+
+    def redraw_canvas_image(self):
+        """重新绘制画布图像"""
+        if self.current_image is not None:
+            if isinstance(self.current_image, np.ndarray):
+                self.display_cv_image()
+            else:  # PIL Image
+                self.display_pil_image()
+        elif hasattr(self, 'current_pil_image') and self.current_pil_image is not None:
+            self.display_pil_image()
+
+    def display_pil_image(self):
+        """在画布上显示PIL图像，支持缩放、旋转、平移"""
+        if hasattr(self, 'current_pil_image') and self.current_pil_image is not None:
+            try:
+                # 转换PIL图像为Tkinter可用的格式
+                pil_image = self.current_pil_image
+                # 应用用户缩放比例
+                img_width, img_height = pil_image.size
+                new_width = int(img_width * self.canvas_scale)
+                new_height = int(img_height * self.canvas_scale)
+                
+                # 调整图像大小
+                resized_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
+                # 如果需要旋转，则旋转图像
+                if self.canvas_rotation != 0:
+                    resized_image = resized_image.rotate(self.canvas_rotation, expand=True)
+                    # 更新宽高以适应旋转后的尺寸
+                    new_width, new_height = resized_image.size
+                
+                self.photo = ImageTk.PhotoImage(resized_image)
+                
+                # 清除画布并绘制图像
+                self.preview_canvas.delete("all")
+                x = (350 - new_width) // 2 + self.canvas_offset_x  # 固定画布宽度为350
+                y = (200 - new_height) // 2 + self.canvas_offset_y  # 固定画布高度为200
+                self.preview_canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
+                
+                # 如果有特征点，绘制它们
+                self.draw_feature_points()
+            except Exception as e:
+                print(f"显示PIL图像时出错: {e}")
+    
+    def display_cv_image(self):
+        """在画布上显示OpenCV图像，支持缩放、旋转、平移"""
+        if self.current_image is not None:
+            try:
+                # 如果是numpy数组，转换BGR到RGB
+                if isinstance(self.current_image, np.ndarray):
+                    image_rgb = cv2.cvtColor(self.current_image, cv2.COLOR_BGR2RGB)
+                    # 应用用户缩放比例
+                    height, width = image_rgb.shape[:2]
+                    new_width = int(width * self.canvas_scale)
+                    new_height = int(height * self.canvas_scale)
+                    
+                    # 调整图像大小
+                    resized_image = cv2.resize(image_rgb, (new_width, new_height), interpolation=cv2.INTER_AREA)
+                    
+                    # 如果需要旋转，则旋转图像
+                    if self.canvas_rotation != 0:
+                        center = (new_width // 2, new_height // 2)
+                        rotation_matrix = cv2.getRotationMatrix2D(center, self.canvas_rotation, 1.0)
+                        resized_image = cv2.warpAffine(resized_image, rotation_matrix, (new_width, new_height))
+                        # 更新宽高以适应旋转后的尺寸
+                        height, width = resized_image.shape[:2]
+                    
+                    # 转换为Tkinter可用的格式
+                    from PIL import Image, ImageTk
+                    pil_image = Image.fromarray(resized_image)
+                    self.photo = ImageTk.PhotoImage(pil_image)
+                    
+                    # 清除画布并绘制图像
+                    self.preview_canvas.delete("all")
+                    x = (350 - new_width) // 2 + self.canvas_offset_x  # 固定画布宽度为350
+                    y = (200 - new_height) // 2 + self.canvas_offset_y  # 固定画布高度为200
+                    self.preview_canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
+                    
+                    # 如果有特征点，绘制它们
+                    self.draw_feature_points()
+                else:
+                    # 如果是PIL图像，直接调整大小
+                    pil_image = self.current_image
+                    # 应用用户缩放比例
+                    img_width, img_height = pil_image.size
+                    new_width = int(img_width * self.canvas_scale)
+                    new_height = int(img_height * self.canvas_scale)
+                    
+                    # 调整图像大小
+                    resized_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                    
+                    # 如果需要旋转，则旋转图像
+                    if self.canvas_rotation != 0:
+                        resized_image = resized_image.rotate(self.canvas_rotation, expand=True)
+                        # 更新宽高以适应旋转后的尺寸
+                        new_width, new_height = resized_image.size
+                    
+                    self.photo = ImageTk.PhotoImage(resized_image)
+                    
+                    # 清除画布并绘制图像
+                    self.preview_canvas.delete("all")
+                    x = (350 - new_width) // 2 + self.canvas_offset_x  # 固定画布宽度为350
+                    y = (200 - new_height) // 2 + self.canvas_offset_y  # 固定画布高度为200
+                    self.preview_canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
+                    
+                    # 如果有特征点，绘制它们
+                    self.draw_feature_points()
+            except Exception as e:
+                print(f"显示图像时出错: {e}")
+
+    def show_canvas_context_menu(self, event):
+        """显示画布右键菜单"""
+        try:
+            self.canvas_context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.canvas_context_menu.grab_release()
+
+    def reset_view(self):
+        """重置视图为初始状态"""
+        self.canvas_scale = 1.0
+        self.canvas_rotation = 0
+        self.canvas_offset_x = 0
+        self.canvas_offset_y = 0
+        self.redraw_canvas_image()
+
+    def toggle_feature_points(self):
+        """切换特征点显示"""
+        # 这里可以实现特征点的显示/隐藏切换
+        # 临时显示一个提示信息
+        messagebox.showinfo("功能提示", "特征点显示功能可与检测结果结合使用")
+
+    def draw_feature_points(self):
+        """在画布上绘制特征点"""
+        if hasattr(self, 'feature_points') and self.feature_points:
+            # 为每个特征点计算在当前视图中的位置
+            for point in self.feature_points:
+                # 获取原始图像尺寸
+                if isinstance(self.current_image, np.ndarray):
+                    orig_width = self.current_image.shape[1]
+                    orig_height = self.current_image.shape[0]
+                elif hasattr(self, 'current_pil_image') and self.current_pil_image is not None:
+                    orig_width, orig_height = self.current_pil_image.size
+                else:
+                    continue  # 如果没有有效图像，跳过绘制
+                
+                # 计算缩放后图像在画布中的位置（居中）
+                scaled_width = int(orig_width * self.canvas_scale)
+                scaled_height = int(orig_height * self.canvas_scale)
+                offset_x = (350 - scaled_width) // 2 + self.canvas_offset_x
+                offset_y = (200 - scaled_height) // 2 + self.canvas_offset_y
+                
+                # 计算特征点在缩放后图像中的位置
+                x = offset_x + point['x'] * self.canvas_scale  # 修正：使用原始坐标而不是已缩放的坐标
+                y = offset_y + point['y'] * self.canvas_scale
+                
+                # 确保坐标在合理范围内
+                if x < 350 and y < 200:  # 基本边界检查
+                    # 根据特征类型使用不同颜色和形状
+                    color = 'red'  # 默认颜色
+                    if point['shape'] == 'circle':
+                        color = 'red'
+                    elif point['shape'] == 'rectangle':
+                        color = 'blue'
+                    elif point['shape'] == 'triangle':
+                        color = 'green'
+                    elif point['shape'] == 'line':
+                        color = 'yellow'
+                    
+                    # 绘制圆形标记
+                    self.preview_canvas.create_oval(
+                        x - 4, y - 4, x + 4, y + 4,
+                        fill=color, outline='white', width=1
+                    )
+                    
+                    # 显示特征类型标签
+                    self.preview_canvas.create_text(
+                        x, y - 10, text=point['shape'][:4], fill=color, font=('Arial', 7, 'bold')
+                    )
+
 
 def run_gui():
     """运行GUI界面"""
     root = tk.Tk()
     
-    # 设置样式
-    style = ttk.Style()
-    style.theme_use('clam')  # 使用更现代的主题
-    
-    # 配置按钮样式
-    style.configure('Accent.TButton', font=('Arial', 10, 'bold'))
-    
+            # 设置样式
+            style = ttk.Style()
+            style.theme_use('clam')  # 使用更现代的主题
+            
+            # 配置各种样式
+            style.configure('Accent.TButton', font=('Arial', 10, 'bold'))
+            style.configure('TLabelFrame', font=('Arial', 10, 'bold'))
+            style.configure('TCombobox', padding=5)
+            style.map('TButton', 
+                     foreground=[('pressed', 'blue'), ('active', 'red')],
+                     background=[('pressed', '!disabled', 'lightblue'), ('active', 'lightgray')])    
     app = CNC_GUI(root)
     root.mainloop()
 

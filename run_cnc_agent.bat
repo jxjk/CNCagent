@@ -23,70 +23,39 @@ if "%DEEPSEEK_API_BASE%"=="" (
 )
 
 echo.
-echo Select startup mode:
-echo 1. Start both beautified GUI and Web server (default)
-echo 2. Start both optimized GUI and Web server 
-echo 3. Start both standard GUI and Web server
-echo 4. Start Web server only (port 5000)
-echo 5. Start Web server only (port 8080)
-echo 6. Start beautified GUI only
-echo 7. Start optimized GUI only
-echo 8. Start standard GUI only
+echo Starting both beautified GUI and Web server...
 echo.
-set /p choice="Enter your choice (1-8, press Enter for default 1): "
-
-REM Go to Python project directory
+echo GUI Features Available:
+echo - Zoom: Ctrl+Mouse Wheel, Ctrl++ or Ctrl+-
+echo - Rotate: Ctrl+R
+echo - Pan: Middle Mouse Button Drag
+echo - Right-click Canvas: Context Menu
+echo - Feature Detection: Identify geometry in drawings
+echo.
+echo Checking dependencies...
+python -c "import sys; print('Python version:', sys.version)"
+python -c "import tkinter; print('Tkinter: OK')" 2>nul || echo ERROR: Tkinter not available
+python -c "import cv2; print('OpenCV: OK')" 2>nul || echo ERROR: OpenCV not installed
+python -c "import numpy; print('NumPy: OK')" 2>nul || echo ERROR: NumPy not installed
+python -c "import PIL; print('PIL/Pillow: OK')" 2>nul || echo ERROR: PIL/Pillow not installed
+python -c "import flask; print('Flask: OK')" 2>nul || echo ERROR: Flask not installed
+echo.
+echo Launching application...
 cd /d "%~dp0python_cncagent"
+python start_unified.py both-beautified
 
-REM Start the appropriate mode based on user selection
-if "%choice%"=="2" (
-    echo.
-    echo Starting optimized GUI and Web server...
-    python start_unified.py both-optimized
-) else if "%choice%"=="3" (
-    echo.
-    echo Starting standard GUI and Web server...
-    python start_unified.py both
-) else if "%choice%"=="4" (
-    echo.
-    echo Starting Web server (port 5000)...
-    python start_unified.py web --port 5000
-) else if "%choice%"=="5" (
-    echo.
-    echo Starting Web server (port 8080)...
-    python start_unified.py web --port 8080
-) else if "%choice%"=="6" (
-    echo.
-    echo Starting beautified GUI...
-    python start_unified.py gui-beautified
-) else if "%choice%"=="7" (
-    echo.
-    echo Starting optimized GUI...
-    python start_unified.py gui-optimized
-) else if "%choice%"=="8" (
-    echo.
-    echo Starting standard GUI...
-    python start_unified.py gui
-) else if "%choice%"=="1" (
-    echo.
-    echo Starting beautified GUI and Web server...
-    python start_unified.py both-beautified
-) else (
-    echo.
-    echo Starting beautified GUI and Web server (default)...
-    python start_unified.py both-beautified
-)
-
-REM Check Python command execution result
 if errorlevel 1 (
     echo.
-    echo Error: Python command execution failed
-    echo Please ensure:
-    echo 1. Python 3.8 or higher is installed
-    echo 2. Project dependencies are installed (run: pip install -r requirements.txt)
-    echo 3. API key is configured correctly
+    echo Launch failed. Checking for detailed errors...
+    echo Make sure all dependencies are installed:
+    echo Run: pip install -r requirements.txt
+    echo Also ensure you have the following packages:
+    echo - opencv-python (for image processing)
+    echo - pillow (for image handling)
+    echo - numpy (for numerical operations)
+    echo - plotly (for 3D model visualization, optional)
+    echo.
     pause
-    exit /b 1
 )
 
 echo.

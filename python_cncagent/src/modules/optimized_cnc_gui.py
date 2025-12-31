@@ -103,6 +103,29 @@ class OptimizedCNC_GUI:
         self.canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
         self.canvas.bind("<Button-1>", self.on_canvas_click)
         
+        # 添加滚动事件支持 - 缩放功能
+        self.canvas.bind("<MouseWheel>", self.on_canvas_scroll)  # Windows
+        self.canvas.bind("<Button-4>", self.on_canvas_scroll)    # Linux
+        self.canvas.bind("<Button-5>", self.on_canvas_scroll)    # Linux
+        
+        # 添加拖拽支持 - 平移功能
+        self.canvas.bind("<ButtonPress-2>", self.on_canvas_drag_start)
+        self.canvas.bind("<B2-Motion>", self.on_canvas_drag)
+        
+        # 添加缩放和旋转支持
+        self.canvas.bind("<Control-KeyPress-plus>", self.zoom_in)
+        self.canvas.bind("<Control-KeyPress-minus>", self.zoom_out)
+        self.canvas.bind("<Control-KeyPress-equal>", self.zoom_in)  # Ctrl+= also zooms in
+        self.canvas.bind("<Control-KeyPress-r>", self.rotate_image)
+        
+        # 初始化视图参数
+        self.canvas_scale = 1.0
+        self.canvas_rotation = 0
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+        self.canvas_offset_x = 0
+        self.canvas_offset_y = 0
+        
         # 识别特征列表
         ttk.Label(input_frame, text="识别特征列表:").grid(row=2, column=0, sticky=tk.W, pady=(0, 5))
         self.feature_frame = ttk.Frame(input_frame)
@@ -630,6 +653,151 @@ class OptimizedCNC_GUI:
         self.canvas.create_text(x, y, text="请导入图纸文件", font=("Arial", 10), fill="gray")
         self.canvas.create_text(x, y+20, text="支持PDF、PNG、JPG、STL等格式", font=("Arial", 8), fill="gray")
         self.canvas.create_text(x, y+40, text="🤖 AI优先处理", font=("Arial", 8), fill="blue")
+
+    def on_canvas_scroll(self, event):
+        """画布滚动事件处理（缩放）"""
+        # 检测是否按住了Ctrl键进行缩放
+        if event.state & 0x4:  # Ctrl键
+            if event.delta > 0 or event.num == 4:  # 向上滚动或Linux的Button-4
+                self.zoom_in()
+            elif event.delta < 0 or event.num == 5:  # 向下滚动或Linux的Button-5
+                self.zoom_out()
+        else:
+            # 普通滚动（上下平移）
+            if event.delta > 0 or event.num == 4:
+                self.canvas.yview_scroll(-1, "units")
+            elif event.delta < 0 or event.num == 5:
+                self.canvas.yview_scroll(1, "units")
+
+    def on_canvas_drag_start(self, event):
+        """开始拖拽"""
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+
+    def on_canvas_drag(self, event):
+        """拖拽事件处理（平移）"""
+        # 计算拖拽距离
+        dx = event.x - self.drag_start_x
+        dy = event.y - self.drag_start_y
+        
+        # 更新画布偏移量
+        self.canvas_offset_x += dx
+        self.canvas_offset_y += dy
+        
+        # 移动画布上的所有项目
+        self.canvas.move(tk.ALL, dx, dy)
+        
+        # 更新起始位置
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+
+    def zoom_in(self, event=None):
+        """放大图像"""
+        self.canvas_scale *= 1.2
+        self.redraw_canvas_image()
+
+    def zoom_out(self, event=None):
+        """缩小图像"""
+        self.canvas_scale /= 1.2
+        if self.canvas_scale < 0.1:  # 最小缩放限制
+            self.canvas_scale = 0.1
+        self.redraw_canvas_image()
+
+    def rotate_image(self, event=None):
+        """旋转图像90度"""
+        self.canvas_rotation = (self.canvas_rotation + 90) % 360
+        self.redraw_canvas_image()
+
+    def redraw_canvas_image(self):
+        """重新绘制画布图像 - 需要重写display_cv_image和display_pil_image方法以支持缩放和平移"""
+        if self.current_image is not None:
+            self.display_cv_image()
+        elif hasattr(self, 'current_pil_image') and self.current_pil_image is not None:
+            self.display_pil_image()
+        elif self.only_description_mode.get():
+            self.create_virtual_image()
+            self.display_cv_image()
+    
+    def display_cv_image(self):
+        """在画布上显示OpenCV图像，支持缩放、旋转、平移"""
+        if self.current_image is not None:
+            try:
+                # 转换BGR到RGB
+                image_rgb = cv2.cvtColor(self.current_image, cv2.COLOR_BGR2RGB)
+                # 调整图像大小以适应画布
+                height, width = image_rgb.shape[:2]
+                canvas_width = self.canvas.winfo_width()
+                canvas_height = self.canvas.winfo_height()
+                
+                if canvas_width <= 1: canvas_width = 400
+                if canvas_height <= 1: canvas_height = 300
+                
+                # 应用用户缩放比例
+                new_width = int(width * self.canvas_scale)
+                new_height = int(height * self.canvas_scale)
+                
+                # 调整图像大小
+                resized_image = cv2.resize(image_rgb, (new_width, new_height), interpolation=cv2.INTER_AREA)
+                
+                # 如果需要旋转，则旋转图像
+                if self.canvas_rotation != 0:
+                    center = (new_width // 2, new_height // 2)
+                    rotation_matrix = cv2.getRotationMatrix2D(center, self.canvas_rotation, 1.0)
+                    resized_image = cv2.warpAffine(resized_image, rotation_matrix, (new_width, new_height))
+                    # 更新宽高以适应旋转后的尺寸
+                    height, width = resized_image.shape[:2]
+                
+                # 转换为Tkinter可用的格式
+                from PIL import Image, ImageTk
+                pil_image = Image.fromarray(resized_image)
+                self.photo = ImageTk.PhotoImage(pil_image)
+                
+                # 清除画布并绘制图像
+                self.canvas.delete("all")
+                # 居中显示，考虑缩放和平移
+                x = (canvas_width - new_width) // 2 + self.canvas_offset_x
+                y = (canvas_height - new_height) // 2 + self.canvas_offset_y
+                self.canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
+            except Exception as e:
+                print(f"显示图像时出错: {e}")
+
+    def display_pil_image(self):
+        """在画布上显示PIL图像，支持缩放、旋转、平移"""
+        if hasattr(self, 'current_pil_image') and self.current_pil_image is not None:
+            try:
+                # 转换PIL图像为Tkinter可用的格式
+                pil_image = self.current_pil_image
+                
+                # 应用用户缩放比例
+                img_width, img_height = pil_image.size
+                new_width = int(img_width * self.canvas_scale)
+                new_height = int(img_height * self.canvas_scale)
+                
+                # 调整图像大小
+                resized_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
+                # 如果需要旋转，则旋转图像
+                if self.canvas_rotation != 0:
+                    resized_image = resized_image.rotate(self.canvas_rotation, expand=True)
+                    # 更新宽高以适应旋转后的尺寸
+                    new_width, new_height = resized_image.size
+                
+                self.photo = ImageTk.PhotoImage(resized_image)
+                
+                # 清除画布并绘制图像
+                self.canvas.delete("all")
+                # 居中显示，考虑缩放和平移
+                canvas_width = self.canvas.winfo_width()
+                canvas_height = self.canvas.winfo_height()
+                
+                if canvas_width <= 1: canvas_width = 400
+                if canvas_height <= 1: canvas_height = 300
+                
+                x = (canvas_width - new_width) // 2 + self.canvas_offset_x
+                y = (canvas_height - new_height) // 2 + self.canvas_offset_y
+                self.canvas.create_image(x, y, anchor=tk.NW, image=self.photo)
+            except Exception as e:
+                print(f"显示PIL图像时出错: {e}")
 
 
 def run_optimized_gui():

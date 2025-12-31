@@ -53,3 +53,48 @@
 2025-12-31 09:34:24,642 - root - INFO - 成功返回响应
 2025-12-31 09:34:24,643 - root - INFO - 已删除临时2D文件: C:\Users\00596\AppData\Local\Temp\tmpbh6c6b_c.pdf
 2025-12-31 09:34:24,644 - werkzeug - INFO - 127.0.0.1 - - [31/Dec/2025 09:34:24] "POST /generate_nc HTTP/1.1" 200 -
+2025-12-31 09:56:52,167 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 09:56:56,155 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 09:56:56,175 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 09:56:56,213 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-31 09:56:56,214 - __main__ - INFO - 预加载核心模块成功
+2025-12-31 09:56:56,220 - __main__ - INFO - 启动模式: 优化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-31 09:56:56,222 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-31 09:56:56,294 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-31 09:56:56,296 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-31 09:56:58,224 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-31 09:56:58,228 - __main__ - INFO - 启动优化版GUI界面（AI优先模式）...
+2025-12-31 10:08:21,138 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 10:08:22,964 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 10:08:22,979 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 10:08:22,995 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-31 10:08:22,996 - __main__ - INFO - 预加载核心模块成功
+2025-12-31 10:08:23,000 - __main__ - INFO - 启动模式: 优化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-31 10:08:23,001 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-31 10:08:23,046 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-31 10:08:23,047 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-31 10:08:25,002 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-31 10:08:25,002 - __main__ - INFO - 启动优化版GUI界面（AI优先模式）...
+2025-12-31 10:20:01,871 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 10:20:07,579 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 10:20:07,590 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 10:20:07,649 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-31 10:20:07,650 - __main__ - INFO - 预加载核心模块成功
+2025-12-31 10:20:07,656 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-31 10:20:07,659 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-31 10:20:07,750 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-31 10:20:07,751 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-31 10:20:09,659 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-31 10:20:09,660 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-31 10:29:44,752 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 10:29:47,308 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 10:29:47,319 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库

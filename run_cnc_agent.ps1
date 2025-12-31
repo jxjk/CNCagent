@@ -25,89 +25,41 @@ if (-not $env:DEEPSEEK_API_BASE) {
 }
 
 Write-Host ""
-Write-Host "Select startup mode:" -ForegroundColor White
-Write-Host "1. Start both beautified GUI and Web server (default)" -ForegroundColor White
-Write-Host "2. Start both optimized GUI and Web server" -ForegroundColor White
-Write-Host "3. Start both standard GUI and Web server" -ForegroundColor White
-Write-Host "4. Start Web server only (port 5000)" -ForegroundColor White
-Write-Host "5. Start Web server only (port 8080)" -ForegroundColor White
-Write-Host "6. Start beautified GUI only" -ForegroundColor White
-Write-Host "7. Start optimized GUI only" -ForegroundColor White
-Write-Host "8. Start standard GUI only" -ForegroundColor White
+Write-Host "Starting both beautified GUI and Web server..." -ForegroundColor Green
 Write-Host ""
-
-$choice = Read-Host "Enter your choice (1-8, press Enter for default 1)"
-
-# Verify Python is installed
-$pythonInstalled = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pythonInstalled) {
-    Write-Host "Error: Python command not found, please ensure Python 3.8 or higher is installed" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
-    exit 1
-}
+Write-Host "GUI Features Available:" -ForegroundColor White
+Write-Host " - Zoom: Ctrl+Mouse Wheel, Ctrl++ or Ctrl+-" -ForegroundColor White
+Write-Host " - Rotate: Ctrl+R" -ForegroundColor White
+Write-Host " - Pan: Middle Mouse Button Drag" -ForegroundColor White
+Write-Host " - Right-click Canvas: Context Menu" -ForegroundColor White
+Write-Host " - Feature Detection: Identify geometry in drawings" -ForegroundColor White
+Write-Host ""
+Write-Host "Checking dependencies..." -ForegroundColor Yellow
+python -c "import sys; print('Python version:', sys.version)"
+$tkinterCheck = python -c "import tkinter; print('Tkinter: OK')" 2>$null; if (-not $tkinterCheck) { Write-Host "ERROR: Tkinter not available" -ForegroundColor Red }
+$cv2Check = python -c "import cv2; print('OpenCV: OK')" 2>$null; if (-not $cv2Check) { Write-Host "ERROR: OpenCV not installed" -ForegroundColor Red }
+$numpyCheck = python -c "import numpy; print('NumPy: OK')" 2>$null; if (-not $numpyCheck) { Write-Host "ERROR: NumPy not installed" -ForegroundColor Red }
+$pilCheck = python -c "import PIL; print('PIL/Pillow: OK')" 2>$null; if (-not $pilCheck) { Write-Host "ERROR: PIL/Pillow not installed" -ForegroundColor Red }
+$flaskCheck = python -c "import flask; print('Flask: OK')" 2>$null; if (-not $flaskCheck) { Write-Host "ERROR: Flask not installed" -ForegroundColor Red }
+Write-Host ""
+Write-Host "Launching application..." -ForegroundColor Yellow
 
 # Switch to project directory
 Set-Location python_cncagent
+python start_unified.py both-beautified
 
-# Start the appropriate mode based on user selection
-switch ($choice) {
-    "2" {
-        Write-Host ""
-        Write-Host "Starting optimized GUI and Web server..." -ForegroundColor Green
-        python start_unified.py both-optimized
-    }
-    "3" {
-        Write-Host ""
-        Write-Host "Starting standard GUI and Web server..." -ForegroundColor Green
-        python start_unified.py both
-    }
-    "4" {
-        Write-Host ""
-        Write-Host "Starting Web server (port 5000)..." -ForegroundColor Green
-        python start_unified.py web --port 5000
-    }
-    "5" {
-        Write-Host ""
-        Write-Host "Starting Web server (port 8080)..." -ForegroundColor Green
-        python start_unified.py web --port 8080
-    }
-    "6" {
-        Write-Host ""
-        Write-Host "Starting beautified GUI..." -ForegroundColor Green
-        python start_unified.py gui-beautified
-    }
-    "7" {
-        Write-Host ""
-        Write-Host "Starting optimized GUI..." -ForegroundColor Green
-        python start_unified.py gui-optimized
-    }
-    "8" {
-        Write-Host ""
-        Write-Host "Starting standard GUI..." -ForegroundColor Green
-        python start_unified.py gui
-    }
-    "1" {
-        Write-Host ""
-        Write-Host "Starting beautified GUI and Web server..." -ForegroundColor Green
-        python start_unified.py both-beautified
-    }
-    Default {
-        Write-Host ""
-        Write-Host "Starting beautified GUI and Web server (default)..." -ForegroundColor Green
-        python start_unified.py both-beautified
-    }
-}
-
-# Check command execution result
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
-    Write-Host "Error: Python command execution failed" -ForegroundColor Red
-    Write-Host "Please ensure:" -ForegroundColor Red
-    Write-Host "1. Python 3.8 or higher is installed" -ForegroundColor Red
-    Write-Host "2. Project dependencies are installed (run: pip install -r requirements.txt)" -ForegroundColor Red
-    Write-Host "3. API key is configured correctly" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
-    exit $LASTEXITCODE
+    Write-Host "Launch failed. Checking for detailed errors..." -ForegroundColor Red
+    Write-Host "Make sure all dependencies are installed:" -ForegroundColor Red
+    Write-Host "Run: pip install -r requirements.txt" -ForegroundColor Red
+    Write-Host "Also ensure you have the following packages:" -ForegroundColor Red
+    Write-Host " - opencv-python (for image processing)" -ForegroundColor Red
+    Write-Host " - pillow (for image handling)" -ForegroundColor Red
+    Write-Host " - numpy (for numerical operations)" -ForegroundColor Red
+    Write-Host " - plotly (for 3D model visualization, optional)" -ForegroundColor Red
+    Write-Host ""
+    Read-Host "Press Enter to continue"
 }
 
 Write-Host ""
