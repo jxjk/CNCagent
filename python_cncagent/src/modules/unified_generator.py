@@ -4,6 +4,7 @@
 移除了对传统方法的依赖，简化架构
 """
 import logging
+import os
 from typing import Dict, Optional, List, Any
 from pathlib import Path
 
@@ -20,10 +21,10 @@ class UnifiedCNCGenerator:
     完全以大模型为中心，移除对传统方法的依赖
     """
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "deepseek-chat"):
         self.logger = logging.getLogger(__name__)
-        self.api_key = api_key
-        self.model = model
+        self.api_key = api_key or os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
+        self.model = model or os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
         # 仅使用AI方法，移除传统方法依赖
         self.ai_generator = lambda user_prompt, pdf_path, image_path=None, model_3d_path=None: generate_nc_with_ai(
             user_prompt, pdf_path, image_path=image_path, model_3d_path=model_3d_path, api_key=self.api_key, model=self.model, material="Aluminum"
@@ -66,14 +67,14 @@ class UnifiedCNCGenerator:
         if not user_prompt or not user_prompt.strip():
             raise InputValidationError("用户需求描述不能为空")
         
-        if pdf_path and not Path(pdf_path).exists():
-            raise InputValidationError(f"PDF文件不存在: {pdf_path}")
+        if pdf_path:
+            self._validate_file_path(pdf_path, ['.pdf'])
         
-        if image_path and not Path(image_path).exists():
-            raise InputValidationError(f"图像文件不存在: {image_path}")
+        if image_path:
+            self._validate_file_path(image_path, ['.jpg', '.jpeg', '.png', '.bmp', '.tiff'])
             
-        if model_3d_path and not Path(model_3d_path).exists():
-            raise InputValidationError(f"3D模型文件不存在: {model_3d_path}")
+        if model_3d_path:
+            self._validate_file_path(model_3d_path, ['.stl', '.step', '.stp', '.igs', '.iges', '.obj', '.ply'])
         
         if not 0.0 <= user_priority_weight <= 1.0:
             raise InputValidationError("用户优先级权重必须在0.0到1.0之间")
@@ -98,6 +99,31 @@ class UnifiedCNCGenerator:
         except Exception as e:
             error = handle_exception(e, self.logger, "生成CNC程序时出错")
             raise CNCError(f"生成CNC程序失败: {str(error)}", original_exception=e) from e
+    
+    def _validate_file_path(self, file_path: str, allowed_extensions: List[str]) -> None:
+        """
+        验证文件路径的安全性，防止路径遍历攻击
+        
+        Args:
+            file_path: 文件路径
+            allowed_extensions: 允许的文件扩展名列表
+        """
+        if not isinstance(file_path, str):
+            raise InputValidationError("文件路径必须是字符串类型")
+        
+        # 检查是否包含路径遍历字符
+        if '..' in file_path or '../' in file_path or '/..' in file_path:
+            raise InputValidationError(f"文件路径包含非法字符，可能存在路径遍历风险: {file_path}")
+        
+        # 检查文件扩展名
+        path = Path(file_path)
+        if path.suffix.lower() not in allowed_extensions:
+            raise InputValidationError(f"不支持的文件格式: {path.suffix.lower()}. 支持的格式: {', '.join(allowed_extensions)}")
+        
+        # 检查路径是否在允许的目录范围内
+        # 这里可以根据实际需要增加更严格的路径验证
+        if not path.exists():
+            raise InputValidationError(f"文件不存在: {file_path}")
     
     def _generate_with_ai_primary(
         self, 
@@ -181,14 +207,14 @@ class UnifiedCNCGenerator:
         if not user_prompt or not user_prompt.strip():
             raise InputValidationError("用户需求描述不能为空")
         
-        if pdf_path and not Path(pdf_path).exists():
-            raise InputValidationError(f"PDF文件不存在: {pdf_path}")
+        if pdf_path:
+            self._validate_file_path(pdf_path, ['.pdf'])
         
-        if image_path and not Path(image_path).exists():
-            raise InputValidationError(f"图像文件不存在: {image_path}")
+        if image_path:
+            self._validate_file_path(image_path, ['.jpg', '.jpeg', '.png', '.bmp', '.tiff'])
             
-        if model_3d_path and not Path(model_3d_path).exists():
-            raise InputValidationError(f"3D模型文件不存在: {model_3d_path}")
+        if model_3d_path:
+            self._validate_file_path(model_3d_path, ['.stl', '.step', '.stp', '.igs', '.iges', '.obj', '.ply'])
         
         if not 0.0 <= user_priority_weight <= 1.0:
             raise InputValidationError("用户优先级权重必须在0.0到1.0之间")

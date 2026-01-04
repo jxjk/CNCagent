@@ -285,6 +285,7 @@ class GeometricReasoningEngine:
         """
         accessibility = "good"
         recommended_tools = []
+        accessibility_issues = []
         
         # 根据特征类型和尺寸推荐刀具
         length, width, depth = feature.dimensions
@@ -299,28 +300,61 @@ class GeometricReasoningEngine:
                     accessibility = "challenging"
             elif min_dimension < 10:
                 recommended_tools.append("标准立铣刀(φ6-φ10)")
+            elif min_dimension < 20:
+                recommended_tools.append("中型立铣刀(φ10-φ20)")
             else:
-                recommended_tools.append("大直径铣刀(φ10+)")
+                recommended_tools.append("大直径铣刀(φ20+)")
                 
             # 深腔槽需要长径比较大的刀具
             if depth > 3 * min_dimension:
                 accessibility = "challenging"
                 recommended_tools.append("长刃铣刀或分层铣削")
+                accessibility_issues.append(f"深径比过大({depth/min_dimension:.1f}:1)，需分层加工")
+            elif depth > min_dimension:
+                accessibility = "moderate"
+                recommended_tools.append("考虑分层铣削")
+                accessibility_issues.append(f"深度大于最小尺寸，建议分层加工")
         
         elif feature.shape_type == "slot":
             # 槽加工的刀具选择
-            if min(length, width) < 5:
+            min_dimension = min(length, width)
+            if min_dimension < 3:
+                recommended_tools.append("超窄槽铣刀")
+                accessibility = "challenging"
+                accessibility_issues.append("槽宽过窄，刀具选择受限")
+            elif min_dimension < 5:
                 recommended_tools.append("窄槽铣刀")
-            else:
+            elif min_dimension < 10:
                 recommended_tools.append("标准铣刀")
+            else:
+                recommended_tools.append("宽槽加工刀具")
+        
+        elif feature.shape_type == "circular_hole":
+            # 圆孔加工刀具选择
+            diameter = min(length, width)
+            if diameter < 3:
+                recommended_tools.append("微型钻头")
+                accessibility = "challenging"
+            elif diameter < 10:
+                recommended_tools.append("标准钻头")
+            elif diameter < 20:
+                recommended_tools.append("大直径钻头")
+            else:
+                recommended_tools.append("镗刀或扩孔钻")
         
         # 检查是否有特殊要求
         if feature.corner_radius and feature.corner_radius > 0:
             recommended_tools.append(f"球头刀或圆角铣刀(R{feature.corner_radius})")
+            
+        # 检查壁厚是否过薄
+        if hasattr(feature, 'wall_thickness') and feature.wall_thickness < 1:
+            accessibility = "challenging"
+            accessibility_issues.append(f"壁厚过薄({feature.wall_thickness}mm)，易变形")
         
         return {
             'accessibility': accessibility,
-            'recommended_tools': recommended_tools
+            'recommended_tools': recommended_tools,
+            'accessibility_issues': accessibility_issues
         }
     
     def _analyze_process_feasibility(self, features: List[Feature3D]) -> Dict:

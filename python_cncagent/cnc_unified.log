@@ -192,3 +192,110 @@
 2025-12-31 12:28:36,393 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
 2025-12-31 12:28:36,394 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
 2025-12-31 12:30:08,101 - src.modules.model_3d_processor - INFO - 开始处理3D模型: D:/Users/00596/Desktop/fetureCAM二次开发/featureCAM 培训/图纸-含3D/U-001.stl
+2025-12-31 12:30:08,140 - src.modules.model_3d_processor - INFO - 3D模型处理完成: D:/Users/00596/Desktop/fetureCAM二次开发/featureCAM 培训/图纸-含3D/U-001.stl
+2025-12-31 12:36:39,483 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 12:36:41,839 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 12:36:41,860 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 12:36:41,886 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-31 12:36:41,887 - __main__ - INFO - 预加载核心模块成功
+2025-12-31 12:36:41,893 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-31 12:36:41,897 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-31 12:36:41,953 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-31 12:36:41,954 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-31 12:36:43,897 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-31 12:36:43,898 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-31 12:36:56,213 - src.modules.model_3d_processor - INFO - 开始处理3D模型: D:/Users/00596/Desktop/fetureCAM二次开发/featureCAM 培训/图纸-含3D/U-001.stl
+2025-12-31 12:36:56,262 - src.modules.model_3d_processor - INFO - 3D模型处理完成: D:/Users/00596/Desktop/fetureCAM二次开发/featureCAM 培训/图纸-含3D/U-001.stl
+2025-12-31 12:41:55,937 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 12:41:57,426 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 12:41:57,434 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 12:41:57,449 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-31 12:41:57,450 - __main__ - INFO - 预加载核心模块成功
+2025-12-31 12:41:57,454 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-31 12:41:57,456 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-31 12:41:57,491 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-31 12:41:57,492 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-31 12:41:59,457 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-31 12:41:59,458 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-31 12:42:20,902 - src.modules.model_3d_processor - INFO - 开始处理3D模型: D:/Users/00596/Desktop/fetureCAM二次开发/featureCAM 培训/图纸-含3D/U-001.stl
+2025-12-31 12:42:20,932 - src.modules.model_3d_processor - INFO - 3D模型处理完成: D:/Users/00596/Desktop/fetureCAM二次开发/featureCAM 培训/图纸-含3D/U-001.stl
+2025-12-31 12:45:12,941 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 12:45:14,230 - __main__ - INFO - 预加载 start_server 模块成功
+2025-12-31 12:45:14,238 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2025-12-31 12:45:14,249 - __main__ - INFO - 预加载 GUI 模块成功
+2025-12-31 12:45:14,249 - __main__ - INFO - 预加载核心模块成功
+2025-12-31 12:45:14,252 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2025-12-31 12:45:14,253 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2025-12-31 12:45:14,283 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2025-12-31 12:45:14,283 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-31 12:45:16,254 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2025-12-31 12:45:16,255 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2025-12-31 12:45:34,883 - root - INFO - 收到生成NC程序请求
+2025-12-31 12:45:34,891 - root - INFO - 收到用户描述: 在加工中心上用瓦尔特390的刀具加工120*18 深18的槽，左下角位置（0,7）。粗加工刀具直径32，精加工刀具直径25，注意使用半径补偿功能前检查相应的刀具补偿值，对于超出正确补偿值0.5以上的，...
+2025-12-31 12:45:34,895 - root - INFO - 已保存2D文件到临时路径: C:\Users\00596\AppData\Local\Temp\tmpln8xg2az.pdf
+2025-12-31 12:45:34,898 - root - INFO - 已保存3D模型到临时路径: C:\Users\00596\AppData\Local\Temp\tmp681f12st.step
+2025-12-31 12:45:34,898 - root - INFO - 使用模型: deepseek-chat, API密钥设置: 已设置
+2025-12-31 12:45:34,898 - root - INFO - 开始调用generate_nc_from_pdf函数
+2025-12-31 12:45:34,899 - root - INFO - 开始处理输入文件...
+2025-12-31 12:45:34,899 - root - INFO - 使用大模型直接生成NC程序，PDF/3D模型特征仅作为辅助参考...
+2025-12-31 12:45:34,929 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2025-12-31 12:45:34,930 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2025-12-31 12:45:37,271 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: 'NoneType' object is not iterable
+2025-12-31 12:45:37,273 - src.modules.model_3d_processor - INFO - 开始处理3D模型: C:\Users\00596\AppData\Local\Temp\tmp681f12st.step
+2025-12-31 12:45:37,293 - src.modules.prompt_builder - WARNING - 处理3D模型时出错: 加载3D模型失败: No module named 'cascadio'
+2025-12-31 12:45:37,293 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2025-12-31 12:45:37,294 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2025-12-31 12:45:37,294 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2025-12-31 12:45:40,807 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2025-12-31 12:47:29,944 - src.modules.ai_driven_generator - INFO - API调用成功，响应长度: 9591
+2025-12-31 12:47:29,946 - src.modules.ai_driven_generator - INFO - 使用模式 '```(?:nc|gcode|fanuc)?\n(.*?)\n```' 提取到 1 个代码块
+2025-12-31 12:47:29,947 - src.modules.ai_driven_generator - INFO - 验证和优化NC程序...
+2025-12-31 12:47:29,948 - src.modules.ai_driven_generator - WARNING - 检测到缺少关键指令: ['G21']
+2025-12-31 12:47:29,948 - src.modules.ai_driven_generator - INFO - NC程序生成完成
+2025-12-31 12:47:29,948 - root - INFO - 正在生成模拟报告...
+2025-12-31 12:47:29,950 - root - INFO - 模拟报告已生成: simulation_report.txt
+2025-12-31 12:47:29,950 - root - INFO - NC程序生成完成
+2025-12-31 12:47:29,952 - root - INFO - NC程序已保存到临时文件: C:\Users\00596\AppData\Local\Temp\tmpb2qxct58.nc
+2025-12-31 12:47:29,953 - root - INFO - 成功返回响应
+2025-12-31 12:47:29,954 - root - INFO - 已删除临时2D文件: C:\Users\00596\AppData\Local\Temp\tmpln8xg2az.pdf
+2025-12-31 12:47:29,955 - root - INFO - 已删除临时3D文件: C:\Users\00596\AppData\Local\Temp\tmp681f12st.step
+2025-12-31 12:47:29,956 - werkzeug - INFO - 127.0.0.1 - - [31/Dec/2025 12:47:29] "POST /generate_nc HTTP/1.1" 200 -
+2026-01-04 12:34:45,952 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2026-01-04 12:34:52,363 - __main__ - INFO - 预加载 start_server 模块成功
+2026-01-04 12:34:52,379 - root - WARNING - 警告: 未安装open3d库，将使用trimesh作为主要3D处理库
+2026-01-04 12:34:52,399 - __main__ - INFO - 预加载 GUI 模块成功
+2026-01-04 12:34:52,400 - __main__ - INFO - 预加载核心模块成功
+2026-01-04 12:34:52,404 - __main__ - INFO - 启动模式: 美化版GUI界面 + Web服务器 (地址: 0.0.0.0:5000)
+2026-01-04 12:34:52,405 - __main__ - INFO - 启动Web服务器，地址: 0.0.0.0:5000
+2026-01-04 12:34:52,525 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.3.22.47:5000
+2026-01-04 12:34:52,525 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-01-04 12:34:54,406 - __main__ - INFO - Web服务器已在 http://0.0.0.0:5000 启动
+2026-01-04 12:34:54,407 - __main__ - INFO - 启动美化版GUI界面（简洁设计）...
+2026-01-04 12:35:24,866 - werkzeug - INFO - 127.0.0.1 - - [04/Jan/2026 12:35:24] "GET / HTTP/1.1" 200 -
+2026-01-04 12:35:27,219 - werkzeug - INFO - 127.0.0.1 - - [04/Jan/2026 12:35:27] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-01-04 12:40:10,591 - root - INFO - 收到生成NC程序请求
+2026-01-04 12:40:10,594 - root - INFO - 收到用户描述: 加工120*18 深18的方肩槽。左下角起点坐标（0,7,0）。注意合理选择刀具大小、和材质。按粗、精工艺在加工中心上加工。毛坯材料S45C。...
+2026-01-04 12:40:10,599 - root - INFO - 已保存2D文件到临时路径: C:\Users\00596\AppData\Local\Temp\tmp1iq_083z.pdf
+2026-01-04 12:40:10,599 - root - INFO - 使用模型: deepseek-chat, API密钥设置: 已设置
+2026-01-04 12:40:10,600 - root - INFO - 开始调用generate_nc_from_pdf函数
+2026-01-04 12:40:10,600 - root - INFO - 开始处理输入文件...
+2026-01-04 12:40:10,600 - root - INFO - 使用大模型直接生成NC程序，PDF/3D模型特征仅作为辅助参考...
+2026-01-04 12:40:10,623 - src.modules.ai_driven_generator - INFO - 使用几何推理引擎分析特征...
+2026-01-04 12:40:10,623 - src.modules.ai_driven_generator - INFO - 使用智能提示词构建器整合多源信息...
+2026-01-04 12:40:14,332 - src.modules.prompt_builder - WARNING - 处理PDF图纸时出错: 'NoneType' object is not iterable
+2026-01-04 12:40:14,337 - src.modules.ai_driven_generator - INFO - 使用大模型生成NC程序...
+2026-01-04 12:40:14,337 - src.modules.ai_driven_generator - INFO - 检测到API密钥，使用模型: deepseek-chat
+2026-01-04 12:40:17,073 - src.modules.ai_driven_generator - INFO - 使用DeepSeek API: https://api.deepseek.com
+2026-01-04 12:40:22,202 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"

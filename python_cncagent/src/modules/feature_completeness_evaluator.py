@@ -305,6 +305,21 @@ class FeatureCompletenessEvaluator:
                         continue
                 missing_info.append(message)
         
+        # 添加安全性相关的检查，确保关键安全信息不缺失
+        safety_patterns = [
+            (r'(?:安全|safe|防护)', 'safety', '缺少安全相关要求'),
+            (r'(?:冷却|切削液|coolant)', 'coolant', '缺少冷却液相关要求'),
+            (r'(?:夹紧|装夹|clamping)', 'clamping', '缺少装夹相关要求'),
+        ]
+        
+        for pattern, key, message in safety_patterns:
+            if key not in missing_info and not re.search(pattern, user_description, re.IGNORECASE):
+                # 检查是否在其他结果中已有相关信息
+                if key == 'clamping' and ('clamping_suggestions' in geometric_result or 
+                                          'clamping' in str(geometric_result.get('quality', 0))):
+                    continue
+                missing_info.append(message)
+        
         # 如果没有任何缺失信息，但整体质量较低，添加一般性提示
         if not missing_info:
             if (geometric_result['quality'] < 0.7 or 

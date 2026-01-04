@@ -6,19 +6,34 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import numpy as np
-try:
-    import open3d as o3d
-    OPEN3D_AVAILABLE = True
-except ImportError:
+import sys
+
+# 检查Python版本，因为Open3D对Python 3.14的支持可能有限
+python_version = sys.version_info
+if python_version >= (3, 14):
+    print(f"警告: 当前Python版本 {python_version.major}.{python_version.minor} 可能不被Open3D完全支持")
     OPEN3D_AVAILABLE = False
-    print("警告: 未安装open3d库，3D查看功能将受限")
+else:
+    try:
+        import open3d as o3d
+        OPEN3D_AVAILABLE = True
+    except ImportError:
+        OPEN3D_AVAILABLE = False
+        print("警告: 未安装open3d库，3D查看功能将受限")
+    except Exception as e:
+        OPEN3D_AVAILABLE = False
+        print(f"警告: Open3D库加载失败，可能是Python版本兼容性问题: {str(e)}")
 
 try:
+    # trimesh通常对新版本Python有更好的支持
     import trimesh
+    # 验证trimesh是否可以正常使用
+    _ = trimesh.Trimesh()
     TRIMESH_AVAILABLE = True
-except ImportError:
+    print("✓ trimesh库可用")
+except Exception as e:
     TRIMESH_AVAILABLE = False
-    print("警告: 未安装trimesh库，部分3D功能将受限")
+    print(f"警告: trimesh库不可用，部分3D功能将受限: {str(e)}")
 
 
 class Enhanced3DViewer:
@@ -76,6 +91,15 @@ class Enhanced3DViewer:
                 self.geometry = None
         else:
             # 如果没有open3d，仍然记录模型路径
+            # 检查是否可以使用trimesh处理模型
+            if TRIMESH_AVAILABLE:
+                try:
+                    import trimesh
+                    # 验证是否可以加载模型
+                    mesh = trimesh.load(model_path)
+                    print(f"模型加载成功，顶点数: {len(mesh.vertices)}, 面数: {len(mesh.faces)}")
+                except Exception as e:
+                    print(f"使用trimesh加载模型失败: {str(e)}")
             self.geometry = None
     
     def create_interactive_window(self):
@@ -176,10 +200,20 @@ class AIEnhanced3DAnalyzer:
         """
         try:
             # 使用trimesh加载模型进行分析
-            if not TRIMESH_AVAILABLE:
+            # 检查trimesh是否可用（再次验证）
+            trimesh_available_local = False
+            try:
+                import trimesh
+                # 尝试创建一个简单的trimesh对象来确认库工作正常
+                _ = trimesh.Trimesh()
+                trimesh_available_local = True
+            except:
+                trimesh_available_local = False
+            
+            if not trimesh_available_local:
+                print("警告: trimesh库不可用，使用降级分析")
                 return self._fallback_analysis(model_path)
             
-            import trimesh
             mesh = trimesh.load(model_path)
             
             # 获取基本模型信息
@@ -230,38 +264,51 @@ class AIEnhanced3DAnalyzer:
         """
         features = []
         
-        # 分析边界框和尺寸
-        if mesh.bounds is not None:
-            min_bound, max_bound = mesh.bounds
-            dimensions = max_bound - min_bound
-            features.append({
-                'type': 'bounding_box',
-                'dimensions': dimensions.tolist(),
-                'min_bound': min_bound.tolist(),
-                'max_bound': max_bound.tolist()
-            })
-        
-        # 检测平面
         try:
-            plane_origins, plane_normals, plane_eq = mesh.face_adjacency_unshared
-            # 计算平面数量（近似）
-            planar_regions = len(np.unique(plane_eq, axis=0)) if len(plane_eq) > 0 else 0
-            features.append({
-                'type': 'planar_regions',
-                'count': planar_regions
-            })
-        except:
-            pass
-        
-        # 检测孔和凹陷
-        if hasattr(mesh, 'faces') and len(mesh.faces) > 0:
-            # 通过检查边界边来检测孔
-            boundary_edges = mesh.edges[mesh.edges_unique_inverse[mesh.edges_face_count == 1]]
-            hole_count = len(boundary_edges) // 2 if len(boundary_edges) > 0 else 0
-            features.append({
-                'type': 'potential_holes',
-                'count': hole_count
-            })
+            # 分析边界框和尺寸
+            if hasattr(mesh, 'bounds') and mesh.bounds is not None:
+                min_bound, max_bound = mesh.bounds
+                dimensions = max_bound - min_bound
+                features.append({
+                    'type': 'bounding_box',
+                    'dimensions': dimensions.tolist(),
+                    'min_bound': min_bound.tolist(),
+                    'max_bound': max_bound.tolist()
+                })
+            
+            # 分析体积和表面积
+            if hasattr(mesh, 'volume'):
+                features.append({
+                    'type': 'volume',
+                    'value': mesh.volume
+                })
+            
+            if hasattr(mesh, 'area'):
+                features.append({
+                    'type': 'surface_area',
+                    'value': mesh.area
+                })
+            
+            # 分析几何基元
+            if TRIMESH_AVAILABLE:
+                # 检测可能的几何基元
+                try:
+                    # 检测基本形状近似
+                    extents = mesh.extents if hasattr(mesh, 'extents') else (mesh.bounds[1] - mesh.bounds[0]) if hasattr(mesh, 'bounds') and mesh.bounds is not None else None
+                    if extents is not None:
+                        # 检查是否接近立方体或圆柱体
+                        ratios = sorted(extents / min(extents + [0.0001])) if isinstance(extents, (list, np.ndarray)) else [1, 1, 1]
+                        if len(ratios) >= 3 and all(0.8 < r < 1.2 for r in ratios[:3]):
+                            features.append({'type': 'possibly_spherical', 'confidence': 0.7})
+                        
+                        # 检查是否接近立方体
+                        if extents is not None and len(extents) >= 3:
+                            if all(0.7 < extents[i]/extents[j] < 1.3 for i in range(3) for j in range(i+1, 3)):
+                                features.append({'type': 'possibly_cubic', 'confidence': 0.8})
+                except:
+                    pass  # 忽略几何基元检测错误
+        except Exception as e:
+            print(f"几何特征分析出错: {str(e)}")
         
         return features
     

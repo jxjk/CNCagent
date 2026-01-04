@@ -5,11 +5,11 @@ AI驱动的NC程序生成模块
 import json
 import logging
 import time
+import os
+import re
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from pathlib import Path
-import requests
-import openai
 
 # 仅保留必要的库导入，减少对传统CV库的依赖
 try:
@@ -31,7 +31,6 @@ except ImportError:
 
 # 不再导入OpenCV和numpy，因为我们现在使用大模型进行特征识别
 from .prompt_builder import prompt_builder
-from .geometric_reasoning_engine import geometric_reasoning_engine
 
 @dataclass
 class ProcessingRequirements:
@@ -58,10 +57,10 @@ class AIDrivenCNCGenerator:
     重构：完全以大模型为中心，使用智能提示词构建器整合OCR、图纸、3D模型特征
     """
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "deepseek-chat"):
         self.logger = logging.getLogger(__name__)
-        self.api_key = api_key
-        self.model = model
+        self.api_key = api_key or os.getenv('DEEPSEEK_API_KEY') or os.getenv('OPENAI_API_KEY')
+        self.model = model or os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
         self.ocr_engine = None
         self.feature_analyzer = None
         
@@ -861,6 +860,9 @@ class AIDrivenCNCGenerator:
             str: 生成的NC程序代码
         """
         try:
+            # 输入验证和安全检查
+            self._validate_inputs(user_prompt, pdf_path, image_path, model_3d_path)
+            
             # 步骤1: 提取PDF特征信息
             pdf_features = {}
             if pdf_path:
@@ -905,6 +907,62 @@ class AIDrivenCNCGenerator:
                 "M30 (PROGRAM END)"
             ]
             return "\n".join(error_program)
+    
+    def _validate_inputs(self, user_prompt: str, pdf_path: Optional[str], image_path: Optional[str], model_3d_path: Optional[str]) -> None:
+        """
+        验证输入参数的安全性
+        
+        Args:
+            user_prompt: 用户需求描述
+            pdf_path: PDF图纸路径
+            image_path: 图像文件路径
+            model_3d_path: 3D模型文件路径
+            
+        Raises:
+            ValueError: 输入参数不合法时抛出异常
+        """
+        # 验证用户提示是否为字符串
+        if not isinstance(user_prompt, str):
+            raise ValueError("用户需求描述必须是字符串类型")
+        
+        # 验证长度限制
+        if len(user_prompt) > 5000:  # 限制用户输入长度
+            raise ValueError("用户需求描述长度不能超过5000字符")
+        
+        # 验证文件路径安全性，防止路径遍历攻击
+        if pdf_path:
+            self._validate_file_path(pdf_path, allowed_extensions=['.pdf'])
+        
+        if image_path:
+            self._validate_file_path(image_path, allowed_extensions=['.jpg', '.jpeg', '.png', '.bmp', '.tiff'])
+        
+        if model_3d_path:
+            self._validate_file_path(model_3d_path, allowed_extensions=['.stl', '.step', '.stp', '.igs', '.iges', '.obj', '.ply'])
+    
+    def _validate_file_path(self, file_path: str, allowed_extensions: List[str]) -> None:
+        """
+        验证文件路径的安全性，防止路径遍历攻击
+        
+        Args:
+            file_path: 文件路径
+            allowed_extensions: 允许的文件扩展名列表
+        """
+        if not isinstance(file_path, str):
+            raise ValueError("文件路径必须是字符串类型")
+        
+        # 检查是否包含路径遍历字符
+        if '..' in file_path or '../' in file_path or '/..' in file_path:
+            raise ValueError(f"文件路径包含非法字符，可能存在路径遍历风险: {file_path}")
+        
+        # 检查文件扩展名
+        path = Path(file_path)
+        if path.suffix.lower() not in allowed_extensions:
+            raise ValueError(f"不支持的文件格式: {path.suffix.lower()}. 支持的格式: {', '.join(allowed_extensions)}")
+        
+        # 检查路径是否在允许的目录范围内
+        # 这里可以根据实际需要增加更严格的路径验证
+        if not path.exists():
+            raise ValueError(f"文件不存在: {file_path}")
 
 # 全局实例
 ai_generator = AIDrivenCNCGenerator()

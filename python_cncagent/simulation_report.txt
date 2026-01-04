@@ -1,7 +1,7 @@
 ============================================================
 CNC 加工模拟报告
 ============================================================
-生成时间: 2025-12-31 10:43:35
+生成时间: 2026-01-04 12:42:05
 
 识别出的几何特征:
 ------------------------------
@@ -17,34 +17,34 @@ CNC 加工模拟报告
 
 NC程序统计:
 ------------------------------
-总行数: 203
-G代码行数: 35
-M代码行数: 12
+总行数: 168
+G代码行数: 33
+M代码行数: 9
 换刀次数: 2
 
 NC程序预览 (前20行):
 ------------------------------
   %
-  O1000(120X18X18 SLOT MILLING - S45C)
-  (========================================)
-  (PROGRAMMER: FANUC EXPERT)
+  O1000 (MAIN PROGRAM - 120X18 SLOT MILLING)
+  (PROGRAMMER: EXPERT CNC)
   (DATE: 2023-10-27)
-  (MACHINE: VMC WITH FANUC CONTROL)
-  (MATERIAL: S45C STEEL)
-  (FEATURE: RECTANGULAR SLOT)
-  (DIMENSIONS: 120 X 18 X 18 DEEP)
-  (LOCATION: LOWER LEFT CORNER AT X0 Y7)
-  (TOOLS: T01 - 32MM ROUGHING END MILL)
-  (       T02 - 25MM FINISHING END MILL)
-  (========================================)
+  (MATERIAL: S45C)
+  (TOOL LIST:)
+  (T01: D12 4FLUTE CARBIDE ENDMILL - ROUGHING)
+  (T02: D10 4FLUTE CARBIDE ENDMILL - FINISHING)
   
-  (********** SAFETY & INITIALIZATION **********)
-  G00 G17 G40 G49 G80 G90 G94 G98
-  (SAFE STARTUP - CANCEL ALL MODALS)
-  G91 G28 Z0
-  (REFERENCE RETURN IN Z)
-  G91 G28 X0 Y0
-  ... 还有 183 行
+  (--- SAFETY INITIALIZATION ---)
+  G90 G94 G80 G40 G49 G17 G21 (ABSOLUTE, FEED PER MIN, CANCEL CYCLES, CANCEL OFFSETS, METRIC)
+  G91 G28 Z0.0 (RETURN TO Z HOME)
+  G91 G28 X0.0 Y0.0 (RETURN TO X,Y HOME)
+  G90 (ABSOLUTE MODE)
+  
+  (--- SET WORK COORDINATE SYSTEM G54 ---)
+  (ASSUME WORKPIECE ZERO AT LOWER LEFT CORNER OF THE SLOT: X0,Y7,Z0)
+  G54
+  
+  (--- TOOL CHANGE : T01 - ROUGHING ---)
+  ... 还有 148 行
 
 ============================================================
 报告结束

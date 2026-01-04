@@ -238,23 +238,45 @@ class RequirementClarifier:
         
         for info_type in missing_info:
             if info_type == '加工类型':
-                questions.append("请问具体需要进行什么类型的加工？例如：钻孔、铣削、沉孔等。")
+                questions.append("请问具体需要进行什么类型的加工？例如：钻孔、铣削、沉孔、攻丝等。")
             elif info_type == '材料规格':
-                questions.append("请提供工件的材料信息，例如：45#钢、铝合金、不锈钢等。")
+                questions.append("请提供工件的材料信息，例如：45#钢、铝合金、不锈钢等，以便确定合适的加工参数。")
             elif info_type == '加工深度':
                 questions.append("请提供具体的加工深度要求，单位为毫米(mm)。")
             elif info_type == '几何尺寸':
-                questions.append("请提供具体的几何尺寸，如孔径、外形尺寸等。")
+                questions.append("请提供具体的几何尺寸，如孔径、外形尺寸等，以确保加工精度。")
             elif info_type == '加工位置':
-                questions.append("请提供加工位置的坐标信息，如X、Y坐标。")
+                questions.append("请提供加工位置的坐标信息，如X、Y坐标，支持多种格式如'X100 Y50'或'(100,50)'。")
             elif info_type == '加工数量':
-                questions.append("请提供需要加工的数量。")
+                questions.append("请提供需要加工的数量，这有助于优化加工路径和效率。")
             elif info_type == '尺寸公差':
-                questions.append("请提供尺寸公差要求，如±0.1mm。")
+                questions.append("请提供尺寸公差要求，如±0.1mm，以便选择合适的加工工艺。")
+            elif info_type == '缺少孔位置坐标信息':
+                questions.append("请提供孔位坐标信息，如'X100 Y50'或'位置(100,50)'，以便精确定位。")
+            elif info_type == '缺少加工深度信息':
+                questions.append("请提供加工深度信息，如'深度20mm'或'深20'，以确保加工到位。")
+            elif info_type == '缺少直径尺寸信息':
+                questions.append("请提供直径尺寸信息，如'φ22沉孔'或'直径22mm'，以便选择合适的刀具。")
+            elif info_type == '缺少材料信息':
+                questions.append("请提供材料信息，如'铝合金'或'45#钢'，以便设置合适的切削参数。")
+            elif info_type == '缺少主轴转速信息':
+                questions.append("请提供主轴转速要求，如'S800'或'转速800'，或允许系统根据材料自动计算。")
+            elif info_type == '缺少进给速度信息':
+                questions.append("请提供进给速度要求，如'F100'或'进给100'，或允许系统根据工艺自动计算。")
+            elif info_type == '缺少安全相关要求':
+                questions.append("请提供安全相关要求，如是否需要冷却液、特殊装夹要求等。")
+            elif info_type == '缺少冷却液相关要求':
+                questions.append("请说明是否需要使用冷却液，以及冷却液类型。")
+            elif info_type == '缺少装夹相关要求':
+                questions.append("请提供装夹要求，如装夹位置、夹紧力等，特别是对于多面加工。")
         
         # 如果原始提示中提到图纸，建议上传图纸
         if any(keyword in original_prompt.lower() for keyword in ['图纸', '图', 'drawing', 'pdf']):
             questions.insert(0, "如果有详细的技术图纸，请提供PDF文件，我可以从中提取详细的技术信息。")
+        
+        # 如果原始提示中提到3D模型，建议上传模型文件
+        if any(keyword in original_prompt.lower() for keyword in ['3d', '三维', '立体', 'stl', 'step', '模型']):
+            questions.append("如果有助理解几何特征的3D模型文件（STL、STEP等格式），请提供以便更精确地分析加工特征。")
         
         return questions
     

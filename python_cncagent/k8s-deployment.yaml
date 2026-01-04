@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cnc-agent-deployment
+  labels:
+    app: cnc-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cnc-agent
+  template:
+    metadata:
+      labels:
+        app: cnc-agent
+    spec:
+      containers:
+      - name: cnc-agent
+        image: cncagent/cnc-agent:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: DEEPSEEK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cnc-agent-secrets
+              key: deepseek-api-key
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cnc-agent-secrets
+              key: openai-api-key
+        - name: PORT
+          value: "5000"
+        volumeMounts:
+        - name: logs-volume
+          mountPath: /app/logs
+        - name: workspace-volume
+          mountPath: /app/workspace
+        - name: temp-volume
+          mountPath: /app/temp
+      volumes:
+      - name: logs-volume
+        persistentVolumeClaim:
+          claimName: cnc-agent-logs-pvc
+      - name: workspace-volume
+        persistentVolumeClaim:
+          claimName: cnc-agent-workspace-pvc
+      - name: temp-volume
+        emptyDir: {}

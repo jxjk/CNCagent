@@ -398,22 +398,79 @@ class Model3DProcessor:
                     'description': '立方体特征，适合铣削加工',
                     'confidence': 0.85
                 })
+            elif prim.get('type') == 'sphere_approximation':
+                mfg_features.append({
+                    'type': 'machining_operation',
+                    'operation': '3D contour milling',
+                    'feature_id': f'sphere_{i}',
+                    'tool_recommendation': 'ball end mill',
+                    'description': '球面特征，需要3D轮廓铣削',
+                    'confidence': 0.8
+                })
+            elif prim.get('type') == 'cone_approximation':
+                mfg_features.append({
+                    'type': 'machining_operation',
+                    'operation': 'tapered cutting',
+                    'feature_id': f'cone_{i}',
+                    'tool_recommendation': 'tapered end mill or ball mill',
+                    'description': '锥面特征，需要锥度加工',
+                    'confidence': 0.75
+                })
         
         # 分析壁厚等加工约束
-        if hasattr(model, 'face_normals') and hasattr(model, 'vertices'):
-            try:
-                # 计算近似的壁厚
-                extents = features.get('bounding_box', {}).get('size', [1, 1, 1])
-                min_extent = min(extents) if extents else 1
+        try:
+            # 如果模型有面的信息，可以进行更详细的壁厚分析
+            if hasattr(model, 'faces') or 'faces_count' in features:
+                # 尝试从网格数据估算壁厚
+                avg_edge_length = 0
+                if hasattr(model, 'edges') and len(model.edges) > 0:
+                    # 计算平均边长作为壁厚参考
+                    edge_lengths = []
+                    for edge in model.edges:
+                        if len(edge) >= 2:
+                            # 这取决于模型的具体结构
+                            pass
+                    if edge_lengths:
+                        avg_edge_length = sum(edge_lengths) / len(edge_lengths)
+                
+                # 估算最小壁厚
+                if features.get('volume', 0) > 0 and features.get('surface_area', 0) > 0:
+                    estimated_thickness = 2 * features['volume'] / features['surface_area']
+                    mfg_features.append({
+                        'type': 'manufacturing_constraint',
+                        'constraint': 'estimated_wall_thickness',
+                        'estimated_value': estimated_thickness,
+                        'description': f'估算的平均壁厚为{estimated_thickness:.2f}mm，影响加工策略',
+                        'confidence': 0.7
+                    })
+        except:
+            # 如果无法估算壁厚，则跳过
+            pass
+        
+        # 检测内部结构和加工可达性
+        if 'volume' in features and 'surface_area' in features:
+            # 通过体积与表面积比值判断内部结构复杂性
+            vol_to_area_ratio = features['volume'] / features['surface_area'] if features['surface_area'] > 0 else 0
+            if vol_to_area_ratio < 0.1:  # 比值小可能意味着内部结构复杂
                 mfg_features.append({
                     'type': 'manufacturing_constraint',
-                    'constraint': 'minimum_wall_thickness',
-                    'estimated_value': min_extent * 0.1,  # 简单估算
-                    'description': '估算的最小壁厚，影响刀具选择和加工策略',
-                    'confidence': 0.6
+                    'constraint': 'internal_geometry_complexity',
+                    'description': '内部几何结构可能较复杂，需注意刀具可达性',
+                    'confidence': 0.7
                 })
-            except:
-                pass
+        
+        # 检测是否有深腔结构
+        bounding_box_size = features.get('bounding_box', {}).get('size', [1, 1, 1])
+        if len(bounding_box_size) >= 3:
+            max_dimension = max(bounding_box_size)
+            min_dimension = min(bounding_box_size)
+            if max_dimension / min_dimension > 10:  # 长宽比很大，可能是深腔
+                mfg_features.append({
+                    'type': 'manufacturing_constraint',
+                    'constraint': 'deep_cavity_structure',
+                    'description': '存在深腔结构，加工中需注意排屑和刀具刚性',
+                    'confidence': 0.8
+                })
         
         return mfg_features
     
